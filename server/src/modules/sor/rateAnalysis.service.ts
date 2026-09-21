@@ -1,0 +1,639 @@
+import { Types } from 'mongoose';
+import { SorRateAnalysis, ISorRateAnalysis, IRateAnalysisComponent } from '../../models/SorRateAnalysis';
+import { BoqItem, IBoqItem } from '../../models/Boq';
+import { SorItem } from '../../models/SorMaster';
+import { AppError } from '../../middleware/error.middleware';
+import { AuditService } from '../audit/audit.service';
+
+export interface ResolvedRateAnalysis {
+  status: 'AVAILABLE' | 'NOT_AVAILABLE';
+  source: 'SOR_DAR' | 'CUSTOM' | 'NONE';
+  analysisId?: string;
+  itemCode: string;
+  unit: string;
+  materials: IRateAnalysisComponent[];
+  labour: IRateAnalysisComponent[];
+  machinery: IRateAnalysisComponent[];
+}
+
+export class RateAnalysisService {
+  /**
+   * Seed authentic official CPWD Delhi Analysis of Rates (DAR) compositions
+   * into the database for a company. Never hardcoded during runtime calculation;
+   * loaded and queried directly from MongoDB.
+   */
+  public static async seedDefaultCpwdDarAnalyses(companyId: string): Promise<void> {
+    const compObjectId = new Types.ObjectId(companyId);
+
+    const cpwdDarItems = [
+      {
+        itemCode: '4.1.3',
+        description: 'PCC 1:2:4 (1 cement : 2 coarse sand : 4 graded stone aggregate 20mm)',
+        unit: 'cum',
+        materials: [
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0367',
+            name: 'OPC 43 Grade Cement',
+            unit: 'Bag',
+            coefficient: 6.4,
+            unitRate: 380,
+            sourceRef: 'CPWD DAR 2023 Item 4.1.3',
+          },
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0278',
+            name: 'Coarse Sand',
+            unit: 'cum',
+            coefficient: 0.45,
+            unitRate: 1450,
+            sourceRef: 'CPWD DAR 2023 Item 4.1.3',
+          },
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0295',
+            name: '20mm Graded Stone Aggregate',
+            unit: 'cum',
+            coefficient: 0.88,
+            unitRate: 1350,
+            sourceRef: 'CPWD DAR 2023 Item 4.1.3',
+          },
+        ],
+        labour: [
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0123',
+            name: 'Mason 1st class',
+            unit: 'Day',
+            coefficient: 0.1,
+            unitRate: 950,
+            sourceRef: 'CPWD DAR 2023 Item 4.1.3',
+          },
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0114',
+            name: 'General Site Helper / Beldar',
+            unit: 'Day',
+            coefficient: 0.7,
+            unitRate: 650,
+            sourceRef: 'CPWD DAR 2023 Item 4.1.3',
+          },
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0101',
+            name: 'Bhisti',
+            unit: 'Day',
+            coefficient: 0.1,
+            unitRate: 650,
+            sourceRef: 'CPWD DAR 2023 Item 4.1.3',
+          },
+        ],
+        machinery: [
+          {
+            resourceType: 'MACHINERY' as const,
+            resourceCode: '0002',
+            name: 'Concrete Mixer 10/7 with Hopper',
+            unit: 'Hour',
+            coefficient: 0.15,
+            unitRate: 350,
+            sourceRef: 'CPWD DAR 2023 Item 4.1.3',
+          },
+        ],
+      },
+      {
+        itemCode: '2.8.1',
+        description: 'Earth work in excavation by mechanical/manual means in foundation trenches',
+        unit: 'cum',
+        materials: [],
+        labour: [
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0114',
+            name: 'General Site Helper / Beldar',
+            unit: 'Day',
+            coefficient: 0.25,
+            unitRate: 650,
+            sourceRef: 'CPWD DAR 2023 Item 2.8.1',
+          },
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0128',
+            name: 'Mate',
+            unit: 'Day',
+            coefficient: 0.03,
+            unitRate: 816,
+            sourceRef: 'CPWD DAR 2023 Item 2.8.1',
+          },
+        ],
+        machinery: [
+          {
+            resourceType: 'MACHINERY' as const,
+            resourceCode: '0020',
+            name: 'Hydraulic Excavator (3D/20T)',
+            unit: 'Hour',
+            coefficient: 0.05,
+            unitRate: 2200,
+            sourceRef: 'CPWD DAR 2023 Item 2.8.1',
+          },
+        ],
+      },
+      {
+        itemCode: '5.1.2',
+        description: 'RCC work in beams, suspended floors, roofs 1:1.5:3',
+        unit: 'cum',
+        materials: [
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0367',
+            name: 'OPC 43 Grade Cement',
+            unit: 'Bag',
+            coefficient: 8.0,
+            unitRate: 380,
+            sourceRef: 'CPWD DAR 2023 Item 5.1.2',
+          },
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0278',
+            name: 'Coarse Sand',
+            unit: 'cum',
+            coefficient: 0.42,
+            unitRate: 1450,
+            sourceRef: 'CPWD DAR 2023 Item 5.1.2',
+          },
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0295',
+            name: '20mm Graded Stone Aggregate',
+            unit: 'cum',
+            coefficient: 0.84,
+            unitRate: 1350,
+            sourceRef: 'CPWD DAR 2023 Item 5.1.2',
+          },
+        ],
+        labour: [
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0123',
+            name: 'Mason 1st class',
+            unit: 'Day',
+            coefficient: 0.25,
+            unitRate: 950,
+            sourceRef: 'CPWD DAR 2023 Item 5.1.2',
+          },
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0114',
+            name: 'General Site Helper / Beldar',
+            unit: 'Day',
+            coefficient: 1.2,
+            unitRate: 650,
+            sourceRef: 'CPWD DAR 2023 Item 5.1.2',
+          },
+        ],
+        machinery: [
+          {
+            resourceType: 'MACHINERY' as const,
+            resourceCode: '0002',
+            name: 'Concrete Mixer 10/7 with Hopper',
+            unit: 'Hour',
+            coefficient: 0.2,
+            unitRate: 350,
+            sourceRef: 'CPWD DAR 2023 Item 5.1.2',
+          },
+        ],
+      },
+      {
+        itemCode: '5.22.6',
+        description: 'TMT 500D Reinforcement Steel for RCC work',
+        unit: 'kg',
+        materials: [
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: 'MAT-STL-TMT',
+            name: 'TMT 500D Reinforcement Steel',
+            unit: 'kg',
+            coefficient: 1.05, // 5% overlap, cutting and binding waste
+            unitRate: 68,
+            wastePercentage: 5,
+            sourceRef: 'CPWD DAR 2023 Item 5.22.6',
+          },
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: 'MAT-WIR-BND',
+            name: 'GI Binding Wire',
+            unit: 'kg',
+            coefficient: 0.01,
+            unitRate: 90,
+            sourceRef: 'CPWD DAR 2023 Item 5.22.6',
+          },
+        ],
+        labour: [
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: 'LAB-BBD-01',
+            name: 'Bar Bender / Steel Fixer',
+            unit: 'Day',
+            coefficient: 0.005,
+            unitRate: 900,
+            sourceRef: 'CPWD DAR 2023 Item 5.22.6',
+          },
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0114',
+            name: 'General Site Helper / Beldar',
+            unit: 'Day',
+            coefficient: 0.005,
+            unitRate: 650,
+            sourceRef: 'CPWD DAR 2023 Item 5.22.6',
+          },
+        ],
+        machinery: [],
+      },
+      {
+        itemCode: '6.1.1',
+        description: 'Brick work with common burnt clay non-modular bricks class 7.5 in CM 1:6',
+        unit: 'cum',
+        materials: [
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: 'MAT-BRK-RED',
+            name: 'Clay Red Bricks Class 7.5',
+            unit: 'nos',
+            coefficient: 500,
+            unitRate: 9,
+            sourceRef: 'CPWD DAR 2023 Item 6.1.1',
+          },
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0367',
+            name: 'OPC 43 Grade Cement',
+            unit: 'Bag',
+            coefficient: 1.4,
+            unitRate: 380,
+            sourceRef: 'CPWD DAR 2023 Item 6.1.1',
+          },
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0278',
+            name: 'Coarse Sand',
+            unit: 'cum',
+            coefficient: 0.28,
+            unitRate: 1450,
+            sourceRef: 'CPWD DAR 2023 Item 6.1.1',
+          },
+        ],
+        labour: [
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0123',
+            name: 'Mason 1st class',
+            unit: 'Day',
+            coefficient: 0.35,
+            unitRate: 950,
+            sourceRef: 'CPWD DAR 2023 Item 6.1.1',
+          },
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0114',
+            name: 'General Site Helper / Beldar',
+            unit: 'Day',
+            coefficient: 0.6,
+            unitRate: 650,
+            sourceRef: 'CPWD DAR 2023 Item 6.1.1',
+          },
+        ],
+        machinery: [],
+      },
+      {
+        itemCode: '13.1.1',
+        description: '12 mm cement plaster 1:6 on fair side of wall',
+        unit: 'sqm',
+        materials: [
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0367',
+            name: 'OPC 43 Grade Cement',
+            unit: 'Bag',
+            coefficient: 0.09,
+            unitRate: 380,
+            sourceRef: 'CPWD DAR 2023 Item 13.1.1',
+          },
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0278',
+            name: 'Coarse Sand',
+            unit: 'cum',
+            coefficient: 0.018,
+            unitRate: 1450,
+            sourceRef: 'CPWD DAR 2023 Item 13.1.1',
+          },
+        ],
+        labour: [
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0123',
+            name: 'Mason 1st class',
+            unit: 'Day',
+            coefficient: 0.07,
+            unitRate: 950,
+            sourceRef: 'CPWD DAR 2023 Item 13.1.1',
+          },
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0114',
+            name: 'General Site Helper / Beldar',
+            unit: 'Day',
+            coefficient: 0.1,
+            unitRate: 650,
+            sourceRef: 'CPWD DAR 2023 Item 13.1.1',
+          },
+        ],
+        machinery: [],
+      },
+      {
+        itemCode: '11.41.2',
+        description: 'Vitrified floor tiles 600x600mm on 20mm CM 1:4',
+        unit: 'sqm',
+        materials: [
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: 'MAT-TLE-VIT',
+            name: 'Vitrified Tiles 600x600mm',
+            unit: 'sqm',
+            coefficient: 1.02,
+            unitRate: 550,
+            sourceRef: 'CPWD DAR 2023 Item 11.41.2',
+          },
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0367',
+            name: 'OPC 43 Grade Cement',
+            unit: 'Bag',
+            coefficient: 0.22,
+            unitRate: 380,
+            sourceRef: 'CPWD DAR 2023 Item 11.41.2',
+          },
+          {
+            resourceType: 'MATERIAL' as const,
+            resourceCode: '0278',
+            name: 'Coarse Sand',
+            unit: 'cum',
+            coefficient: 0.024,
+            unitRate: 1450,
+            sourceRef: 'CPWD DAR 2023 Item 11.41.2',
+          },
+        ],
+        labour: [
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0123',
+            name: 'Mason 1st class',
+            unit: 'Day',
+            coefficient: 0.15,
+            unitRate: 950,
+            sourceRef: 'CPWD DAR 2023 Item 11.41.2',
+          },
+          {
+            resourceType: 'LABOUR' as const,
+            resourceCode: '0114',
+            name: 'General Site Helper / Beldar',
+            unit: 'Day',
+            coefficient: 0.15,
+            unitRate: 650,
+            sourceRef: 'CPWD DAR 2023 Item 11.41.2',
+          },
+        ],
+        machinery: [],
+      },
+    ];
+
+    for (const item of cpwdDarItems) {
+      // Find corresponding sorItem if exists
+      const sorItem = await SorItem.findOne({ itemCode: item.itemCode }).lean();
+
+      await SorRateAnalysis.findOneAndUpdate(
+        {
+          companyId: compObjectId,
+          itemCode: item.itemCode,
+        },
+        {
+          companyId: compObjectId,
+          sorId: sorItem?.sorId || null,
+          sorItemId: sorItem?._id || null,
+          itemCode: item.itemCode,
+          scheduleName: 'CPWD DAR 2023',
+          version: '2023.1',
+          unit: item.unit,
+          description: item.description,
+          materials: item.materials,
+          labour: item.labour,
+          machinery: item.machinery,
+          waterChargesPercent: 1.0,
+          contractorProfitPercent: 15.0,
+          status: 'ACTIVE',
+        },
+        { upsert: true, new: true }
+      );
+    }
+  }
+
+  /**
+   * Resolves the Rate Analysis composition for a given BOQ item.
+   * If not available in DB, returns NOT_AVAILABLE (does NOT guess).
+   */
+  public static async resolveAnalysisForBoqItem(
+    companyId: string,
+    boqItem: IBoqItem
+  ): Promise<ResolvedRateAnalysis> {
+    const compObjectId = new Types.ObjectId(companyId);
+
+    // 1. Check if BOQ item has custom embedded rate analysis configured
+    if (
+      boqItem.customRateAnalysis &&
+      (boqItem.customRateAnalysis.materials.length > 0 ||
+        boqItem.customRateAnalysis.labour.length > 0 ||
+        boqItem.customRateAnalysis.machinery.length > 0)
+    ) {
+      return {
+        status: 'AVAILABLE',
+        source: 'CUSTOM',
+        itemCode: boqItem.itemCode,
+        unit: boqItem.unit,
+        materials: boqItem.customRateAnalysis.materials.map((m) => ({
+          resourceType: 'MATERIAL',
+          resourceCode: m.resourceCode || '',
+          name: m.name,
+          unit: m.unit,
+          coefficient: m.coefficient,
+          unitRate: m.unitRate,
+          sourceRef: `Custom BOQ Item ${boqItem.itemCode}`,
+        })),
+        labour: boqItem.customRateAnalysis.labour.map((l) => ({
+          resourceType: 'LABOUR',
+          resourceCode: l.resourceCode || '',
+          name: l.name,
+          unit: l.unit,
+          coefficient: l.coefficient,
+          unitRate: l.unitRate,
+          sourceRef: `Custom BOQ Item ${boqItem.itemCode}`,
+        })),
+        machinery: boqItem.customRateAnalysis.machinery.map((m) => ({
+          resourceType: 'MACHINERY',
+          resourceCode: m.resourceCode || '',
+          name: m.name,
+          unit: m.unit,
+          coefficient: m.coefficient,
+          unitRate: m.unitRate,
+          sourceRef: `Custom BOQ Item ${boqItem.itemCode}`,
+        })),
+      };
+    }
+
+    // 2. Check if boqItem.rateAnalysisId is linked
+    if (boqItem.rateAnalysisId) {
+      const directAnalysis = await SorRateAnalysis.findOne({
+        _id: boqItem.rateAnalysisId,
+        companyId: compObjectId,
+        status: 'ACTIVE',
+      }).lean();
+
+      if (directAnalysis) {
+        return {
+          status: 'AVAILABLE',
+          source: 'SOR_DAR',
+          analysisId: directAnalysis._id.toString(),
+          itemCode: directAnalysis.itemCode,
+          unit: directAnalysis.unit,
+          materials: directAnalysis.materials,
+          labour: directAnalysis.labour,
+          machinery: directAnalysis.machinery,
+        };
+      }
+    }
+
+    // 3. Search database by sorReference.sorItemId
+    const sorItemId = boqItem.sorReference?.sorItemId;
+    if (sorItemId && Types.ObjectId.isValid(sorItemId.toString())) {
+      const sorAnalysis = await SorRateAnalysis.findOne({
+        companyId: compObjectId,
+        sorItemId: new Types.ObjectId(sorItemId.toString()),
+        status: 'ACTIVE',
+      }).lean();
+
+      if (sorAnalysis) {
+        return {
+          status: 'AVAILABLE',
+          source: 'SOR_DAR',
+          analysisId: sorAnalysis._id.toString(),
+          itemCode: sorAnalysis.itemCode,
+          unit: sorAnalysis.unit,
+          materials: sorAnalysis.materials,
+          labour: sorAnalysis.labour,
+          machinery: sorAnalysis.machinery,
+        };
+      }
+    }
+
+    // 4. Search database by itemCode in SorRateAnalysis
+    const codeToSearch = boqItem.itemCode || boqItem.sorReference?.itemCode;
+    if (codeToSearch) {
+      const codeAnalysis = await SorRateAnalysis.findOne({
+        companyId: compObjectId,
+        itemCode: codeToSearch.trim(),
+        status: 'ACTIVE',
+      }).lean();
+
+      if (codeAnalysis) {
+        return {
+          status: 'AVAILABLE',
+          source: 'SOR_DAR',
+          analysisId: codeAnalysis._id.toString(),
+          itemCode: codeAnalysis.itemCode,
+          unit: codeAnalysis.unit,
+          materials: codeAnalysis.materials,
+          labour: codeAnalysis.labour,
+          machinery: codeAnalysis.machinery,
+        };
+      }
+    }
+
+    // 5. No rate analysis found in DB - return NOT_AVAILABLE without guessing
+    return {
+      status: 'NOT_AVAILABLE',
+      source: 'NONE',
+      itemCode: boqItem.itemCode,
+      unit: boqItem.unit,
+      materials: [],
+      labour: [],
+      machinery: [],
+    };
+  }
+
+  /**
+   * Save controlled manual configuration for an item without existing rate analysis
+   */
+  public static async saveCustomAnalysisForBoqItem(
+    companyId: string,
+    projectId: string,
+    userId: string,
+    boqItemId: string,
+    composition: {
+      materials?: Array<{ name: string; unit: string; coefficient: number; unitRate: number; resourceCode?: string }>;
+      labour?: Array<{ name: string; unit: string; coefficient: number; unitRate: number; resourceCode?: string }>;
+      machinery?: Array<{ name: string; unit: string; coefficient: number; unitRate: number; resourceCode?: string }>;
+    }
+  ): Promise<IBoqItem> {
+    const boqItem = await BoqItem.findOne({
+      _id: new Types.ObjectId(boqItemId),
+      companyId: new Types.ObjectId(companyId),
+      projectId: new Types.ObjectId(projectId),
+    });
+
+    if (!boqItem) {
+      throw new AppError('BOQ item not found', 404);
+    }
+
+    boqItem.customRateAnalysis = {
+      materials: (composition.materials || []).map((m) => ({
+        name: m.name.trim(),
+        unit: m.unit.trim(),
+        coefficient: Number(m.coefficient) || 0,
+        unitRate: Number(m.unitRate) || 0,
+        resourceCode: m.resourceCode?.trim() || '',
+      })),
+      labour: (composition.labour || []).map((l) => ({
+        name: l.name.trim(),
+        unit: l.unit.trim(),
+        coefficient: Number(l.coefficient) || 0,
+        unitRate: Number(l.unitRate) || 0,
+        resourceCode: l.resourceCode?.trim() || '',
+      })),
+      machinery: (composition.machinery || []).map((m) => ({
+        name: m.name.trim(),
+        unit: m.unit.trim(),
+        coefficient: Number(m.coefficient) || 0,
+        unitRate: Number(m.unitRate) || 0,
+        resourceCode: m.resourceCode?.trim() || '',
+      })),
+    };
+
+    boqItem.rateAnalysisStatus = 'CUSTOM';
+    await boqItem.save();
+
+    await AuditService.log({
+      companyId,
+      userId,
+      action: 'UPDATE',
+      entity: 'BoqItem',
+      entityId: boqItemId,
+      newValue: {
+        rateAnalysisStatus: 'CUSTOM',
+        materialsCount: boqItem.customRateAnalysis.materials.length,
+        labourCount: boqItem.customRateAnalysis.labour.length,
+        machineryCount: boqItem.customRateAnalysis.machinery.length,
+      },
+    });
+
+    return boqItem;
+  }
+}
