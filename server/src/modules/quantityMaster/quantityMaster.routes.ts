@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { QuantityMasterController } from './quantityMaster.controller';
 import { authenticate } from '../../middleware/auth.middleware';
 import { requireCompany } from '../../middleware/company.middleware';
@@ -43,7 +44,40 @@ router.get('/rate-lists/:id', QuantityMasterController.getRateListById);
 router.put('/rate-lists/:id/overrides', QuantityMasterController.updateRateListOverrides);
 router.delete('/rate-lists/:id', QuantityMasterController.deleteRateList);
 
+import path from 'path';
+
+const uploadMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50 MB
+  },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExts = ['.pdf', '.xlsx', '.xls', '.csv'];
+    const isAllowed =
+      allowedExts.includes(ext) ||
+      file.mimetype === 'application/pdf' ||
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.mimetype === 'application/vnd.ms-excel' ||
+      file.mimetype === 'text/csv';
+
+    if (isAllowed) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, Excel (.xlsx, .xls), and CSV (.csv) files are supported for import'));
+    }
+  },
+});
+
 // Import History
 router.get('/import-history', QuantityMasterController.getImportHistory);
+
+// PDF Import & Bulk Extraction Routes
+router.post(
+  '/import-pdf/parse',
+  uploadMemory.single('file'),
+  QuantityMasterController.parsePdfImport
+);
+router.post('/import-pdf/commit', QuantityMasterController.commitPdfImport);
 
 export default router;

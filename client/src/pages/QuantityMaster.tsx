@@ -46,6 +46,22 @@ import {
   SorImport,
 } from '../types';
 import { cn } from '../utils/cn';
+import {
+  exportMaterialsPdf,
+  exportManpowerPdf,
+  exportMachineryPdf,
+  exportFormulasPdf,
+  exportRateListsPdf,
+  exportMaterialsExcel,
+  exportManpowerExcel,
+  exportMachineryExcel,
+  exportFormulasExcel,
+  exportRateListsExcel,
+} from '../utils/quantityMasterPdfExport';
+import {
+  QuantityMasterPdfImportModal,
+  MasterType,
+} from '../components/quantityMaster/QuantityMasterPdfImportModal';
 
 interface OutletContextType {
   setSidebarOpen: (open: boolean) => void;
@@ -90,11 +106,225 @@ export const QuantityMaster: React.FC = () => {
   const [isRateListModalOpen, setIsRateListModalOpen] = useState(false);
   const [rateListToEdit, setRateListToEdit] = useState<MasterRateList | null>(null);
 
+  // PDF Bulk Import & Export State
+  const [isPdfImportModalOpen, setIsPdfImportModalOpen] = useState(false);
+  const [pdfImportType, setPdfImportType] = useState<MasterType>('materials');
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleOpenPdfImport = (type: MasterType) => {
+    setPdfImportType(type);
+    setIsPdfImportModalOpen(true);
+  };
+
+  // PDF Export Handlers
+  const handleExportMaterials = async () => {
+    try {
+      setIsExportingPdf(true);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (selectedRateListId) params.append('rateListId', selectedRateListId);
+      params.append('page', '1');
+      params.append('limit', '1000');
+      const res = await api.get(`/quantity-master/materials?${params.toString()}`);
+      const items = res.data?.data?.items || materialsData?.items || [];
+      exportMaterialsPdf(items, categoryFilter !== 'all' ? categoryFilter : undefined);
+      showToast(`Exported ${items.length} materials to PDF`);
+    } catch (err) {
+      console.error('Export materials error:', err);
+      showToast('Failed to export materials PDF');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportManpower = async () => {
+    try {
+      setIsExportingPdf(true);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (selectedRateListId) params.append('rateListId', selectedRateListId);
+      params.append('page', '1');
+      params.append('limit', '1000');
+      const res = await api.get(`/quantity-master/manpower?${params.toString()}`);
+      const items = res.data?.data?.items || manpowerData?.items || [];
+      exportManpowerPdf(items, categoryFilter !== 'all' ? categoryFilter : undefined);
+      showToast(`Exported ${items.length} manpower trades to PDF`);
+    } catch (err) {
+      console.error('Export manpower error:', err);
+      showToast('Failed to export manpower PDF');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportMachinery = async () => {
+    try {
+      setIsExportingPdf(true);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (selectedRateListId) params.append('rateListId', selectedRateListId);
+      params.append('page', '1');
+      params.append('limit', '1000');
+      const res = await api.get(`/quantity-master/machinery?${params.toString()}`);
+      const items = res.data?.data?.items || machineryData?.items || [];
+      exportMachineryPdf(items, categoryFilter !== 'all' ? categoryFilter : undefined);
+      showToast(`Exported ${items.length} machinery items to PDF`);
+    } catch (err) {
+      console.error('Export machinery error:', err);
+      showToast('Failed to export machinery PDF');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportFormulas = async () => {
+    try {
+      setIsExportingPdf(true);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (formulaSubTab !== 'all') params.append('typeFilter', formulaSubTab);
+      params.append('page', '1');
+      params.append('limit', '1000');
+      const res = await api.get(`/quantity-master/formulas?${params.toString()}`);
+      const items = res.data?.data?.items || formulasData?.items || [];
+      exportFormulasPdf(items);
+      showToast(`Exported ${items.length} formulas to PDF`);
+    } catch (err) {
+      console.error('Export formulas error:', err);
+      showToast('Failed to export formulas PDF');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportRateLists = async () => {
+    try {
+      setIsExportingPdf(true);
+      const items = rateListsData || [];
+      exportRateListsPdf(items);
+      showToast(`Exported ${items.length} rate lists to PDF`);
+    } catch (err) {
+      console.error('Export rate lists error:', err);
+      showToast('Failed to export rate lists PDF');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  // Excel Export Handlers
+  const handleExportMaterialsExcel = async () => {
+    try {
+      setIsExportingPdf(true);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (selectedRateListId) params.append('rateListId', selectedRateListId);
+      params.append('page', '1');
+      params.append('limit', '1000');
+      const res = await api.get(`/quantity-master/materials?${params.toString()}`);
+      const items = res.data?.data?.items || materialsData?.items || [];
+      exportMaterialsExcel(items);
+      showToast(`Exported ${items.length} materials to Excel`);
+    } catch (err) {
+      console.error('Export materials excel error:', err);
+      showToast('Failed to export materials Excel');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportManpowerExcel = async () => {
+    try {
+      setIsExportingPdf(true);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (selectedRateListId) params.append('rateListId', selectedRateListId);
+      params.append('page', '1');
+      params.append('limit', '1000');
+      const res = await api.get(`/quantity-master/manpower?${params.toString()}`);
+      const items = res.data?.data?.items || manpowerData?.items || [];
+      exportManpowerExcel(items);
+      showToast(`Exported ${items.length} manpower trades to Excel`);
+    } catch (err) {
+      console.error('Export manpower excel error:', err);
+      showToast('Failed to export manpower Excel');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportMachineryExcel = async () => {
+    try {
+      setIsExportingPdf(true);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (selectedRateListId) params.append('rateListId', selectedRateListId);
+      params.append('page', '1');
+      params.append('limit', '1000');
+      const res = await api.get(`/quantity-master/machinery?${params.toString()}`);
+      const items = res.data?.data?.items || machineryData?.items || [];
+      exportMachineryExcel(items);
+      showToast(`Exported ${items.length} machinery items to Excel`);
+    } catch (err) {
+      console.error('Export machinery excel error:', err);
+      showToast('Failed to export machinery Excel');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportFormulasExcel = async () => {
+    try {
+      setIsExportingPdf(true);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (formulaSubTab !== 'all') params.append('typeFilter', formulaSubTab);
+      params.append('page', '1');
+      params.append('limit', '1000');
+      const res = await api.get(`/quantity-master/formulas?${params.toString()}`);
+      const items = res.data?.data?.items || formulasData?.items || [];
+      exportFormulasExcel(items);
+      showToast(`Exported ${items.length} formulas to Excel`);
+    } catch (err) {
+      console.error('Export formulas excel error:', err);
+      showToast('Failed to export formulas Excel');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportRateListsExcel = async () => {
+    try {
+      setIsExportingPdf(true);
+      const items = rateListsData || [];
+      exportRateListsExcel(items);
+      showToast(`Exported ${items.length} rate lists to Excel`);
+    } catch (err) {
+      console.error('Export rate lists excel error:', err);
+      showToast('Failed to export rate lists Excel');
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   const handleTabChange = (tab: TabType) => {
@@ -547,6 +777,32 @@ export const QuantityMaster: React.FC = () => {
               {/* Action Buttons */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
+                  onClick={handleExportMaterialsExcel}
+                  disabled={isExportingPdf}
+                  title="Export Materials to Excel Spreadsheet (.xlsx)"
+                  className="px-3 py-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 border border-emerald-600/40 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Excel</span>
+                </button>
+                <button
+                  onClick={handleExportMaterials}
+                  disabled={isExportingPdf}
+                  title="Export Materials as PDF Document"
+                  className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/80 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <span>PDF</span>
+                </button>
+                <button
+                  onClick={() => handleOpenPdfImport('materials')}
+                  title="Bulk Import Materials from PDF, Excel or CSV"
+                  className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all shadow-sm"
+                >
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Import (PDF/Excel)</span>
+                </button>
+                <button
                   onClick={() => {
                     setMaterialToEdit(null);
                     setIsMaterialModalOpen(true);
@@ -768,16 +1024,45 @@ export const QuantityMaster: React.FC = () => {
                 </select>
               </div>
 
-              <button
-                onClick={() => {
-                  setManpowerToEdit(null);
-                  setIsManpowerModalOpen(true);
-                }}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Manpower</span>
-              </button>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleExportManpowerExcel}
+                  disabled={isExportingPdf}
+                  title="Export Manpower to Excel Spreadsheet (.xlsx)"
+                  className="px-3 py-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 border border-emerald-600/40 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Excel</span>
+                </button>
+                <button
+                  onClick={handleExportManpower}
+                  disabled={isExportingPdf}
+                  title="Export Manpower as PDF Document"
+                  className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/80 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <span>PDF</span>
+                </button>
+                <button
+                  onClick={() => handleOpenPdfImport('manpower')}
+                  title="Bulk Import Manpower from PDF, Excel or CSV"
+                  className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all shadow-sm"
+                >
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Import (PDF/Excel)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setManpowerToEdit(null);
+                    setIsManpowerModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Manpower</span>
+                </button>
+              </div>
             </div>
 
             <div className="rounded-xl border border-slate-800 bg-[#0E1320] overflow-hidden shadow-lg">
@@ -960,16 +1245,45 @@ export const QuantityMaster: React.FC = () => {
                 </select>
               </div>
 
-              <button
-                onClick={() => {
-                  setMachineryToEdit(null);
-                  setIsMachineryModalOpen(true);
-                }}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Machinery</span>
-              </button>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleExportMachineryExcel}
+                  disabled={isExportingPdf}
+                  title="Export Machinery to Excel Spreadsheet (.xlsx)"
+                  className="px-3 py-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 border border-emerald-600/40 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Excel</span>
+                </button>
+                <button
+                  onClick={handleExportMachinery}
+                  disabled={isExportingPdf}
+                  title="Export Machinery as PDF Document"
+                  className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/80 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <span>PDF</span>
+                </button>
+                <button
+                  onClick={() => handleOpenPdfImport('machinery')}
+                  title="Bulk Import Machinery from PDF, Excel or CSV"
+                  className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all shadow-sm"
+                >
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Import (PDF/Excel)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setMachineryToEdit(null);
+                    setIsMachineryModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Machinery</span>
+                </button>
+              </div>
             </div>
 
             <div className="rounded-xl border border-slate-800 bg-[#0E1320] overflow-hidden shadow-lg">
@@ -1131,16 +1445,45 @@ export const QuantityMaster: React.FC = () => {
                 </button>
               </div>
 
-              <button
-                onClick={() => {
-                  setFormulaToEdit(null);
-                  setIsFormulaModalOpen(true);
-                }}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Formula</span>
-              </button>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleExportFormulasExcel}
+                  disabled={isExportingPdf}
+                  title="Export Formulas to Excel Spreadsheet (.xlsx)"
+                  className="px-3 py-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 border border-emerald-600/40 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Excel</span>
+                </button>
+                <button
+                  onClick={handleExportFormulas}
+                  disabled={isExportingPdf}
+                  title="Export Formulas as PDF Document"
+                  className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/80 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <span>PDF</span>
+                </button>
+                <button
+                  onClick={() => handleOpenPdfImport('formulas')}
+                  title="Bulk Import Formulas from PDF, Excel or CSV"
+                  className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all shadow-sm"
+                >
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Import (PDF/Excel)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setFormulaToEdit(null);
+                    setIsFormulaModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Formula</span>
+                </button>
+              </div>
             </div>
 
             {/* Formulas Table */}
@@ -1260,16 +1603,45 @@ export const QuantityMaster: React.FC = () => {
                 </p>
               </div>
 
-              <button
-                onClick={() => {
-                  setRateListToEdit(null);
-                  setIsRateListModalOpen(true);
-                }}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Rate List</span>
-              </button>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleExportRateListsExcel}
+                  disabled={isExportingPdf}
+                  title="Export Rate Lists to Excel Spreadsheet (.xlsx)"
+                  className="px-3 py-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 border border-emerald-600/40 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Excel</span>
+                </button>
+                <button
+                  onClick={handleExportRateLists}
+                  disabled={isExportingPdf}
+                  title="Export Rate Lists as PDF Document"
+                  className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/80 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <span>PDF</span>
+                </button>
+                <button
+                  onClick={() => handleOpenPdfImport('rate-lists')}
+                  title="Bulk Import Rate Lists from PDF, Excel or CSV"
+                  className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all shadow-sm"
+                >
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Import (PDF/Excel)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setRateListToEdit(null);
+                    setIsRateListModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Rate List</span>
+                </button>
+              </div>
             </div>
 
             <div className="rounded-xl border border-slate-800 bg-[#0E1320] overflow-hidden shadow-lg">
@@ -1600,6 +1972,24 @@ export const QuantityMaster: React.FC = () => {
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['qm-rate-lists'] });
             showToast('Rate list saved successfully');
+          }}
+        />
+      )}
+
+      {/* PDF BULK IMPORT & EXTRACTION MODAL */}
+      {isPdfImportModalOpen && (
+        <QuantityMasterPdfImportModal
+          isOpen={isPdfImportModalOpen}
+          initialType={pdfImportType}
+          onClose={() => setIsPdfImportModalOpen(false)}
+          onImportSuccess={(msg) => {
+            queryClient.invalidateQueries({ queryKey: ['qm-materials'] });
+            queryClient.invalidateQueries({ queryKey: ['qm-manpower'] });
+            queryClient.invalidateQueries({ queryKey: ['qm-machinery'] });
+            queryClient.invalidateQueries({ queryKey: ['qm-formulas'] });
+            queryClient.invalidateQueries({ queryKey: ['qm-rate-lists'] });
+            queryClient.invalidateQueries({ queryKey: ['qm-import-history'] });
+            showToast(msg);
           }}
         />
       )}

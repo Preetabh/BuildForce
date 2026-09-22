@@ -283,4 +283,52 @@ export class QuantityMasterController {
       next(err);
     }
   }
+
+  // PDF / Excel / CSV Bulk Extraction
+  public static async parsePdfImport(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ success: false, message: 'Please upload a valid document (PDF, Excel, or CSV)' });
+      }
+
+      const type = (req.body.type || req.query.type || 'materials') as any;
+      const fileName = req.file.originalname || 'document.pdf';
+      const { QuantityMasterPdfService } = await import('./quantityMasterPdf.service');
+      const result = await QuantityMasterPdfService.parseMasterFile(req.file.buffer, fileName, type);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: `Extracted ${result.totalDetected} items (${result.validCount} valid) from ${fileName}`,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // PDF Bulk Ingestion Commit
+  public static async commitPdfImport(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const userId = req.user!.userId;
+      const { type, items, fileName } = req.body;
+
+      const { QuantityMasterPdfService } = await import('./quantityMasterPdf.service');
+      const result = await QuantityMasterPdfService.bulkCommitMaster(
+        companyId,
+        userId,
+        type,
+        items,
+        fileName
+      );
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: result.message,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
