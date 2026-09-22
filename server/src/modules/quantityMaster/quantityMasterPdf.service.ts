@@ -51,11 +51,80 @@ export class QuantityMasterPdfService {
       if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
         throw new AppError('The Excel workbook contains no sheets.', 400);
       }
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      // 1. Smart sheet selection if multiple sheets exist
+      let targetSheetName = workbook.SheetNames[0];
+      const typeKey = type.toLowerCase();
+      for (const name of workbook.SheetNames) {
+        const lower = name.toLowerCase();
+        if (
+          (typeKey === 'formulas' && (lower.includes('formula') || lower.includes('civil'))) ||
+          (typeKey === 'materials' && lower.includes('material')) ||
+          (typeKey === 'manpower' && (lower.includes('manpower') || lower.includes('labour') || lower.includes('labor'))) ||
+          (typeKey === 'machinery' && (lower.includes('machin') || lower.includes('plant') || lower.includes('equip'))) ||
+          (typeKey === 'rate-lists' && lower.includes('rate'))
+        ) {
+          targetSheetName = name;
+          break;
+        }
+      }
+      const sheet = workbook.Sheets[targetSheetName];
+
+      // 2. Locate actual header row (handles banner text or description at row 0)
+      const matrix: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      if (!matrix || matrix.length === 0) {
+        throw new AppError('The Excel sheet contains no rows or data.', 400);
+      }
+
+      const headerKeywords = [
+        'category',
+        'code',
+        'name',
+        'unit',
+        'kind',
+        'resource',
+        'qty',
+        'rate',
+        'material',
+        'labour',
+        'labor',
+        'machinery',
+        'item',
+        'description',
+        'basis',
+        'variable',
+        'specification',
+        'wage',
+        'coverage',
+      ];
+
+      let headerRowIndex = 0;
+      let maxMatches = 0;
+
+      const scanLimit = Math.min(10, matrix.length);
+      for (let r = 0; r < scanLimit; r++) {
+        const rowCells = matrix[r] || [];
+        let matches = 0;
+        for (const cell of rowCells) {
+          const cellStr = String(cell || '').trim().toLowerCase();
+          if (!cellStr) continue;
+          if (headerKeywords.some((kw) => cellStr.includes(kw))) {
+            matches++;
+          }
+        }
+        if (matches > maxMatches && matches >= 2) {
+          maxMatches = matches;
+          headerRowIndex = r;
+        }
+      }
+
+      const rawRows: any[] = XLSX.utils.sheet_to_json(sheet, {
+        range: headerRowIndex,
+        defval: '',
+      });
 
       if (!rawRows || rawRows.length === 0) {
-        throw new AppError('The Excel sheet contains no rows or data.', 400);
+        throw new AppError('The Excel sheet contains no data rows.', 400);
       }
 
       let parsedItems: any[] = [];
@@ -87,7 +156,7 @@ export class QuantityMasterPdfService {
         totalDetected: parsedItems.length,
         validCount,
         items: parsedItems,
-        rawTextPreview: `Excel / CSV (${rawRows.length} rows processed)`,
+        rawTextPreview: `Excel / CSV (${rawRows.length} data rows processed from "${targetSheetName}")`,
       };
     } catch (err: any) {
       console.error('[QuantityMasterPdfService] Excel extraction failed:', err);
@@ -251,11 +320,265 @@ export class QuantityMasterPdfService {
   }
 
   /**
+   * Helper: Parse variables string into key-value map
+   * Example: "dry_fac=1.33; bag_volume=0.035; wastage_pct=5"
+   */
+  private static parseVariables(varString?: string): Record<string, number> {
+    const vars: Record<string, number> = {};
+    if (!varString) return vars;
+
+    const parts = String(varString).split(/[;,\n]/);
+    for (const part of parts) {
+      const [rawKey, rawVal] = part.split('=');
+      if (rawKey && rawVal) {
+        const key = rawKey.trim().toLowerCase();
+        const num = parseFloat(rawVal.trim());
+        if (!isNaN(num)) {
+          vars[key] = num;
+        }
+      }
+    }
+    return vars;
+  }
+
+  /**
+   * Safely evaluate mathematical quantity expression with variables
+   * Example: "500 * (1 + wastage_pct/100)" with { wastage_pct: 5 } -> 525
+   * Example: "0.305 / (1 + 6) / bag_volume" with { bag_volume: 0.035 } -> 1.2449
+   */
+  private static evaluateQuantity(qtyExpr: any, vars: Record<string, number> = {}): number {
+    if (typeof qtyExpr === 'number') {
+      return isNaN(qtyExpr) ? 0 : Number(qtyExpr.toFixed(4));
+    }
+    let expr = String(qtyExpr || '').trim();
+    if (!expr) return 0;
+
+    const directNum = parseFloat(expr);
+    if (!isNaN(directNum) && !/[+\-*/()]/.test(expr)) {
+      return Number(directNum.toFixed(4));
+    }
+
+    // Merge standard construction formula defaults if not supplied
+    const mergedVars: Record<string, number> = {
+      wastage_pct: 5,
+      dry_fac: 1.33,
+      dry_factor: 1.33,
+      bag_volume: 0.035,
+      cement_bag_weight: 50,
+      water_density: 1000,
+      ...vars,
+    };
+
+    // Sort variable names by descending length so "bag_volume_extra" is replaced before "bag_volume"
+    const sortedKeys = Object.keys(mergedVars).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+      const val = mergedVars[key];
+      const regex = new RegExp(`\\b${key}\\b`, 'gi');
+      expr = expr.replace(regex, String(val));
+    }
+
+    // Replace any remaining alphabetic tokens with 1
+    expr = expr.replace(/[a-zA-Z_]+/g, '1');
+
+    // Only allow safe mathematical characters
+    if (!/^[0-9+\-*/().\s]+$/.test(expr)) {
+      return !isNaN(directNum) ? directNum : 0;
+    }
+
+    try {
+      const result = new Function(`return (${expr})`)();
+      if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
+        return Number(result.toFixed(4));
+      }
+    } catch {
+      // Fallback
+    }
+
+    return !isNaN(directNum) ? directNum : 0;
+  }
+
+  /**
    * Map Excel rows to Formulas
+   * Supports both:
+   * 1. Multi-row Civil Formulas Library (One row per material/labour/machinery resource, formula columns repeat or blank)
+   * 2. Single-row consolidated format
    */
   private static mapExcelFormulas(rows: Record<string, any>[]): any[] {
     const items: any[] = [];
+    if (!Array.isArray(rows) || rows.length === 0) return items;
 
+    // Check if the spreadsheet is in the multi-row Civil Library format
+    const sampleRow = rows[0] || {};
+    const isMultiRow = Boolean(
+      this.findField(sampleRow, [
+        'kind *',
+        'kind',
+        'resource code *',
+        'resource code',
+        'resource name (reference)',
+        'resource name',
+        'qty per unit basis *',
+        'qty per unit basis',
+        'resource type',
+      ]) ||
+      (rows[1] &&
+        this.findField(rows[1], [
+          'kind *',
+          'kind',
+          'resource code *',
+          'resource code',
+          'qty per unit basis *',
+        ]))
+    );
+
+    if (isMultiRow) {
+      const formulasList: any[] = [];
+      let currentFormula: any = null;
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+
+        const rowCodeRaw = String(
+          this.findField(row, ['formula code *', 'formula code', 'item code']) || ''
+        ).trim();
+        const rowNameRaw = String(
+          this.findField(row, ['formula name *', 'formula name', 'work item', 'formula', 'item name']) || ''
+        ).trim();
+
+        // If a formula code or name is present and different from currentFormula, start a new formula
+        const isNewFormula =
+          (rowCodeRaw && (!currentFormula || currentFormula.code.toLowerCase() !== rowCodeRaw.toLowerCase())) ||
+          (!rowCodeRaw && rowNameRaw && (!currentFormula || currentFormula.name.toLowerCase() !== rowNameRaw.toLowerCase()));
+
+        if (isNewFormula) {
+          const category = String(
+            this.findField(row, ['category name *', 'category name', 'category', 'category code']) || 'Civil Work'
+          ).trim();
+          const unit = String(
+            this.findField(row, ['unit basis *', 'unit basis', 'unit']) || 'CUM'
+          ).trim().toUpperCase();
+          const description = String(
+            this.findField(row, ['description', 'specification', 'desc']) || ''
+          ).trim();
+          const rawVars = String(
+            this.findField(row, ['variables (name=value; ...)', 'variables', 'vars']) || ''
+          );
+
+          const formulaCode = (
+            rowCodeRaw ||
+            rowNameRaw.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 30) ||
+            `FORM-${Math.floor(1000 + Math.random() * 9000)}`
+          ).toUpperCase();
+
+          currentFormula = {
+            code: formulaCode,
+            name: rowNameRaw || rowCodeRaw,
+            category: category || 'Civil Work',
+            unit: unit || 'CUM',
+            description,
+            referenceStandard: 'Civil Standard Library',
+            variables: this.parseVariables(rawVars),
+            materialFactors: [],
+            labourFactors: [],
+            machineryFactors: [],
+            isStandard: true,
+            isValid: true,
+          };
+          formulasList.push(currentFormula);
+        } else if (currentFormula) {
+          // Continuation row: merge variables or update missing fields
+          const rawVars = String(
+            this.findField(row, ['variables (name=value; ...)', 'variables', 'vars']) || ''
+          );
+          if (rawVars) {
+            currentFormula.variables = {
+              ...currentFormula.variables,
+              ...this.parseVariables(rawVars),
+            };
+          }
+          if (rowNameRaw && !currentFormula.name) {
+            currentFormula.name = rowNameRaw;
+          }
+        }
+
+        if (!currentFormula) continue;
+
+        // Resource line details
+        const kind = String(
+          this.findField(row, ['kind *', 'kind', 'resource type', 'type']) || ''
+        ).trim().toLowerCase();
+
+        const resCode = String(
+          this.findField(row, ['resource code *', 'resource code', 'item code', 'code']) || ''
+        ).trim();
+
+        const resName = String(
+          this.findField(row, ['resource name (reference)', 'resource name', 'reference', 'name', 'item']) || resCode || ''
+        ).trim();
+
+        const resUnit = String(
+          this.findField(row, ['unit *', 'unit', 'uom']) || 'nos'
+        ).trim();
+
+        const rawQty = this.findField(row, [
+          'qty per unit basis *',
+          'qty per unit basis',
+          'qty',
+          'quantity',
+          'factor',
+          'amount',
+        ]);
+
+        if (!resName && !resCode) continue;
+
+        const evaluatedQty = this.evaluateQuantity(rawQty, currentFormula.variables);
+        const finalFactor = evaluatedQty > 0 ? evaluatedQty : 1;
+
+        // Categorize into Material, Labour, or Machinery
+        const isLabour =
+          kind.includes('labour') ||
+          kind.includes('labor') ||
+          kind.includes('manpower') ||
+          resCode.toLowerCase().startsWith('l-') ||
+          resUnit.toLowerCase() === 'day';
+
+        const isMachinery =
+          kind.includes('machin') ||
+          kind.includes('plant') ||
+          kind.includes('equip') ||
+          resCode.toLowerCase().startsWith('mac-') ||
+          resCode.toLowerCase().startsWith('eq-') ||
+          resUnit.toLowerCase() === 'hour';
+
+        if (isLabour) {
+          currentFormula.labourFactors.push({
+            labourCode: resCode || `LAB-${currentFormula.labourFactors.length + 1}`,
+            name: resName || resCode || 'Labour',
+            unit: resUnit || 'Day',
+            factor: finalFactor,
+          });
+        } else if (isMachinery) {
+          currentFormula.machineryFactors.push({
+            machineryCode: resCode || `MAC-${currentFormula.machineryFactors.length + 1}`,
+            name: resName || resCode || 'Equipment',
+            unit: resUnit || 'Hour',
+            factor: finalFactor,
+          });
+        } else {
+          currentFormula.materialFactors.push({
+            materialCode: resCode || `MAT-${currentFormula.materialFactors.length + 1}`,
+            name: resName || resCode || 'Material',
+            unit: resUnit || 'NOS',
+            factor: finalFactor,
+            wastePercent: 0,
+          });
+        }
+      }
+
+      return formulasList;
+    }
+
+    // Fallback: Single-row format handler
     for (const row of rows) {
       const name = String(
         this.findField(row, ['formula name', 'work item', 'formula', 'name', 'description'])
@@ -264,7 +587,7 @@ export class QuantityMasterPdfService {
 
       const category = String(this.findField(row, ['category']) || 'Civil Work').trim();
       let code = String(this.findField(row, ['code', 'formula code'])).trim();
-      const unit = String(this.findField(row, ['unit']) || 'CUM').trim().toUpperCase();
+      const unit = String(this.findField(row, ['unit', 'unit basis']) || 'CUM').trim().toUpperCase();
       const description = String(this.findField(row, ['description', 'specification'])).trim();
 
       if (!code) {
@@ -275,28 +598,80 @@ export class QuantityMasterPdfService {
       const labourFactors: any[] = [];
       const machineryFactors: any[] = [];
 
-      // Check if text columns specify factors or default standard factors
-      if (name.toLowerCase().includes('concrete') || name.toLowerCase().includes('rcc')) {
-        materialFactors.push(
-          { materialCode: 'MAT-CEM-001', name: 'Cement (PPC/OPC)', unit: 'BAG', factor: 8.2, wastePercent: 2 },
-          { materialCode: 'MAT-SND-001', name: 'River Sand / Fine Aggregate', unit: 'CUM', factor: 0.42, wastePercent: 3 },
-          { materialCode: 'MAT-AGG-001', name: 'Coarse Aggregate (20mm)', unit: 'CUM', factor: 0.84, wastePercent: 3 }
-        );
-        labourFactors.push(
-          { labourCode: 'LAB-MAS-001', name: 'Mason (Grade 1)', unit: 'Day', factor: 0.25 },
-          { labourCode: 'LAB-HLP-001', name: 'Beldar / Mazdoor', unit: 'Day', factor: 1.5 }
-        );
-        machineryFactors.push(
-          { machineryCode: 'MAC-MIX-001', name: 'Concrete Mixer 10/7', unit: 'Hour', factor: 0.15 }
-        );
-      } else if (name.toLowerCase().includes('plaster')) {
-        materialFactors.push(
-          { materialCode: 'MAT-CEM-001', name: 'Cement', unit: 'BAG', factor: 0.12, wastePercent: 5 },
-          { materialCode: 'MAT-SND-001', name: 'Fine Sand', unit: 'CUM', factor: 0.02, wastePercent: 5 }
-        );
-        labourFactors.push(
-          { labourCode: 'LAB-MAS-001', name: 'Plaster Mason', unit: 'Day', factor: 0.08 }
-        );
+      // Parse factor strings if present (e.g. "Materials Required": "Cement: 8.2 BAG, Sand: 0.42 CUM")
+      const matReqStr = String(this.findField(row, ['materials required', 'materials', 'material factors']) || '');
+      if (matReqStr) {
+        const parts = matReqStr.split(/[,;]/);
+        for (const p of parts) {
+          const match = p.match(/(.*?):\s*([\d.]+)\s*(\w+)?/);
+          if (match) {
+            materialFactors.push({
+              materialCode: `MAT-${materialFactors.length + 1}`,
+              name: match[1].trim(),
+              factor: parseFloat(match[2]) || 1,
+              unit: (match[3] || 'NOS').toUpperCase(),
+              wastePercent: 0,
+            });
+          }
+        }
+      }
+
+      const labReqStr = String(this.findField(row, ['labour required', 'labour', 'manpower', 'labour factors']) || '');
+      if (labReqStr) {
+        const parts = labReqStr.split(/[,;]/);
+        for (const p of parts) {
+          const match = p.match(/(.*?):\s*([\d.]+)\s*(\w+)?/);
+          if (match) {
+            labourFactors.push({
+              labourCode: `LAB-${labourFactors.length + 1}`,
+              name: match[1].trim(),
+              factor: parseFloat(match[2]) || 1,
+              unit: match[3] || 'Day',
+            });
+          }
+        }
+      }
+
+      const macReqStr = String(this.findField(row, ['machinery required', 'machinery', 'equipment', 'machinery factors']) || '');
+      if (macReqStr) {
+        const parts = macReqStr.split(/[,;]/);
+        for (const p of parts) {
+          const match = p.match(/(.*?):\s*([\d.]+)\s*(\w+)?/);
+          if (match) {
+            machineryFactors.push({
+              machineryCode: `MAC-${machineryFactors.length + 1}`,
+              name: match[1].trim(),
+              factor: parseFloat(match[2]) || 1,
+              unit: match[3] || 'Hour',
+            });
+          }
+        }
+      }
+
+      // If no explicit factors were parsed, use standard reference factors
+      if (materialFactors.length === 0 && labourFactors.length === 0) {
+        if (name.toLowerCase().includes('concrete') || name.toLowerCase().includes('rcc')) {
+          materialFactors.push(
+            { materialCode: 'MAT-CEM-001', name: 'Cement (PPC/OPC)', unit: 'BAG', factor: 8.2, wastePercent: 2 },
+            { materialCode: 'MAT-SND-001', name: 'River Sand / Fine Aggregate', unit: 'CUM', factor: 0.42, wastePercent: 3 },
+            { materialCode: 'MAT-AGG-001', name: 'Coarse Aggregate (20mm)', unit: 'CUM', factor: 0.84, wastePercent: 3 }
+          );
+          labourFactors.push(
+            { labourCode: 'LAB-MAS-001', name: 'Mason (Grade 1)', unit: 'Day', factor: 0.25 },
+            { labourCode: 'LAB-HLP-001', name: 'Beldar / Mazdoor', unit: 'Day', factor: 1.5 }
+          );
+          machineryFactors.push(
+            { machineryCode: 'MAC-MIX-001', name: 'Concrete Mixer 10/7', unit: 'Hour', factor: 0.15 }
+          );
+        } else if (name.toLowerCase().includes('plaster')) {
+          materialFactors.push(
+            { materialCode: 'MAT-CEM-001', name: 'Cement', unit: 'BAG', factor: 0.12, wastePercent: 5 },
+            { materialCode: 'MAT-SND-001', name: 'Fine Sand', unit: 'CUM', factor: 0.02, wastePercent: 5 }
+          );
+          labourFactors.push(
+            { labourCode: 'LAB-MAS-001', name: 'Plaster Mason', unit: 'Day', factor: 0.08 }
+          );
+        }
       }
 
       items.push({

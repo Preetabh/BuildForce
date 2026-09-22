@@ -8,6 +8,11 @@ export interface ISorMaster extends Document {
   sorName: string; // e.g. CPWD DSR 2023 Civil
   version: string; // e.g. 2023.1
   category?: string; // e.g. Buildings & Roads, Infrastructure
+  country?: string; // e.g. India
+  state?: string; // e.g. Chhattisgarh, Maharashtra, All-India
+  owningBody?: string; // e.g. CPWD, NHAI, MES, CG PWD, MH PWD
+  year?: string; // e.g. 2023, 2026
+  notes?: string;
   effectiveFrom: Date;
   effectiveTo?: Date;
   sourceDocument?: string;
@@ -37,7 +42,7 @@ const sorMasterSchema = new Schema<ISorMaster>(
     },
     scheduleType: {
       type: String,
-      default: 'DSR',
+      default: 'Central Govt',
       trim: true,
     },
     sorName: {
@@ -49,15 +54,41 @@ const sorMasterSchema = new Schema<ISorMaster>(
       type: String,
       required: true,
       trim: true,
+      default: '2023',
     },
     category: {
       type: String,
       default: 'Civil Works',
       trim: true,
     },
+    country: {
+      type: String,
+      default: 'India',
+      trim: true,
+    },
+    state: {
+      type: String,
+      default: 'All-India',
+      trim: true,
+    },
+    owningBody: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    year: {
+      type: String,
+      default: '2023',
+      trim: true,
+    },
+    notes: {
+      type: String,
+      default: '',
+    },
     effectiveFrom: {
       type: Date,
       required: true,
+      default: Date.now,
     },
     effectiveTo: {
       type: Date,

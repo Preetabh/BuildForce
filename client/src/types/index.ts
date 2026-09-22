@@ -92,9 +92,15 @@ export interface SorMaster {
   sorName: string;
   version: string;
   category?: string;
+  country?: string;
+  state?: string;
+  owningBody?: string;
+  year?: string;
+  notes?: string;
   effectiveFrom: string;
   sourceDocument?: string;
   status: string;
+  itemCount?: number;
 }
 
 

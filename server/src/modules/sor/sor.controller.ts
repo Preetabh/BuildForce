@@ -350,5 +350,87 @@ export class SorController {
       next(error);
     }
   }
+
+  /**
+   * Create a new Department / SOR Master
+   */
+  public static async createSorMaster(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const result = await SorService.createSorMaster(companyId, req.body);
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Rename / Update Department / SOR Master
+   */
+  public static async updateSorMaster(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { masterId } = req.params;
+      const result = await SorService.updateSorMaster(companyId, masterId, req.body);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Clear all items within an SOR Master
+   */
+  public static async clearSorMasterItems(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { masterId } = req.params;
+      const result = await SorService.clearSorMasterItems(companyId, masterId);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Create a single SOR Item manually
+   */
+  public static async createSorItem(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const result = await SorService.createSorItem(companyId, req.body);
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Update an existing SOR Item
+   */
+  public static async updateSorItem(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { itemId } = req.params;
+      const result = await SorService.updateSorItem(companyId, itemId, req.body);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Delete a single SOR Item
+   */
+  public static async deleteSorItem(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { itemId } = req.params;
+      const result = await SorService.deleteSorItem(companyId, itemId);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 

@@ -50,7 +50,7 @@ export class QuantityMasterService {
     }
 
     const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.max(1, Math.min(100, Number(query.limit) || 15));
+    const limit = Math.max(1, Math.min(1000, Number(query.limit) || 15));
     const skip = (page - 1) * limit;
 
     const sortField = query.sort || 'createdAt';
@@ -306,7 +306,7 @@ export class QuantityMasterService {
     }
 
     const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.max(1, Math.min(100, Number(query.limit) || 15));
+    const limit = Math.max(1, Math.min(1000, Number(query.limit) || 15));
     const skip = (page - 1) * limit;
 
     const [items, total, categories] = await Promise.all([
@@ -539,7 +539,7 @@ export class QuantityMasterService {
     }
 
     const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.max(1, Math.min(100, Number(query.limit) || 15));
+    const limit = Math.max(1, Math.min(1000, Number(query.limit) || 15));
     const skip = (page - 1) * limit;
 
     const [items, total, categories] = await Promise.all([
@@ -775,7 +775,7 @@ export class QuantityMasterService {
     }
 
     const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.max(1, Math.min(100, Number(query.limit) || 15));
+    const limit = Math.max(1, Math.min(1000, Number(query.limit) || 15));
     const skip = (page - 1) * limit;
 
     const [items, total, categories] = await Promise.all([
@@ -911,7 +911,15 @@ export class QuantityMasterService {
 
   public static async createRateList(
     companyId: string,
-    data: { name: string; code?: string; description?: string; isDefault?: boolean }
+    data: {
+      name: string;
+      code?: string;
+      description?: string;
+      isDefault?: boolean;
+      materialRates?: Array<{ itemId: string; itemCode: string; itemName: string; unit: string; rate: number }>;
+      labourRates?: Array<{ itemId: string; itemCode: string; itemName: string; unit: string; rate: number }>;
+      machineryRates?: Array<{ itemId: string; itemCode: string; itemName: string; unit: string; rate: number }>;
+    }
   ) {
     const compObjectId = new Types.ObjectId(companyId);
     let code = data.code ? data.code.trim().toUpperCase() : '';
@@ -923,15 +931,25 @@ export class QuantityMasterService {
         .toUpperCase();
     }
 
+    let uniqueCode = code;
+    let counter = 1;
+    while (await RateList.exists({ companyId: compObjectId, code: uniqueCode })) {
+      uniqueCode = `${code}_${counter++}`;
+    }
+
+    if (data.isDefault) {
+      await RateList.updateMany({ companyId: compObjectId }, { $set: { isDefault: false } });
+    }
+
     const rateList = await RateList.create({
       companyId: compObjectId,
       name: data.name.trim(),
-      code,
+      code: uniqueCode,
       description: data.description || '',
       isDefault: data.isDefault || false,
-      materialRates: [],
-      labourRates: [],
-      machineryRates: [],
+      materialRates: data.materialRates || [],
+      labourRates: data.labourRates || [],
+      machineryRates: data.machineryRates || [],
     });
 
     return rateList;
@@ -951,6 +969,9 @@ export class QuantityMasterService {
     companyId: string,
     id: string,
     data: {
+      name?: string;
+      description?: string;
+      isDefault?: boolean;
       materialRates?: Array<{ itemId: string; itemCode: string; itemName: string; unit: string; rate: number }>;
       labourRates?: Array<{ itemId: string; itemCode: string; itemName: string; unit: string; rate: number }>;
       machineryRates?: Array<{ itemId: string; itemCode: string; itemName: string; unit: string; rate: number }>;
@@ -963,9 +984,21 @@ export class QuantityMasterService {
 
     if (!rateList) throw new AppError('Rate list not found', 404);
 
-    if (data.materialRates) rateList.materialRates = data.materialRates as any;
-    if (data.labourRates) rateList.labourRates = data.labourRates as any;
-    if (data.machineryRates) rateList.machineryRates = data.machineryRates as any;
+    if (data.name && data.name.trim()) rateList.name = data.name.trim();
+    if (data.description !== undefined) rateList.description = data.description;
+    if (data.isDefault !== undefined) {
+      if (data.isDefault) {
+        await RateList.updateMany(
+          { companyId: new Types.ObjectId(companyId), _id: { $ne: rateList._id } },
+          { $set: { isDefault: false } }
+        );
+      }
+      rateList.isDefault = data.isDefault;
+    }
+
+    if (data.materialRates !== undefined) rateList.materialRates = data.materialRates as any;
+    if (data.labourRates !== undefined) rateList.labourRates = data.labourRates as any;
+    if (data.machineryRates !== undefined) rateList.machineryRates = data.machineryRates as any;
 
     await rateList.save();
     return rateList;

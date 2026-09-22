@@ -667,21 +667,77 @@ export const exportMachineryExcel = (machineryItems: MasterMachinery[]) => {
  * EXPORT FORMULAS TO EXCEL
  */
 export const exportFormulasExcel = (formulas: MasterFormula[]) => {
-  const rows = formulas.map((f, idx) => ({
-    '#': idx + 1,
-    Code: f.code,
-    'Work Item / Formula Name': f.name,
-    Category: f.category || 'Civil Work',
-    Unit: (f.unit || 'CUM').toUpperCase(),
-    'Materials Required': (f.materialFactors || []).map((m) => `${m.name}: ${m.factor} ${m.unit}`).join(', '),
-    'Labour Required': (f.labourFactors || []).map((l) => `${l.name}: ${l.factor} ${l.unit}`).join(', '),
-    'Machinery Required': (f.machineryFactors || []).map((m) => `${m.name}: ${m.factor} ${m.unit}`).join(', '),
-  }));
+  const rows: any[] = [];
+
+  for (const f of formulas) {
+    const totalFactors =
+      (f.materialFactors?.length || 0) +
+      (f.labourFactors?.length || 0) +
+      (f.machineryFactors?.length || 0);
+
+    const baseMeta = {
+      'Category Code': f.category.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 20),
+      'Category Name *': f.category,
+      'Formula Code *': f.code,
+      'Formula Name *': f.name,
+      'Unit Basis *': (f.unit || 'cum').toLowerCase(),
+      'Description': f.description || '',
+      'Variables (name=value; ...)': 'wastage_pct=5; dry_fac=1.33; bag_volume=0.035',
+    };
+
+    if (totalFactors === 0) {
+      rows.push({
+        ...baseMeta,
+        'Kind *': 'material',
+        'Resource Code *': 'MAT-GEN-001',
+        'Resource Name (reference)': 'Standard Material',
+        'Qty per Unit Basis *': 1,
+        'Unit *': 'nos',
+      });
+      continue;
+    }
+
+    // Material Factors
+    for (const m of f.materialFactors || []) {
+      rows.push({
+        ...baseMeta,
+        'Kind *': 'material',
+        'Resource Code *': m.materialCode,
+        'Resource Name (reference)': m.name,
+        'Qty per Unit Basis *': m.factor,
+        'Unit *': (m.unit || 'nos').toLowerCase(),
+      });
+    }
+
+    // Labour Factors
+    for (const l of f.labourFactors || []) {
+      rows.push({
+        ...baseMeta,
+        'Kind *': 'labour',
+        'Resource Code *': l.labourCode,
+        'Resource Name (reference)': l.name,
+        'Qty per Unit Basis *': l.factor,
+        'Unit *': (l.unit || 'day').toLowerCase(),
+      });
+    }
+
+    // Machinery Factors
+    for (const mac of f.machineryFactors || []) {
+      rows.push({
+        ...baseMeta,
+        'Kind *': 'machinery',
+        'Resource Code *': mac.machineryCode,
+        'Resource Name (reference)': mac.name,
+        'Qty per Unit Basis *': mac.factor,
+        'Unit *': (mac.unit || 'hour').toLowerCase(),
+      });
+    }
+  }
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Formulas');
-  downloadWorkbook(wb, `Formulas_Master_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, 'Civil_Formulas');
+  downloadWorkbook(wb, `Civil_Formulas_Master_${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
 
 /**
@@ -875,31 +931,226 @@ export const downloadSampleExcelTemplate = (type: 'materials' | 'manpower' | 'ma
     downloadWorkbook(wb, 'Sample_Machinery_Template.xlsx');
   } else if (type === 'formulas') {
     const sampleRows = [
+      // Formula 1: Modular Brick 200mm
       {
-        'Formula Name': 'RCC M20 (1:1.5:3) in Beams & Columns',
-        Code: 'FORM-RCC-M20',
-        Category: 'Concrete',
-        Unit: 'CUM',
-        Description: 'Complete M20 concrete rate analysis',
+        'Category Code': 'brick',
+        'Category Name *': 'Brickwork',
+        'Formula Code *': 'modular_200mm',
+        'Formula Name *': 'Modular Brick 200mm',
+        'Unit Basis *': 'cum',
+        'Description': 'Modular Brick 200mm - 500 bricks per cum with 1:6 cement sand mortar',
+        'Variables (name=value; ...)': 'dry_fac=1.33; bag_volume=0.035; wastage_pct=5',
+        'Kind *': 'material',
+        'Resource Code *': 'bricks',
+        'Resource Name (reference)': 'Bricks (with wastage)',
+        'Qty per Unit Basis *': '500 * (1 + wastage_pct/100)',
+        'Unit *': 'nos',
       },
       {
-        'Formula Name': 'Cement Plaster 12mm thick in 1:4 mix',
-        Code: 'FORM-PLS-12MM',
-        Category: 'Plastering',
-        Unit: 'SQM',
-        Description: '12mm single coat wall plaster',
+        'Category Code': 'brick',
+        'Category Name *': 'Brickwork',
+        'Formula Code *': 'modular_200mm',
+        'Formula Name *': 'Modular Brick 200mm',
+        'Unit Basis *': 'cum',
+        'Description': 'Modular Brick 200mm - 500 bricks per cum with 1:6 cement sand mortar',
+        'Variables (name=value; ...)': 'dry_fac=1.33; bag_volume=0.035; wastage_pct=5',
+        'Kind *': 'material',
+        'Resource Code *': 'cement',
+        'Resource Name (reference)': 'Cement (OPC 43, 50kg bag)',
+        'Qty per Unit Basis *': '0.305 / (1 + 6) / bag_volume',
+        'Unit *': 'bag',
       },
       {
-        'Formula Name': 'Brickwork in 1:6 cement mortar in superstructure',
-        Code: 'FORM-BRK-14',
-        Category: 'Masonry',
-        Unit: 'CUM',
-        Description: 'Burnt clay brick masonry',
+        'Category Code': 'brick',
+        'Category Name *': 'Brickwork',
+        'Formula Code *': 'modular_200mm',
+        'Formula Name *': 'Modular Brick 200mm',
+        'Unit Basis *': 'cum',
+        'Description': 'Modular Brick 200mm - 500 bricks per cum with 1:6 cement sand mortar',
+        'Variables (name=value; ...)': 'dry_fac=1.33; bag_volume=0.035; wastage_pct=5',
+        'Kind *': 'material',
+        'Resource Code *': 'sand',
+        'Resource Name (reference)': 'Sand (fine)',
+        'Qty per Unit Basis *': '0.305 * 6 / (1 + 6)',
+        'Unit *': 'cum',
+      },
+      {
+        'Category Code': 'brick',
+        'Category Name *': 'Brickwork',
+        'Formula Code *': 'modular_200mm',
+        'Formula Name *': 'Modular Brick 200mm',
+        'Unit Basis *': 'cum',
+        'Description': 'Modular Brick 200mm - 500 bricks per cum with 1:6 cement sand mortar',
+        'Variables (name=value; ...)': 'dry_fac=1.33; bag_volume=0.035; wastage_pct=5',
+        'Kind *': 'material',
+        'Resource Code *': 'water',
+        'Resource Name (reference)': 'Water',
+        'Qty per Unit Basis *': '0.305 / (1 + 6) / bag_volume * 50 * 0.5 / 1000',
+        'Unit *': 'kl',
+      },
+      {
+        'Category Code': 'brick',
+        'Category Name *': 'Brickwork',
+        'Formula Code *': 'modular_200mm',
+        'Formula Name *': 'Modular Brick 200mm',
+        'Unit Basis *': 'cum',
+        'Description': 'Modular Brick 200mm - 500 bricks per cum with 1:6 cement sand mortar',
+        'Variables (name=value; ...)': 'dry_fac=1.33; bag_volume=0.035; wastage_pct=5',
+        'Kind *': 'labour',
+        'Resource Code *': 'L-MASON',
+        'Resource Name (reference)': 'Mason (Skilled)',
+        'Qty per Unit Basis *': 0.94,
+        'Unit *': 'day',
+      },
+      {
+        'Category Code': 'brick',
+        'Category Name *': 'Brickwork',
+        'Formula Code *': 'modular_200mm',
+        'Formula Name *': 'Modular Brick 200mm',
+        'Unit Basis *': 'cum',
+        'Description': 'Modular Brick 200mm - 500 bricks per cum with 1:6 cement sand mortar',
+        'Variables (name=value; ...)': 'dry_fac=1.33; bag_volume=0.035; wastage_pct=5',
+        'Kind *': 'labour',
+        'Resource Code *': 'L-MAZDOOR',
+        'Resource Name (reference)': 'Mazdoor (General Labour)',
+        'Qty per Unit Basis *': 1.81,
+        'Unit *': 'day',
+      },
+      {
+        'Category Code': 'brick',
+        'Category Name *': 'Brickwork',
+        'Formula Code *': 'modular_200mm',
+        'Formula Name *': 'Modular Brick 200mm',
+        'Unit Basis *': 'cum',
+        'Description': 'Modular Brick 200mm - 500 bricks per cum with 1:6 cement sand mortar',
+        'Variables (name=value; ...)': 'dry_fac=1.33; bag_volume=0.035; wastage_pct=5',
+        'Kind *': 'labour',
+        'Resource Code *': 'L-BHISTI',
+        'Resource Name (reference)': 'Bhisti (Water Carrier)',
+        'Qty per Unit Basis *': 0.35,
+        'Unit *': 'day',
+      },
+
+      // Formula 2: Modular Brick 100mm (half)
+      {
+        'Category Code': 'brick',
+        'Category Name *': 'Brickwork',
+        'Formula Code *': 'modular_100mm',
+        'Formula Name *': 'Modular Brick 100mm (half)',
+        'Unit Basis *': 'cum',
+        'Description': 'Modular Brick 100mm half brick wall',
+        'Variables (name=value; ...)': 'dry_fac=1.33; bag_volume=0.035; wastage_pct=5',
+        'Kind *': 'material',
+        'Resource Code *': 'bricks',
+        'Resource Name (reference)': 'Bricks (with wastage)',
+        'Qty per Unit Basis *': '500 * (1 + wastage_pct/100)',
+        'Unit *': 'nos',
+      },
+      {
+        'Category Code': 'brick',
+        'Category Name *': 'Brickwork',
+        'Formula Code *': 'modular_100mm',
+        'Formula Name *': 'Modular Brick 100mm (half)',
+        'Unit Basis *': 'cum',
+        'Description': 'Modular Brick 100mm half brick wall',
+        'Variables (name=value; ...)': 'dry_fac=1.33; bag_volume=0.035; wastage_pct=5',
+        'Kind *': 'material',
+        'Resource Code *': 'cement',
+        'Resource Name (reference)': 'Cement (OPC 43, 50kg bag)',
+        'Qty per Unit Basis *': '0.2 / (1 + 4) / bag_volume',
+        'Unit *': 'bag',
+      },
+      {
+        'Category Code': 'brick',
+        'Category Name *': 'Brickwork',
+        'Formula Code *': 'modular_100mm',
+        'Formula Name *': 'Modular Brick 100mm (half)',
+        'Unit Basis *': 'cum',
+        'Description': 'Modular Brick 100mm half brick wall',
+        'Variables (name=value; ...)': 'dry_fac=1.33; bag_volume=0.035; wastage_pct=5',
+        'Kind *': 'labour',
+        'Resource Code *': 'L-MASON',
+        'Resource Name (reference)': 'Mason (Skilled)',
+        'Qty per Unit Basis *': 0.94,
+        'Unit *': 'day',
+      },
+      {
+        'Category Code': 'brick',
+        'Category Name *': 'Brickwork',
+        'Formula Code *': 'modular_100mm',
+        'Formula Name *': 'Modular Brick 100mm (half)',
+        'Unit Basis *': 'cum',
+        'Description': 'Modular Brick 100mm half brick wall',
+        'Variables (name=value; ...)': 'dry_fac=1.33; bag_volume=0.035; wastage_pct=5',
+        'Kind *': 'labour',
+        'Resource Code *': 'L-MAZDOOR',
+        'Resource Name (reference)': 'Mazdoor (General Labour)',
+        'Qty per Unit Basis *': 1.81,
+        'Unit *': 'day',
+      },
+
+      // Formula 3: M5 Concrete (1:5:10)
+      {
+        'Category Code': 'concrete',
+        'Category Name *': 'Concrete Work',
+        'Formula Code *': 'm5',
+        'Formula Name *': 'M5 Concrete (1:5:10)',
+        'Unit Basis *': 'cum',
+        'Description': 'Nominal mix 1:5:10 as per IS 456',
+        'Variables (name=value; ...)': 'dry_fac=1.54; bag_volume=0.0347',
+        'Kind *': 'material',
+        'Resource Code *': 'cement',
+        'Resource Name (reference)': 'Cement (OPC 43, 50kg bag)',
+        'Qty per Unit Basis *': '(1 / 16) * dry_fac / bag_volume',
+        'Unit *': 'bag',
+      },
+      {
+        'Category Code': 'concrete',
+        'Category Name *': 'Concrete Work',
+        'Formula Code *': 'm5',
+        'Formula Name *': 'M5 Concrete (1:5:10)',
+        'Unit Basis *': 'cum',
+        'Description': 'Nominal mix 1:5:10 as per IS 456',
+        'Variables (name=value; ...)': 'dry_fac=1.54; bag_volume=0.0347',
+        'Kind *': 'material',
+        'Resource Code *': 'sand',
+        'Resource Name (reference)': 'Sand (Coarse Zone II)',
+        'Qty per Unit Basis *': '(5 / 16) * dry_fac',
+        'Unit *': 'cum',
+      },
+      {
+        'Category Code': 'concrete',
+        'Category Name *': 'Concrete Work',
+        'Formula Code *': 'm5',
+        'Formula Name *': 'M5 Concrete (1:5:10)',
+        'Unit Basis *': 'cum',
+        'Description': 'Nominal mix 1:5:10 as per IS 456',
+        'Variables (name=value; ...)': 'dry_fac=1.54; bag_volume=0.0347',
+        'Kind *': 'material',
+        'Resource Code *': 'aggregate',
+        'Resource Name (reference)': 'Coarse Aggregate 40mm',
+        'Qty per Unit Basis *': '(10 / 16) * dry_fac',
+        'Unit *': 'cum',
+      },
+      {
+        'Category Code': 'concrete',
+        'Category Name *': 'Concrete Work',
+        'Formula Code *': 'm5',
+        'Formula Name *': 'M5 Concrete (1:5:10)',
+        'Unit Basis *': 'cum',
+        'Description': 'Nominal mix 1:5:10 as per IS 456',
+        'Variables (name=value; ...)': 'dry_fac=1.54; bag_volume=0.0347',
+        'Kind *': 'machinery',
+        'Resource Code *': 'MAC-MIX-001',
+        'Resource Name (reference)': 'Concrete Mixer 10/7',
+        'Qty per Unit Basis *': 0.15,
+        'Unit *': 'hour',
       },
     ];
     const ws = XLSX.utils.json_to_sheet(sampleRows);
-    XLSX.utils.book_append_sheet(wb, ws, 'Formulas_Sample');
-    downloadWorkbook(wb, 'Sample_Formulas_Template.xlsx');
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Civil_Formulas');
+    downloadWorkbook(wb, 'Sample_Civil_Formulas_Template.xlsx');
   } else {
     const sampleRows = [
       {

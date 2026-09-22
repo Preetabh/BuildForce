@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import {
   Boxes,
   Users,
@@ -12,6 +13,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Filter,
   Download,
   Upload,
@@ -46,7 +49,6 @@ import {
   SorImport,
 } from '../types';
 import { cn } from '../utils/cn';
-<<<<<<< HEAD
 import {
   exportMaterialsPdf,
   exportManpowerPdf,
@@ -58,19 +60,171 @@ import {
   exportMachineryExcel,
   exportFormulasExcel,
   exportRateListsExcel,
+  downloadWorkbook,
 } from '../utils/quantityMasterPdfExport';
 import {
   QuantityMasterPdfImportModal,
   MasterType,
 } from '../components/quantityMaster/QuantityMasterPdfImportModal';
-=======
->>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
 
 interface OutletContextType {
   setSidebarOpen: (open: boolean) => void;
 }
 
 type TabType = 'materials' | 'manpower' | 'machinery' | 'formulas' | 'rate-lists' | 'import-history';
+
+interface PaginationControlsProps {
+  page: number;
+  totalPages: number;
+  total: number;
+  limit: number;
+  itemName: string;
+  onPageChange: (newPage: number) => void;
+  onLimitChange: (newLimit: number) => void;
+}
+
+const PaginationControls: React.FC<PaginationControlsProps> = ({
+  page,
+  totalPages,
+  total,
+  limit,
+  itemName,
+  onPageChange,
+  onLimitChange,
+}) => {
+  if (!total || total <= 0) return null;
+
+  const startIdx = (page - 1) * limit + 1;
+  const endIdx = Math.min(page * limit, total);
+
+  // Generate page numbers with ellipses for clean navigation
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (page <= 4) {
+        for (let i = 1; i <= 5; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (page >= totalPages - 3) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        pages.push(page - 1);
+        pages.push(page);
+        pages.push(page + 1);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  };
+
+  return (
+    <div className="p-3.5 bg-[#111726] border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+      {/* Left: Showing info & Rows per page */}
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+        <span>
+          Showing <strong className="text-white font-semibold">{startIdx}</strong> to{' '}
+          <strong className="text-white font-semibold">{endIdx}</strong> of{' '}
+          <strong className="text-white font-semibold">{total}</strong> {itemName}
+        </span>
+
+        <div className="flex items-center gap-2 border-l border-slate-700/80 pl-3 sm:pl-4">
+          <span className="text-slate-400">Rows per page:</span>
+          <select
+            value={limit >= 500 ? 500 : limit}
+            onChange={(e) => {
+              const newLimit = Number(e.target.value);
+              onLimitChange(newLimit);
+              onPageChange(1);
+            }}
+            className="px-2.5 py-1 bg-[#0A0D16] border border-slate-700 rounded-lg text-white font-semibold focus:outline-none focus:border-blue-500 cursor-pointer"
+          >
+            <option value={15}>15</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={500}>All ({total})</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Right: Page Navigation (First, Prev, Page numbers, Next, Last) */}
+      <div className="flex items-center gap-1">
+        {/* First Page */}
+        <button
+          onClick={() => onPageChange(1)}
+          disabled={page <= 1}
+          title="First Page"
+          className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors"
+        >
+          <ChevronsLeft className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Previous */}
+        <button
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+          title="Previous Page"
+          className="px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white flex items-center gap-1 transition-colors font-medium"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Prev</span>
+        </button>
+
+        {/* Page Pills */}
+        <div className="flex items-center gap-1 px-0.5">
+          {getPageNumbers().map((p, idx) =>
+            typeof p === 'number' ? (
+              <button
+                key={idx}
+                onClick={() => onPageChange(p)}
+                className={cn(
+                  'w-7 h-7 rounded-lg text-xs font-semibold flex items-center justify-center transition-all',
+                  page === p
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                    : 'bg-slate-800/60 hover:bg-slate-700 text-slate-300'
+                )}
+              >
+                {p}
+              </button>
+            ) : (
+              <span key={idx} className="px-1 text-slate-500">
+                ...
+              </span>
+            )
+          )}
+        </div>
+
+        {/* Next */}
+        <button
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          disabled={page >= totalPages}
+          title="Next Page"
+          className="px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white flex items-center gap-1 transition-colors font-medium"
+        >
+          <span className="hidden sm:inline">Next</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Last Page */}
+        <button
+          onClick={() => onPageChange(totalPages)}
+          disabled={page >= totalPages}
+          title="Last Page"
+          className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors"
+        >
+          <ChevronsRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export const QuantityMaster: React.FC = () => {
   const { setSidebarOpen } = useOutletContext<OutletContextType>();
@@ -85,7 +239,7 @@ export const QuantityMaster: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedRateListId, setSelectedRateListId] = useState('');
   const [page, setPage] = useState(1);
-  const limit = 15;
+  const [limit, setLimit] = useState(15);
 
   // View Details Modal State
   const [viewingItem, setViewingItem] = useState<{
@@ -109,14 +263,11 @@ export const QuantityMaster: React.FC = () => {
   const [isRateListModalOpen, setIsRateListModalOpen] = useState(false);
   const [rateListToEdit, setRateListToEdit] = useState<MasterRateList | null>(null);
 
-<<<<<<< HEAD
-  // PDF Bulk Import & Export State
+  // PDF / Excel Bulk Import & Export State
   const [isPdfImportModalOpen, setIsPdfImportModalOpen] = useState(false);
   const [pdfImportType, setPdfImportType] = useState<MasterType>('materials');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
-=======
->>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -124,7 +275,6 @@ export const QuantityMaster: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-<<<<<<< HEAD
   const handleOpenPdfImport = (type: MasterType) => {
     setPdfImportType(type);
     setIsPdfImportModalOpen(true);
@@ -334,8 +484,6 @@ export const QuantityMaster: React.FC = () => {
     }
   };
 
-=======
->>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
     setSearch('');
@@ -786,7 +934,6 @@ export const QuantityMaster: React.FC = () => {
               {/* Action Buttons */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
-<<<<<<< HEAD
                   onClick={handleExportMaterialsExcel}
                   disabled={isExportingPdf}
                   title="Export Materials to Excel Spreadsheet (.xlsx)"
@@ -801,7 +948,7 @@ export const QuantityMaster: React.FC = () => {
                   title="Export Materials as PDF Document"
                   className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/80 transition-all shadow-sm disabled:opacity-50"
                 >
-                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
                   <span>PDF</span>
                 </button>
                 <button
@@ -809,12 +956,10 @@ export const QuantityMaster: React.FC = () => {
                   title="Bulk Import Materials from PDF, Excel or CSV"
                   className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all shadow-sm"
                 >
-                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <Download className="w-3.5 h-3.5 text-blue-400" />
                   <span>Import (PDF/Excel)</span>
                 </button>
                 <button
-=======
->>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
                   onClick={() => {
                     setMaterialToEdit(null);
                     setIsMaterialModalOpen(true);
@@ -935,34 +1080,16 @@ export const QuantityMaster: React.FC = () => {
                 </table>
               </div>
 
-              {materialsData && materialsData.totalPages > 1 && (
-                <div className="p-3 bg-[#111726] border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                  <span>
-                    Showing {(page - 1) * limit + 1} to {Math.min(page * limit, materialsData.total)} of{' '}
-                    {materialsData.total} items
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page <= 1}
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white flex items-center gap-1"
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                      <span>Prev</span>
-                    </button>
-                    <span className="font-semibold text-white px-2">
-                      {page} / {materialsData.totalPages}
-                    </span>
-                    <button
-                      onClick={() => setPage((p) => Math.min(materialsData.totalPages, p + 1))}
-                      disabled={page >= materialsData.totalPages}
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white flex items-center gap-1"
-                    >
-                      <span>Next</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
+              {materialsData && (
+                <PaginationControls
+                  page={page}
+                  totalPages={materialsData.totalPages}
+                  total={materialsData.total}
+                  limit={limit}
+                  itemName="materials"
+                  onPageChange={setPage}
+                  onLimitChange={setLimit}
+                />
               )}
             </div>
           </div>
@@ -1036,7 +1163,6 @@ export const QuantityMaster: React.FC = () => {
                 </select>
               </div>
 
-<<<<<<< HEAD
               {/* Action Buttons */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -1054,7 +1180,7 @@ export const QuantityMaster: React.FC = () => {
                   title="Export Manpower as PDF Document"
                   className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/80 transition-all shadow-sm disabled:opacity-50"
                 >
-                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
                   <span>PDF</span>
                 </button>
                 <button
@@ -1062,7 +1188,7 @@ export const QuantityMaster: React.FC = () => {
                   title="Bulk Import Manpower from PDF, Excel or CSV"
                   className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all shadow-sm"
                 >
-                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <Download className="w-3.5 h-3.5 text-blue-400" />
                   <span>Import (PDF/Excel)</span>
                 </button>
                 <button
@@ -1076,18 +1202,6 @@ export const QuantityMaster: React.FC = () => {
                   <span>Add Manpower</span>
                 </button>
               </div>
-=======
-              <button
-                onClick={() => {
-                  setManpowerToEdit(null);
-                  setIsManpowerModalOpen(true);
-                }}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Manpower</span>
-              </button>
->>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
             </div>
 
             <div className="rounded-xl border border-slate-800 bg-[#0E1320] overflow-hidden shadow-lg">
@@ -1198,6 +1312,18 @@ export const QuantityMaster: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              {manpowerData && (
+                <PaginationControls
+                  page={page}
+                  totalPages={manpowerData.totalPages}
+                  total={manpowerData.total}
+                  limit={limit}
+                  itemName="manpower trades"
+                  onPageChange={setPage}
+                  onLimitChange={setLimit}
+                />
+              )}
             </div>
           </div>
         )}
@@ -1270,7 +1396,6 @@ export const QuantityMaster: React.FC = () => {
                 </select>
               </div>
 
-<<<<<<< HEAD
               {/* Action Buttons */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -1288,7 +1413,7 @@ export const QuantityMaster: React.FC = () => {
                   title="Export Machinery as PDF Document"
                   className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/80 transition-all shadow-sm disabled:opacity-50"
                 >
-                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
                   <span>PDF</span>
                 </button>
                 <button
@@ -1296,7 +1421,7 @@ export const QuantityMaster: React.FC = () => {
                   title="Bulk Import Machinery from PDF, Excel or CSV"
                   className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all shadow-sm"
                 >
-                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <Download className="w-3.5 h-3.5 text-blue-400" />
                   <span>Import (PDF/Excel)</span>
                 </button>
                 <button
@@ -1310,18 +1435,6 @@ export const QuantityMaster: React.FC = () => {
                   <span>Add Machinery</span>
                 </button>
               </div>
-=======
-              <button
-                onClick={() => {
-                  setMachineryToEdit(null);
-                  setIsMachineryModalOpen(true);
-                }}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Machinery</span>
-              </button>
->>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
             </div>
 
             <div className="rounded-xl border border-slate-800 bg-[#0E1320] overflow-hidden shadow-lg">
@@ -1423,6 +1536,18 @@ export const QuantityMaster: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              {machineryData && (
+                <PaginationControls
+                  page={page}
+                  totalPages={machineryData.totalPages}
+                  total={machineryData.total}
+                  limit={limit}
+                  itemName="machinery items"
+                  onPageChange={setPage}
+                  onLimitChange={setLimit}
+                />
+              )}
             </div>
           </div>
         )}
@@ -1432,25 +1557,106 @@ export const QuantityMaster: React.FC = () => {
         {/* ========================================================================= */}
         {activeTab === 'formulas' && (
           <div className="space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-xl bg-[#0F1422] border border-slate-800">
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <div className="flex flex-col gap-3 p-4 rounded-xl bg-[#0F1422] border border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                  <div className="relative flex-1 min-w-[180px] max-w-sm">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => {
+                        setSearch(e.target.value);
+                        setPage(1);
+                      }}
+                      placeholder="Search formulas or code..."
+                      className="w-full pl-9 pr-3 py-2 bg-[#0A0D16] border border-slate-700/80 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => {
+                      setCategoryFilter(e.target.value);
+                      setPage(1);
+                    }}
+                    className="px-3 py-2 bg-[#0A0D16] border border-slate-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="all">All Formula Categories</option>
+                    {formulasData?.categories?.map((c: string) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleExportFormulasExcel}
+                    disabled={isExportingPdf}
+                    title="Export Formulas to Excel Spreadsheet (.xlsx)"
+                    className="px-3 py-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 border border-emerald-600/40 transition-all shadow-sm disabled:opacity-50"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Excel</span>
+                  </button>
+                  <button
+                    onClick={handleExportFormulas}
+                    disabled={isExportingPdf}
+                    title="Export Formulas as PDF Document"
+                    className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/80 transition-all shadow-sm disabled:opacity-50"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-blue-400" />
+                    <span>PDF</span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenPdfImport('formulas')}
+                    title="Bulk Import Formulas from PDF, Excel or CSV"
+                    className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all shadow-sm"
+                  >
+                    <Download className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Import (PDF/Excel)</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFormulaToEdit(null);
+                      setIsFormulaModalOpen(true);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>New Formula</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-tabs */}
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1 border-t border-slate-800/80">
                 <button
-                  onClick={() => setFormulaSubTab('all')}
+                  onClick={() => {
+                    setFormulaSubTab('all');
+                    setPage(1);
+                  }}
                   className={cn(
                     'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors',
                     formulaSubTab === 'all'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
                       : 'bg-slate-800/80 text-slate-400 hover:text-white'
                   )}
                 >
                   All Formulas
                 </button>
                 <button
-                  onClick={() => setFormulaSubTab('materials')}
+                  onClick={() => {
+                    setFormulaSubTab('materials');
+                    setPage(1);
+                  }}
                   className={cn(
                     'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
                     formulaSubTab === 'materials'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
                       : 'bg-slate-800/80 text-slate-400 hover:text-white'
                   )}
                 >
@@ -1458,11 +1664,14 @@ export const QuantityMaster: React.FC = () => {
                   <span>Material Formulas</span>
                 </button>
                 <button
-                  onClick={() => setFormulaSubTab('manpower')}
+                  onClick={() => {
+                    setFormulaSubTab('manpower');
+                    setPage(1);
+                  }}
                   className={cn(
                     'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
                     formulaSubTab === 'manpower'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
                       : 'bg-slate-800/80 text-slate-400 hover:text-white'
                   )}
                 >
@@ -1470,11 +1679,14 @@ export const QuantityMaster: React.FC = () => {
                   <span>Manpower Formulas</span>
                 </button>
                 <button
-                  onClick={() => setFormulaSubTab('machinery')}
+                  onClick={() => {
+                    setFormulaSubTab('machinery');
+                    setPage(1);
+                  }}
                   className={cn(
                     'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
                     formulaSubTab === 'machinery'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
                       : 'bg-slate-800/80 text-slate-400 hover:text-white'
                   )}
                 >
@@ -1482,59 +1694,6 @@ export const QuantityMaster: React.FC = () => {
                   <span>Machinery Formulas</span>
                 </button>
               </div>
-
-<<<<<<< HEAD
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={handleExportFormulasExcel}
-                  disabled={isExportingPdf}
-                  title="Export Formulas to Excel Spreadsheet (.xlsx)"
-                  className="px-3 py-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 border border-emerald-600/40 transition-all shadow-sm disabled:opacity-50"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Excel</span>
-                </button>
-                <button
-                  onClick={handleExportFormulas}
-                  disabled={isExportingPdf}
-                  title="Export Formulas as PDF Document"
-                  className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/80 transition-all shadow-sm disabled:opacity-50"
-                >
-                  <Download className="w-3.5 h-3.5 text-blue-400" />
-                  <span>PDF</span>
-                </button>
-                <button
-                  onClick={() => handleOpenPdfImport('formulas')}
-                  title="Bulk Import Formulas from PDF, Excel or CSV"
-                  className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all shadow-sm"
-                >
-                  <Upload className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Import (PDF/Excel)</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setFormulaToEdit(null);
-                    setIsFormulaModalOpen(true);
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>New Formula</span>
-                </button>
-              </div>
-=======
-              <button
-                onClick={() => {
-                  setFormulaToEdit(null);
-                  setIsFormulaModalOpen(true);
-                }}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Formula</span>
-              </button>
->>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
             </div>
 
             {/* Formulas Table */}
@@ -1637,6 +1796,18 @@ export const QuantityMaster: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              {formulasData && (
+                <PaginationControls
+                  page={page}
+                  totalPages={formulasData.totalPages}
+                  total={formulasData.total}
+                  limit={limit}
+                  itemName="formulas"
+                  onPageChange={setPage}
+                  onLimitChange={setLimit}
+                />
+              )}
             </div>
           </div>
         )}
@@ -1654,7 +1825,6 @@ export const QuantityMaster: React.FC = () => {
                 </p>
               </div>
 
-<<<<<<< HEAD
               {/* Action Buttons */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -1672,7 +1842,7 @@ export const QuantityMaster: React.FC = () => {
                   title="Export Rate Lists as PDF Document"
                   className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/80 transition-all shadow-sm disabled:opacity-50"
                 >
-                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
                   <span>PDF</span>
                 </button>
                 <button
@@ -1680,7 +1850,7 @@ export const QuantityMaster: React.FC = () => {
                   title="Bulk Import Rate Lists from PDF, Excel or CSV"
                   className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all shadow-sm"
                 >
-                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <Download className="w-3.5 h-3.5 text-blue-400" />
                   <span>Import (PDF/Excel)</span>
                 </button>
                 <button
@@ -1694,18 +1864,6 @@ export const QuantityMaster: React.FC = () => {
                   <span>New Rate List</span>
                 </button>
               </div>
-=======
-              <button
-                onClick={() => {
-                  setRateListToEdit(null);
-                  setIsRateListModalOpen(true);
-                }}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Rate List</span>
-              </button>
->>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
             </div>
 
             <div className="rounded-xl border border-slate-800 bg-[#0E1320] overflow-hidden shadow-lg">
@@ -2039,9 +2197,8 @@ export const QuantityMaster: React.FC = () => {
           }}
         />
       )}
-<<<<<<< HEAD
 
-      {/* PDF BULK IMPORT & EXTRACTION MODAL */}
+      {/* PDF / EXCEL BULK IMPORT MODAL */}
       {isPdfImportModalOpen && (
         <QuantityMasterPdfImportModal
           isOpen={isPdfImportModalOpen}
@@ -2058,8 +2215,6 @@ export const QuantityMaster: React.FC = () => {
           }}
         />
       )}
-=======
->>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
     </div>
   );
 };
@@ -3012,6 +3167,9 @@ const FormulaModal: React.FC<{
 /* ========================================================================= */
 /* MODAL: RATE LIST */
 /* ========================================================================= */
+/* ========================================================================= */
+/* MODAL: RATE LIST (FULL MULTI-RESOURCE OVERRIDE MODAL LIKE SCREENSHOT) */
+/* ========================================================================= */
 const RateListModal: React.FC<{
   isOpen: boolean;
   rateListToEdit: MasterRateList | null;
@@ -3021,24 +3179,347 @@ const RateListModal: React.FC<{
   const [name, setName] = useState(rateListToEdit?.name || '');
   const [description, setDescription] = useState(rateListToEdit?.description || '');
   const [isDefault, setIsDefault] = useState(rateListToEdit?.isDefault || false);
+
+  const [activeSubTab, setActiveSubTab] = useState<'materials' | 'manpower' | 'machinery'>('materials');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const [materials, setMaterials] = useState<MasterMaterial[]>([]);
+  const [labour, setLabour] = useState<MasterLabour[]>([]);
+  const [machinery, setMachinery] = useState<MasterMachinery[]>([]);
+  const [isLoadingItems, setIsLoadingItems] = useState(true);
+
+  // Overrides: itemId -> override rate string or number
+  const [materialOverrides, setMaterialOverrides] = useState<Record<string, string | number>>({});
+  const [labourOverrides, setLabourOverrides] = useState<Record<string, string | number>>({});
+  const [machineryOverrides, setMachineryOverrides] = useState<Record<string, string | number>>({});
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [infoToast, setInfoToast] = useState<string | null>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load Catalog Items & Initial Overrides
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCatalog = async () => {
+      try {
+        setIsLoadingItems(true);
+        const [matRes, labRes, macRes] = await Promise.all([
+          api.get('/quantity-master/materials?limit=1000&page=1'),
+          api.get('/quantity-master/manpower?limit=1000&page=1'),
+          api.get('/quantity-master/machinery?limit=1000&page=1'),
+        ]);
+
+        if (!isMounted) return;
+        setMaterials(matRes.data?.data?.items || []);
+        setLabour(labRes.data?.data?.items || []);
+        setMachinery(macRes.data?.data?.items || []);
+
+        if (rateListToEdit) {
+          setName(rateListToEdit.name || '');
+          setDescription(rateListToEdit.description || '');
+          setIsDefault(rateListToEdit.isDefault || false);
+
+          const mOverrides: Record<string, string | number> = {};
+          rateListToEdit.materialRates?.forEach((r) => {
+            mOverrides[String(r.itemId)] = r.rate;
+          });
+          setMaterialOverrides(mOverrides);
+
+          const lOverrides: Record<string, string | number> = {};
+          rateListToEdit.labourRates?.forEach((r) => {
+            lOverrides[String(r.itemId)] = r.rate;
+          });
+          setLabourOverrides(lOverrides);
+
+          const macOverrides: Record<string, string | number> = {};
+          rateListToEdit.machineryRates?.forEach((r) => {
+            macOverrides[String(r.itemId)] = r.rate;
+          });
+          setMachineryOverrides(macOverrides);
+        }
+      } catch (err) {
+        console.error('Failed to load catalog for rate list:', err);
+        setError('Failed to load resource catalogs. Please try again.');
+      } finally {
+        if (isMounted) setIsLoadingItems(false);
+      }
+    };
+    fetchCatalog();
+    return () => {
+      isMounted = false;
+    };
+  }, [rateListToEdit]);
+
+  // Grouping helper
+  const groupByCategory = <T extends { category?: string }>(items: T[]) => {
+    const groups: Record<string, T[]> = {};
+    items.forEach((item) => {
+      const cat = item.category && item.category.trim() ? item.category.trim().toUpperCase() : 'GENERAL';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(item);
+    });
+    return groups;
+  };
+
+  // Filter items based on search
+  const filteredMaterials = materials.filter(
+    (m) =>
+      m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const filteredLabour = labour.filter(
+    (l) =>
+      l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      l.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      l.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const filteredMachinery = machinery.filter(
+    (mac) =>
+      mac.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mac.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mac.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Clear single override
+  const clearMaterialOverride = (id: string) => {
+    setMaterialOverrides((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const clearLabourOverride = (id: string) => {
+    setLabourOverrides((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const clearMachineryOverride = (id: string) => {
+    setMachineryOverrides((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  // Export Excel
+  const handleExportExcel = () => {
+    try {
+      const wb = XLSX.utils.book_new();
+
+      // Materials
+      const matRows = materials.map((m) => ({
+        Type: 'Material',
+        Category: m.category || 'General',
+        'Item Code': m.code || '',
+        'Item Name': m.name,
+        Unit: m.unit || '',
+        'Default Rate': m.standardRate ?? 0,
+        'Rate List Rate':
+          materialOverrides[m._id] !== undefined && materialOverrides[m._id] !== ''
+            ? Number(materialOverrides[m._id])
+            : m.standardRate ?? 0,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(matRows), 'Materials');
+
+      // Manpower
+      const labRows = labour.map((l) => ({
+        Type: 'Manpower',
+        Category: l.category || 'General',
+        'Item Code': l.code || '',
+        'Item Name': l.name,
+        Unit: l.unit || '',
+        'Default Rate': l.standardDailyRate ?? 0,
+        'Rate List Rate':
+          labourOverrides[l._id] !== undefined && labourOverrides[l._id] !== ''
+            ? Number(labourOverrides[l._id])
+            : l.standardDailyRate ?? 0,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(labRows), 'Manpower');
+
+      // Machinery
+      const macRows = machinery.map((mac) => ({
+        Type: 'Machinery',
+        Category: mac.category || 'General',
+        'Item Code': mac.code || '',
+        'Item Name': mac.name,
+        Unit: mac.unit || '',
+        'Default Rate': mac.standardHourlyRate ?? 0,
+        'Rate List Rate':
+          machineryOverrides[mac._id] !== undefined && machineryOverrides[mac._id] !== ''
+            ? Number(machineryOverrides[mac._id])
+            : mac.standardHourlyRate ?? 0,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(macRows), 'Machinery');
+
+      const safeName = (name.trim() || 'Rate_List').replace(/[^a-zA-Z0-9_-]/g, '_');
+      downloadWorkbook(wb, `${safeName}_Rates.xlsx`);
+    } catch (err) {
+      console.error('Export error:', err);
+      setError('Failed to export Excel spreadsheet');
+    }
+  };
+
+  // Import Excel
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+
+        const newMatOverrides = { ...materialOverrides };
+        const newLabOverrides = { ...labourOverrides };
+        const newMacOverrides = { ...machineryOverrides };
+        let count = 0;
+
+        wb.SheetNames.forEach((sheetName) => {
+          const ws = wb.Sheets[sheetName];
+          const rows: any[] = XLSX.utils.sheet_to_json(ws);
+
+          rows.forEach((row) => {
+            const rawRate = row['Rate List Rate'] ?? row['Rate'] ?? row['New Rate'] ?? row['Custom Rate'];
+            if (rawRate === undefined || rawRate === null || rawRate === '') return;
+            const rateNum = Number(rawRate);
+            if (isNaN(rateNum) || rateNum < 0) return;
+
+            const code = String(row['Item Code'] ?? row['Code'] ?? '').trim().toLowerCase();
+            const itemName = String(row['Item Name'] ?? row['Name'] ?? '').trim().toLowerCase();
+
+            // Material
+            const matchedMat = materials.find(
+              (m) => (code && m.code?.toLowerCase() === code) || (itemName && m.name.toLowerCase() === itemName)
+            );
+            if (matchedMat) {
+              newMatOverrides[matchedMat._id] = rateNum;
+              count++;
+              return;
+            }
+
+            // Labour
+            const matchedLab = labour.find(
+              (l) => (code && l.code?.toLowerCase() === code) || (itemName && l.name.toLowerCase() === itemName)
+            );
+            if (matchedLab) {
+              newLabOverrides[matchedLab._id] = rateNum;
+              count++;
+              return;
+            }
+
+            // Machinery
+            const matchedMac = machinery.find(
+              (mac) => (code && mac.code?.toLowerCase() === code) || (itemName && mac.name.toLowerCase() === itemName)
+            );
+            if (matchedMac) {
+              newMacOverrides[matchedMac._id] = rateNum;
+              count++;
+              return;
+            }
+          });
+        });
+
+        setMaterialOverrides(newMatOverrides);
+        setLabourOverrides(newLabOverrides);
+        setMachineryOverrides(newMacOverrides);
+        setError(null);
+        setInfoToast(`Loaded ${count} rates from ${file.name}`);
+        setTimeout(() => setInfoToast(null), 4000);
+      } catch (err) {
+        console.error('Import excel error:', err);
+        setError('Failed to parse Excel file. Please ensure valid format.');
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  };
+
+  // Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError('Rate list name is required');
       return;
     }
+
     setIsSubmitting(true);
     setError(null);
+
     try {
+      // Build materialRates
+      const materialRates: any[] = [];
+      Object.entries(materialOverrides).forEach(([id, rateVal]) => {
+        if (rateVal !== '' && rateVal !== undefined && !isNaN(Number(rateVal))) {
+          const m = materials.find((item) => String(item._id) === String(id));
+          if (m) {
+            materialRates.push({
+              itemId: m._id,
+              itemCode: m.code || '',
+              itemName: m.name,
+              unit: m.unit || '',
+              rate: Number(rateVal),
+            });
+          }
+        }
+      });
+
+      // Build labourRates
+      const labourRates: any[] = [];
+      Object.entries(labourOverrides).forEach(([id, rateVal]) => {
+        if (rateVal !== '' && rateVal !== undefined && !isNaN(Number(rateVal))) {
+          const l = labour.find((item) => String(item._id) === String(id));
+          if (l) {
+            labourRates.push({
+              itemId: l._id,
+              itemCode: l.code || '',
+              itemName: l.name,
+              unit: l.unit || '',
+              rate: Number(rateVal),
+            });
+          }
+        }
+      });
+
+      // Build machineryRates
+      const machineryRates: any[] = [];
+      Object.entries(machineryOverrides).forEach(([id, rateVal]) => {
+        if (rateVal !== '' && rateVal !== undefined && !isNaN(Number(rateVal))) {
+          const mac = machinery.find((item) => String(item._id) === String(id));
+          if (mac) {
+            machineryRates.push({
+              itemId: mac._id,
+              itemCode: mac.code || '',
+              itemName: mac.name,
+              unit: mac.unit || '',
+              rate: Number(rateVal),
+            });
+          }
+        }
+      });
+
       const payload = {
         name: name.trim(),
         description: description.trim(),
         isDefault,
+        materialRates,
+        labourRates,
+        machineryRates,
       };
-      await api.post('/quantity-master/rate-lists', payload);
+
+      if (rateListToEdit) {
+        await api.put(`/quantity-master/rate-lists/${rateListToEdit._id}/overrides`, payload);
+      } else {
+        await api.post('/quantity-master/rate-lists', payload);
+      }
+
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -3048,80 +3529,353 @@ const RateListModal: React.FC<{
     }
   };
 
+  const matGroups = groupByCategory(filteredMaterials);
+  const labGroups = groupByCategory(filteredLabour);
+  const macGroups = groupByCategory(filteredMachinery);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-[#10141E] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden text-slate-100">
-        <div className="flex items-center justify-between px-6 py-4 bg-[#131926] border-b border-slate-800">
-          <h3 className="font-bold text-sm sm:text-base text-white">
-            {rateListToEdit ? 'Edit Rate List' : 'New Regional Rate List'}
-          </h3>
-          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-white">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-3xl bg-[#10141E] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden text-slate-100 flex flex-col max-h-[92vh]">
+        {/* MODAL HEADER */}
+        <div className="p-5 sm:p-6 bg-[#131926] border-b border-slate-800">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-base sm:text-lg text-white">
+              {rateListToEdit ? 'Edit Rate List' : 'Create New Rate List'}
+            </h3>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 rounded-lg text-slate-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              Rate List Name <span className="text-red-400">*</span>
-            </label>
+          {/* Rate List Name Input with inner clear X button */}
+          <div className="relative mt-2">
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Delhi NCR Schedule Rates 2026"
-              className="w-full px-3 py-2 bg-[#0A0D16] border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-blue-500"
+              placeholder="Enter Rate List Name (e.g. Raipur Q1 2026)"
+              className="w-full pl-4 pr-10 py-2.5 bg-[#0A0D16] border border-slate-700/80 focus:border-blue-500 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none transition-colors"
             />
+            {name && (
+              <button
+                type="button"
+                onClick={() => setName('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 transition-colors"
+                title="Clear Name"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Description / Location</label>
-            <textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g. Applicable for Gurugram & Noida tender work"
-              className="w-full px-3 py-2 bg-[#0A0D16] border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
+          <p className="text-xs text-slate-400 mt-2">
+            Material, Manpower and Machinery rates build together in one list — fill all three tabs.
+          </p>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="isDefaultRateList"
-              checked={isDefault}
-              onChange={(e) => setIsDefault(e.target.checked)}
-              className="w-4 h-4 accent-blue-600 rounded"
-            />
-            <label htmlFor="isDefaultRateList" className="text-xs text-slate-300 font-medium cursor-pointer">
-              Set as company default reference rate list
+          {/* Default Rate List Checkbox & Search */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-2 border-t border-slate-800/60">
+            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isDefault}
+                onChange={(e) => setIsDefault(e.target.checked)}
+                className="w-4 h-4 accent-blue-600 rounded bg-[#0A0D16] border-slate-700"
+              />
+              <span>Set as company default reference rate list</span>
             </label>
-          </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+            {/* Quick Search */}
+            <div className="relative min-w-[180px] max-w-xs">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Filter items..."
+                className="w-full pl-8 pr-3 py-1 bg-[#0A0D16] border border-slate-700/80 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* THREE RESOURCE TABS */}
+        <div className="flex items-center gap-6 border-b border-slate-800 px-6 pt-3 bg-[#0D111A]">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('materials')}
+            className={cn(
+              'pb-2.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all',
+              activeSubTab === 'materials'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            )}
+          >
+            <Boxes className="w-4 h-4" />
+            <span>Material • {materials.length}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('manpower')}
+            className={cn(
+              'pb-2.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all',
+              activeSubTab === 'manpower'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            )}
+          >
+            <Users className="w-4 h-4" />
+            <span>Manpower • {labour.length}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('machinery')}
+            className={cn(
+              'pb-2.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all',
+              activeSubTab === 'machinery'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            )}
+          >
+            <Truck className="w-4 h-4" />
+            <span>Machinery • {machinery.length}</span>
+          </button>
+        </div>
+
+        {/* ERROR / TOAST NOTIFICATION */}
+        {error && (
+          <div className="m-4 mb-0 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+        {infoToast && (
+          <div className="m-4 mb-0 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{infoToast}</span>
+          </div>
+        )}
+
+        {/* SCROLLABLE ITEMS LIST GROUPED BY CATEGORY */}
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 bg-[#0E121D]">
+          {isLoadingItems ? (
+            <div className="py-16 text-center text-slate-400">
+              <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-xs">Loading items catalog...</p>
+            </div>
+          ) : activeSubTab === 'materials' ? (
+            Object.keys(matGroups).length === 0 ? (
+              <div className="py-12 text-center text-slate-500 text-xs">No materials found.</div>
+            ) : (
+              Object.entries(matGroups).map(([category, items]) => (
+                <div key={category} className="space-y-2">
+                  <h4 className="text-[11px] font-bold tracking-wider text-blue-400 uppercase pb-1 border-b border-slate-800/80">
+                    {category}
+                  </h4>
+                  <div className="space-y-1.5">
+                    {items.map((item) => (
+                      <div
+                        key={item._id}
+                        className="flex items-center justify-between gap-4 py-1.5 px-2 rounded-lg hover:bg-slate-800/40 transition-colors"
+                      >
+                        <div className="text-xs sm:text-sm text-slate-200">
+                          <span className="font-medium text-white">{item.name}</span>
+                          <span className="text-slate-400 text-xs ml-1 font-mono lowercase">({item.unit})</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={materialOverrides[item._id] ?? ''}
+                            onChange={(e) =>
+                              setMaterialOverrides((prev) => ({
+                                ...prev,
+                                [item._id]: e.target.value,
+                              }))
+                            }
+                            placeholder={`Def: ${item.standardRate ?? 0}`}
+                            className="w-28 sm:w-32 px-3 py-1.5 bg-[#0A0D16] border border-slate-700/80 focus:border-blue-500 rounded-lg text-xs sm:text-sm text-right font-mono text-white placeholder-slate-500 focus:outline-none transition-colors"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => clearMaterialOverride(item._id)}
+                            title="Reset to default rate"
+                            className="p-1.5 rounded-lg border border-slate-700/80 bg-[#0A0D16] text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )
+          ) : activeSubTab === 'manpower' ? (
+            Object.keys(labGroups).length === 0 ? (
+              <div className="py-12 text-center text-slate-500 text-xs">No manpower trades found.</div>
+            ) : (
+              Object.entries(labGroups).map(([category, items]) => (
+                <div key={category} className="space-y-2">
+                  <h4 className="text-[11px] font-bold tracking-wider text-blue-400 uppercase pb-1 border-b border-slate-800/80">
+                    {category}
+                  </h4>
+                  <div className="space-y-1.5">
+                    {items.map((item) => (
+                      <div
+                        key={item._id}
+                        className="flex items-center justify-between gap-4 py-1.5 px-2 rounded-lg hover:bg-slate-800/40 transition-colors"
+                      >
+                        <div className="text-xs sm:text-sm text-slate-200">
+                          <span className="font-medium text-white">{item.name}</span>
+                          <span className="text-slate-400 text-xs ml-1 font-mono lowercase">({item.unit})</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={labourOverrides[item._id] ?? ''}
+                            onChange={(e) =>
+                              setLabourOverrides((prev) => ({
+                                ...prev,
+                                [item._id]: e.target.value,
+                              }))
+                            }
+                            placeholder={`Def: ${item.standardDailyRate ?? 0}`}
+                            className="w-28 sm:w-32 px-3 py-1.5 bg-[#0A0D16] border border-slate-700/80 focus:border-blue-500 rounded-lg text-xs sm:text-sm text-right font-mono text-white placeholder-slate-500 focus:outline-none transition-colors"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => clearLabourOverride(item._id)}
+                            title="Reset to default rate"
+                            className="p-1.5 rounded-lg border border-slate-700/80 bg-[#0A0D16] text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )
+          ) : (
+            Object.keys(macGroups).length === 0 ? (
+              <div className="py-12 text-center text-slate-500 text-xs">No machinery items found.</div>
+            ) : (
+              Object.entries(macGroups).map(([category, items]) => (
+                <div key={category} className="space-y-2">
+                  <h4 className="text-[11px] font-bold tracking-wider text-blue-400 uppercase pb-1 border-b border-slate-800/80">
+                    {category}
+                  </h4>
+                  <div className="space-y-1.5">
+                    {items.map((item) => (
+                      <div
+                        key={item._id}
+                        className="flex items-center justify-between gap-4 py-1.5 px-2 rounded-lg hover:bg-slate-800/40 transition-colors"
+                      >
+                        <div className="text-xs sm:text-sm text-slate-200">
+                          <span className="font-medium text-white">{item.name}</span>
+                          <span className="text-slate-400 text-xs ml-1 font-mono lowercase">({item.unit})</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={machineryOverrides[item._id] ?? ''}
+                            onChange={(e) =>
+                              setMachineryOverrides((prev) => ({
+                                ...prev,
+                                [item._id]: e.target.value,
+                              }))
+                            }
+                            placeholder={`Def: ${item.standardHourlyRate ?? 0}`}
+                            className="w-28 sm:w-32 px-3 py-1.5 bg-[#0A0D16] border border-slate-700/80 focus:border-blue-500 rounded-lg text-xs sm:text-sm text-right font-mono text-white placeholder-slate-500 focus:outline-none transition-colors"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => clearMachineryOverride(item._id)}
+                            title="Reset to default rate"
+                            className="p-1.5 rounded-lg border border-slate-700/80 bg-[#0A0D16] text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )
+          )}
+        </div>
+
+        {/* MODAL FOOTER */}
+        <div className="p-4 sm:p-5 bg-[#131926] border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          {/* Left: Export Excel */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 transition-all"
+          >
+            <Upload className="w-3.5 h-3.5 text-blue-400" />
+            <span>Export Excel</span>
+          </button>
+
+          {/* Right: Import Excel, Cancel, Save */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".xlsx,.xls,.csv"
+              onChange={handleImportExcel}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 transition-all"
+            >
+              <Download className="w-3.5 h-3.5 text-blue-400" />
+              <span>Import Excel</span>
+            </button>
+
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-transparent border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-medium"
+              className="px-4 py-2 rounded-xl bg-transparent border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition-all"
             >
               Cancel
             </button>
+
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               disabled={isSubmitting}
-              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md disabled:opacity-50"
+              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all disabled:opacity-50"
             >
-              {isSubmitting ? 'Saving...' : 'Save Rate List'}
+              {isSubmitting ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <span>{rateListToEdit ? 'Save Changes & Rates' : 'Create & Save Rates'}</span>
+              )}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

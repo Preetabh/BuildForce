@@ -1690,14 +1690,212 @@ export class SorService {
   }
 
   /**
-   * List all published SOR Schedules & Versions for company
+   * List all published SOR Schedules & Versions for company with accurate itemCount
    */
   public static async getSorMasters(companyId: string) {
-    return SorMaster.find({
-      companyId: new Types.ObjectId(companyId),
-    })
+    const compQuery = companyId && Types.ObjectId.isValid(companyId)
+      ? { $or: [{ companyId: new Types.ObjectId(companyId) }, { companyId: { $exists: false } }] }
+      : {};
+
+    const masters = await SorMaster.find(compQuery)
       .sort({ createdAt: -1 })
       .lean();
+
+    const masterIds = masters.map((m) => m._id);
+    const counts = await SorItem.aggregate([
+      { $match: { sorId: { $in: masterIds } } },
+      { $group: { _id: '$sorId', count: { $sum: 1 } } },
+    ]);
+    const countMap = new Map(counts.map((c: any) => [c._id.toString(), c.count]));
+
+    return masters.map((m) => ({
+      ...m,
+      itemCount: countMap.get(m._id.toString()) || 0,
+    }));
+  }
+
+  /**
+   * Create a new SOR Master Schedule / Department
+   */
+  public static async createSorMaster(
+    companyId: string,
+    data: {
+      authority?: string;
+      sorName?: string;
+      departmentName?: string;
+      type?: string;
+      scheduleType?: string;
+      country?: string;
+      state?: string;
+      owningBody?: string;
+      year?: string;
+      notes?: string;
+      version?: string;
+      department?: string;
+      category?: string;
+      effectiveFrom?: string | Date;
+    }
+  ) {
+    const finalName = (data.departmentName || data.sorName || '').trim();
+    if (!finalName) {
+      throw new AppError('Department / Schedule name is required', 400);
+    }
+
+    const typeVal = (data.type || data.scheduleType || 'Central Govt').trim();
+    const owningBodyVal = (data.owningBody || data.authority || 'CPWD').trim();
+    const yearVal = (data.year || data.version || '2023').trim();
+
+    const master = await SorMaster.create({
+      companyId: new Types.ObjectId(companyId),
+      authority: owningBodyVal,
+      sorName: finalName,
+      version: yearVal,
+      department: data.department?.trim() || 'Civil',
+      category: data.category?.trim() || 'Civil Works',
+      scheduleType: typeVal,
+      country: data.country?.trim() || 'India',
+      state: data.state?.trim() || (typeVal.includes('State') ? 'State Specific' : 'All-India'),
+      owningBody: owningBodyVal,
+      year: yearVal,
+      notes: data.notes?.trim() || '',
+      effectiveFrom: data.effectiveFrom ? new Date(data.effectiveFrom) : new Date(),
+      status: 'ACTIVE',
+    });
+
+    return master;
+  }
+
+  /**
+   * Rename / Update an existing SOR Master Schedule
+   */
+  public static async updateSorMaster(
+    companyId: string,
+    masterId: string,
+    data: { sorName?: string; authority?: string; version?: string; department?: string }
+  ) {
+    if (!Types.ObjectId.isValid(masterId)) {
+      throw new AppError('Invalid master ID format', 400);
+    }
+
+    const master = await SorMaster.findOneAndUpdate(
+      { _id: new Types.ObjectId(masterId) },
+      { $set: data },
+      { new: true }
+    );
+
+    if (!master) {
+      throw new AppError('Department / Schedule not found', 404);
+    }
+
+    return master;
+  }
+
+  /**
+   * Clear all items within an SOR Master Schedule
+   */
+  public static async clearSorMasterItems(companyId: string, masterId: string) {
+    if (!Types.ObjectId.isValid(masterId)) {
+      throw new AppError('Invalid master ID format', 400);
+    }
+
+    const master = await SorMaster.findById(masterId);
+    if (!master) {
+      throw new AppError('Department / Schedule not found', 404);
+    }
+
+    const result = await SorItem.deleteMany({ sorId: master._id });
+    return { success: true, message: `Cleared ${result.deletedCount} items from ${master.sorName}` };
+  }
+
+
+  /**
+   * Create a single SOR Item manually
+   */
+  public static async createSorItem(
+    companyId: string,
+    data: {
+      sorId: string;
+      srNo?: number;
+      itemCode: string;
+      descriptionEnglish: string;
+      descriptionHindi?: string;
+      unit?: string;
+      rate?: number;
+      workCategory?: string;
+      chapter?: string;
+    }
+  ) {
+    if (!Types.ObjectId.isValid(data.sorId)) {
+      throw new AppError('Invalid department / SOR ID', 400);
+    }
+
+    const master = await SorMaster.findById(data.sorId);
+    if (!master) {
+      throw new AppError('SOR Master Schedule not found', 404);
+    }
+
+    if (!data.itemCode || !data.itemCode.trim()) {
+      throw new AppError('Item Code (SR No) is required', 400);
+    }
+
+    if (!data.descriptionEnglish || !data.descriptionEnglish.trim()) {
+      throw new AppError('Work description is required', 400);
+    }
+
+    const item = await SorItem.create({
+      sorId: master._id,
+      srNo: data.srNo,
+      itemCode: data.itemCode.trim(),
+      descriptionEnglish: data.descriptionEnglish.trim(),
+      descriptionHindi: data.descriptionHindi?.trim() || '',
+      unit: data.unit?.trim().toUpperCase() || '',
+      rate: data.rate !== undefined ? Number(data.rate) : 0,
+      workCategory: data.workCategory?.trim().toUpperCase() || 'EARTH WORK',
+      chapter: data.chapter?.trim() || '',
+      status: 'ACTIVE',
+    });
+
+    return item;
+  }
+
+  /**
+   * Update an existing SOR Item
+   */
+  public static async updateSorItem(companyId: string, itemId: string, data: any) {
+    if (!Types.ObjectId.isValid(itemId)) {
+      throw new AppError('Invalid item ID', 400);
+    }
+
+    const item = await SorItem.findById(itemId);
+    if (!item) {
+      throw new AppError('SOR item not found', 404);
+    }
+
+    if (data.itemCode) item.itemCode = data.itemCode.trim();
+    if (data.descriptionEnglish) item.descriptionEnglish = data.descriptionEnglish.trim();
+    if (data.unit !== undefined) item.unit = data.unit.trim().toUpperCase();
+    if (data.rate !== undefined) item.rate = Number(data.rate);
+    if (data.workCategory) item.workCategory = data.workCategory.trim().toUpperCase();
+    if (data.chapter !== undefined) item.chapter = data.chapter.trim();
+
+    await item.save();
+    return item;
+  }
+
+  /**
+   * Delete a single SOR Item
+   */
+  public static async deleteSorItem(companyId: string, itemId: string) {
+    if (!Types.ObjectId.isValid(itemId)) {
+      throw new AppError('Invalid item ID', 400);
+    }
+
+    const result = await SorItem.deleteOne({ _id: new Types.ObjectId(itemId) });
+    if (result.deletedCount === 0) {
+      throw new AppError('SOR item not found', 404);
+    }
+
+    return { success: true, message: 'SOR item deleted successfully' };
   }
 
   /**

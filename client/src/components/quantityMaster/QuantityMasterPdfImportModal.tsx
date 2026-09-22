@@ -364,18 +364,24 @@ export const QuantityMasterPdfImportModal: React.FC<QuantityMasterPdfImportModal
                 <thead className="sticky top-0 bg-[#131928] text-slate-400 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-800">
                   <tr>
                     <th className="py-2.5 px-3 w-10 text-center">#</th>
-                    <th className="py-2.5 px-3">Item Name</th>
+                    <th className="py-2.5 px-3">
+                      {selectedType === 'formulas' ? 'Formula / Work Item' : 'Item Name'}
+                    </th>
                     <th className="py-2.5 px-3">Category</th>
                     <th className="py-2.5 px-3">Code</th>
                     <th className="py-2.5 px-3 text-center">Unit</th>
-                    <th className="py-2.5 px-3 text-right">Rate (₹)</th>
+                    {selectedType === 'formulas' ? (
+                      <th className="py-2.5 px-3 min-w-[260px]">Resources & Factors (Materials / Manpower / Machinery)</th>
+                    ) : (
+                      <th className="py-2.5 px-3 text-right">Rate (₹)</th>
+                    )}
                     <th className="py-2.5 px-3 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredPreviewItems.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400">
+                      <td colSpan={selectedType === 'formulas' ? 7 : 7} className="py-8 text-center text-slate-400">
                         No items match filter
                       </td>
                     </tr>
@@ -385,13 +391,60 @@ export const QuantityMasterPdfImportModal: React.FC<QuantityMasterPdfImportModal
                       return (
                         <tr key={idx} className="hover:bg-slate-800/40">
                           <td className="py-2 px-3 text-center text-slate-500 font-mono">{idx + 1}</td>
-                          <td className="py-2 px-3 text-white font-medium">{it.name}</td>
+                          <td className="py-2 px-3 text-white font-medium">
+                            <div>
+                              <span>{it.name}</span>
+                              {it.description && (
+                                <p className="text-[10px] text-slate-400 line-clamp-1">{it.description}</p>
+                              )}
+                            </div>
+                          </td>
                           <td className="py-2 px-3 text-slate-300">{it.category || 'General'}</td>
                           <td className="py-2 px-3 text-blue-400 font-mono text-[11px]">{it.code}</td>
                           <td className="py-2 px-3 text-center text-slate-300 uppercase">{it.unit || '—'}</td>
-                          <td className="py-2 px-3 text-right font-bold text-white font-mono">
-                            ₹{Number(rateVal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </td>
+                          {selectedType === 'formulas' ? (
+                            <td className="py-2 px-3">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {it.materialFactors && it.materialFactors.length > 0 && (
+                                  <span
+                                    title={it.materialFactors.map((m: any) => `${m.name}: ${m.factor} ${m.unit}`).join(', ')}
+                                    className="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 text-[10px] font-mono border border-blue-500/25"
+                                  >
+                                    🧱 {it.materialFactors.length} Mat (
+                                    {it.materialFactors.slice(0, 2).map((m: any) => `${m.name.split(' ')[0]}: ${m.factor}`).join(', ')}
+                                    {it.materialFactors.length > 2 ? '...' : ''})
+                                  </span>
+                                )}
+                                {it.labourFactors && it.labourFactors.length > 0 && (
+                                  <span
+                                    title={it.labourFactors.map((l: any) => `${l.name}: ${l.factor} ${l.unit}`).join(', ')}
+                                    className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[10px] font-mono border border-amber-500/25"
+                                  >
+                                    👷 {it.labourFactors.length} Lab (
+                                    {it.labourFactors.slice(0, 2).map((l: any) => `${l.name.split(' ')[0]}: ${l.factor}`).join(', ')}
+                                    {it.labourFactors.length > 2 ? '...' : ''})
+                                  </span>
+                                )}
+                                {it.machineryFactors && it.machineryFactors.length > 0 && (
+                                  <span
+                                    title={it.machineryFactors.map((m: any) => `${m.name}: ${m.factor} ${m.unit}`).join(', ')}
+                                    className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 text-[10px] font-mono border border-purple-500/25"
+                                  >
+                                    🚜 {it.machineryFactors.length} Mach
+                                  </span>
+                                )}
+                                {(!it.materialFactors || it.materialFactors.length === 0) &&
+                                  (!it.labourFactors || it.labourFactors.length === 0) &&
+                                  (!it.machineryFactors || it.machineryFactors.length === 0) && (
+                                    <span className="text-slate-500 text-[11px] italic">No factors</span>
+                                  )}
+                              </div>
+                            </td>
+                          ) : (
+                            <td className="py-2 px-3 text-right font-bold text-white font-mono">
+                              ₹{Number(rateVal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </td>
+                          )}
                           <td className="py-2 px-3 text-center">
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                               <CheckCircle2 className="w-2.5 h-2.5" />

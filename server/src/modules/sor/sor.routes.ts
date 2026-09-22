@@ -56,7 +56,14 @@ router.get('/items/smart-search', requirePermission('sor.view'), SorController.s
 router.get('/schedules/hierarchy', requirePermission('sor.view'), SorController.getScheduleHierarchy);
 router.get('/export', requirePermission('sor.view'), SorController.exportSor);
 router.get('/items', requirePermission('sor.view'), SorController.getSorItems);
+router.post('/items', requirePermission('sor.import'), SorController.createSorItem);
+router.patch('/items/:itemId', requirePermission('sor.import'), SorController.updateSorItem);
+router.delete('/items/:itemId', requirePermission('sor.import'), SorController.deleteSorItem);
+
 router.get('/masters', requirePermission('sor.view'), SorController.getSorMasters);
+router.post('/masters', requirePermission('sor.import'), SorController.createSorMaster);
+router.patch('/masters/:masterId', requirePermission('sor.import'), SorController.updateSorMaster);
+router.delete('/masters/:masterId/items', requirePermission('sor.import'), SorController.clearSorMasterItems);
 router.delete('/masters/:masterId', requirePermission('sor.import'), SorController.deleteSorMaster);
 
 
