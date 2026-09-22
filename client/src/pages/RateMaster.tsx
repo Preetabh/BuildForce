@@ -42,7 +42,18 @@ import { SorImportModal } from '../components/sor/SorImportModal';
 import { formatCurrency } from '../utils/formatters';
 import { useDebounce } from '../hooks/useDebounce';
 
-const INDIAN_STATES = [
+const DEFAULT_TYPES = [
+  'Central Govt',
+  'State Govt',
+  'Central PSU',
+  'State PSU',
+  'Defence',
+  'Railways',
+  'Private (Personal / Company)',
+  'Other',
+];
+
+const COMMON_STATES = [
   'All-India',
   'Andhra Pradesh',
   'Arunachal Pradesh',
@@ -75,15 +86,23 @@ const INDIAN_STATES = [
   'West Bengal',
 ];
 
-const DEPARTMENT_TYPES = [
-  'Central Govt',
-  'State Govt',
-  'Central PSU',
-  'State PSU',
-  'Defence',
-  'Railways',
-  'Private (Personal / Company)',
-  'Other',
+const COMMON_UNITS = [
+  'CUM',
+  'SQM',
+  'METRE',
+  'RMT',
+  'KG',
+  'TONNE',
+  'QUINTAL',
+  'NOS',
+  'LITRE',
+  'BAG',
+  'SET',
+  'TRIP',
+  'HOUR',
+  'DAY',
+  'POINT',
+  'EACH',
 ];
 
 export const RateMaster: React.FC = () => {
@@ -114,6 +133,7 @@ export const RateMaster: React.FC = () => {
   const [itemToEdit, setItemToEdit] = useState<SorItem | null>(null);
   const [deptToEdit, setDeptToEdit] = useState<SorMaster | null>(null);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [compareTargetSorId, setCompareTargetSorId] = useState<string>('');
   const [isKeywordsModalOpen, setIsKeywordsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [resumeImportId, setResumeImportId] = useState<string | null>(null);
@@ -133,6 +153,28 @@ export const RateMaster: React.FC = () => {
   const [browseType, setBrowseType] = useState('All');
   const [browseOwner, setBrowseOwner] = useState('All');
 
+  // Dynamic Recent Schedules stored in localStorage
+  const [recentScheduleIds, setRecentScheduleIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('recent_sor_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const recordRecentSchedule = (id: string) => {
+    setRecentScheduleIds((prev) => {
+      const updated = [id, ...prev.filter((item) => item !== id)].slice(0, 6);
+      try {
+        localStorage.setItem('recent_sor_ids', JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+  };
+
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -140,14 +182,14 @@ export const RateMaster: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Form states for "New SOR Department" popup (matches Image 1 & 2)
+  // Form states for "New SOR Department" popup
   const [deptForm, setDeptForm] = useState({
     departmentName: '',
     type: '',
     country: 'India',
     state: '',
     owningBody: '',
-    year: '2023',
+    year: new Date().getFullYear().toString(),
     notes: '',
   });
 
@@ -157,7 +199,7 @@ export const RateMaster: React.FC = () => {
     descriptionEnglish: '',
     unit: 'CUM',
     rate: '',
-    workCategory: 'EARTH WORK',
+    workCategory: '',
     chapter: '',
   });
 
@@ -178,7 +220,7 @@ export const RateMaster: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch available SOR departments / schedules
+  // Fetch available SOR departments / schedules from DB
   const { data: sorMasters = [], refetch: refetchMasters } = useQuery<SorMaster[]>({
     queryKey: ['sorMasters'],
     queryFn: async () => {
@@ -191,6 +233,7 @@ export const RateMaster: React.FC = () => {
   useEffect(() => {
     if (!selectedSorId && sorMasters.length > 0) {
       setSelectedSorId(sorMasters[0]._id);
+      recordRecentSchedule(sorMasters[0]._id);
     }
   }, [sorMasters, selectedSorId]);
 
@@ -223,6 +266,17 @@ export const RateMaster: React.FC = () => {
     enabled: !!selectedSorId,
   });
 
+  // Fetch items for comparison target schedule if selected
+  const { data: compareTargetItems = [] } = useQuery<SorItem[]>({
+    queryKey: ['sorItemsCompare', compareTargetSorId],
+    queryFn: async () => {
+      if (!compareTargetSorId) return [];
+      const res = await api.get(`/sor/items?sorId=${compareTargetSorId}&limit=50`);
+      return res.data?.data || [];
+    },
+    enabled: !!compareTargetSorId && isCompareModalOpen,
+  });
+
   // Fetch Import History
   const { data: importsHistory = [], refetch: refetchHistory, isLoading: isLoadingHistory } = useQuery<SorImport[]>({
     queryKey: ['sorImportsHistory'],
@@ -236,51 +290,140 @@ export const RateMaster: React.FC = () => {
   const items = itemsData?.items || [];
   const pagination = itemsData?.pagination;
 
-  // Handlers for Department actions
+  // Dynamically extract real types/categories from currently loaded items
+  const dynamicCategories = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((it) => {
+      if (it.workCategory) set.add(it.workCategory);
+      if (it.chapter) set.add(it.chapter);
+    });
+    return Array.from(set).sort();
+  }, [items]);
+
+  // Dynamically extract filter lists from real database masters
+  const uniqueCountries = useMemo(() => {
+    const list = Array.from(new Set(sorMasters.map((m) => m.country?.trim()).filter(Boolean))) as string[];
+    return list.length > 0 ? list : ['India'];
+  }, [sorMasters]);
+
+  const uniqueStates = useMemo(() => {
+    const list = Array.from(new Set(sorMasters.map((m) => m.state?.trim()).filter(Boolean))) as string[];
+    return list.length > 0 ? list : ['All-India'];
+  }, [sorMasters]);
+
+  const uniqueTypes = useMemo(() => {
+    const list = Array.from(new Set(sorMasters.map((m) => m.scheduleType?.trim()).filter(Boolean))) as string[];
+    return list.length > 0 ? list : DEFAULT_TYPES;
+  }, [sorMasters]);
+
+  const uniqueOwners = useMemo(() => {
+    const list = Array.from(
+      new Set(sorMasters.map((m) => (m.owningBody || m.authority)?.trim()).filter(Boolean))
+    ) as string[];
+    return list;
+  }, [sorMasters]);
+
+  // Real Recent schedules from user history
+  const recentMasters = useMemo(() => {
+    if (recentScheduleIds.length === 0) return sorMasters.slice(0, 5);
+    const map = new Map(sorMasters.map((m) => [m._id, m]));
+    const list = recentScheduleIds.map((id) => map.get(id)).filter(Boolean) as SorMaster[];
+    return list.length > 0 ? list : sorMasters.slice(0, 5);
+  }, [recentScheduleIds, sorMasters]);
+
+  // Filtered list for "Browse Schedule of Rates" modal
+  const filteredBrowseMasters = useMemo(() => {
+    return sorMasters.filter((m) => {
+      // Tab filter
+      if (browseCategoryTab === 'Govt') {
+        const typeStr = (m.scheduleType || '').toLowerCase();
+        const isGovt =
+          typeStr.includes('govt') ||
+          typeStr.includes('psu') ||
+          typeStr.includes('railways') ||
+          typeStr.includes('defence') ||
+          typeStr.includes('dsr') ||
+          typeStr.includes('pwd');
+        if (!isGovt) return false;
+      }
+      if (browseCategoryTab === 'Private') {
+        if (!(m.scheduleType || '').toLowerCase().includes('private')) return false;
+      }
+
+      // Dropdown filters
+      if (browseCountry !== 'All' && m.country && m.country !== browseCountry) return false;
+      if (browseState !== 'All' && m.state && m.state !== browseState) return false;
+      if (browseType !== 'All' && m.scheduleType && m.scheduleType !== browseType) return false;
+      if (browseOwner !== 'All' && (m.owningBody || m.authority) !== browseOwner) return false;
+
+      // Search term
+      if (browseSearch.trim()) {
+        const q = browseSearch.toLowerCase();
+        const matchesName = m.sorName.toLowerCase().includes(q);
+        const matchesOwner = (m.owningBody || m.authority || '').toLowerCase().includes(q);
+        const matchesState = (m.state || '').toLowerCase().includes(q);
+        const matchesType = (m.scheduleType || '').toLowerCase().includes(q);
+        if (!matchesName && !matchesOwner && !matchesState && !matchesType) return false;
+      }
+
+      return true;
+    });
+  }, [sorMasters, browseCategoryTab, browseCountry, browseState, browseType, browseOwner, browseSearch]);
+
+  // Group filtered masters by Region / State dynamically
+  const groupedBrowseMasters = useMemo(() => {
+    const groups: { [key: string]: SorMaster[] } = {};
+    for (const m of filteredBrowseMasters) {
+      let groupKey = '';
+      if (m.state && m.state !== 'All-India' && m.state !== '—') {
+        groupKey = m.state;
+      } else if (m.scheduleType?.toLowerCase().includes('private')) {
+        groupKey = '— (Private)';
+      } else {
+        groupKey = '— (Central Govt)';
+      }
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(m);
+    }
+    return groups;
+  }, [filteredBrowseMasters]);
+
+  // Department CRUD Handlers
   const handleSaveDepartment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deptForm.departmentName.trim()) {
       showToast('Department Name is required');
       return;
     }
-    if (!deptForm.type) {
-      showToast('Please select a Type');
-      return;
-    }
-    if ((deptForm.type === 'State Govt' || deptForm.type === 'State PSU') && !deptForm.state) {
-      showToast('State is required for State Govt / State PSU');
-      return;
-    }
 
     try {
       if (deptToEdit) {
-        // Update existing
         await api.patch(`/sor/masters/${deptToEdit._id}`, {
           sorName: deptForm.departmentName.trim(),
-          scheduleType: deptForm.type,
-          country: deptForm.country,
-          state: deptForm.state || (deptForm.type.includes('State') ? 'State Specific' : 'All-India'),
+          scheduleType: deptForm.type || 'Central Govt',
+          country: deptForm.country || 'India',
+          state: deptForm.state || 'All-India',
           owningBody: deptForm.owningBody || deptForm.departmentName,
           authority: deptForm.owningBody || deptForm.departmentName,
-          year: deptForm.year,
-          version: deptForm.year,
-          notes: deptForm.notes,
+          year: deptForm.year || '2023',
+          version: deptForm.year || '2023',
+          notes: deptForm.notes || '',
         });
         showToast(`Department "${deptForm.departmentName}" updated!`);
       } else {
-        // Create new
         const res = await api.post('/sor/masters', {
           departmentName: deptForm.departmentName.trim(),
-          type: deptForm.type,
+          type: deptForm.type || 'Central Govt',
           country: deptForm.country || 'India',
-          state: deptForm.state || (deptForm.type.includes('State') ? 'State Specific' : 'All-India'),
+          state: deptForm.state || 'All-India',
           owningBody: deptForm.owningBody || deptForm.departmentName,
-          year: deptForm.year || '2023',
+          year: deptForm.year || new Date().getFullYear().toString(),
           notes: deptForm.notes || '',
         });
         showToast(`Department "${deptForm.departmentName}" created successfully!`);
         if (res.data?.data?._id) {
           setSelectedSorId(res.data.data._id);
+          recordRecentSchedule(res.data.data._id);
         }
       }
 
@@ -292,7 +435,7 @@ export const RateMaster: React.FC = () => {
         country: 'India',
         state: '',
         owningBody: '',
-        year: '2023',
+        year: new Date().getFullYear().toString(),
         notes: '',
       });
       await refetchMasters();
@@ -354,7 +497,7 @@ export const RateMaster: React.FC = () => {
     }
   };
 
-  // Handlers for Items
+  // Item CRUD Handlers
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeMaster || !manualItemForm.itemCode.trim() || !manualItemForm.descriptionEnglish.trim()) return;
@@ -365,7 +508,7 @@ export const RateMaster: React.FC = () => {
         descriptionEnglish: manualItemForm.descriptionEnglish.trim(),
         unit: manualItemForm.unit.trim().toUpperCase(),
         rate: manualItemForm.rate ? Number(manualItemForm.rate) : 0,
-        workCategory: manualItemForm.workCategory.trim().toUpperCase(),
+        workCategory: manualItemForm.workCategory.trim().toUpperCase() || 'GENERAL WORK',
         chapter: manualItemForm.chapter.trim() || manualItemForm.workCategory,
       });
       showToast(`Item ${manualItemForm.itemCode} added to schedule`);
@@ -375,7 +518,7 @@ export const RateMaster: React.FC = () => {
         descriptionEnglish: '',
         unit: 'CUM',
         rate: '',
-        workCategory: 'EARTH WORK',
+        workCategory: '',
         chapter: '',
       });
       await refetchItems();
@@ -428,7 +571,7 @@ export const RateMaster: React.FC = () => {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      const fileName = `${(activeMaster?.sorName || 'CPWD_SOR').replace(/[^a-zA-Z0-9_-]/g, '_')}_${activeMaster?.version || '2023'}.xlsx`;
+      const fileName = `${(activeMaster?.sorName || 'SOR_Schedule').replace(/[^a-zA-Z0-9_-]/g, '_')}_${activeMaster?.version || '2023'}.xlsx`;
       link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
@@ -450,69 +593,26 @@ export const RateMaster: React.FC = () => {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const totalItemsCount = activeMaster?.itemCount !== undefined ? activeMaster.itemCount : pagination?.total || items.length;
-
-  // Filtered list for "Browse Schedule of Rates" modal
-  const filteredBrowseMasters = useMemo(() => {
-    return sorMasters.filter((m) => {
-      // Tab filter
-      if (browseCategoryTab === 'Govt') {
-        const isGovt =
-          m.scheduleType?.toLowerCase().includes('govt') ||
-          m.scheduleType?.toLowerCase().includes('psu') ||
-          m.scheduleType?.toLowerCase().includes('railways') ||
-          m.scheduleType?.toLowerCase().includes('defence');
-        if (!isGovt) return false;
-      }
-      if (browseCategoryTab === 'Private') {
-        if (!m.scheduleType?.toLowerCase().includes('private')) return false;
-      }
-
-      // Dropdown filters
-      if (browseCountry !== 'All' && m.country && m.country !== browseCountry) return false;
-      if (browseState !== 'All' && m.state && m.state !== browseState) return false;
-      if (browseType !== 'All' && m.scheduleType && m.scheduleType !== browseType) return false;
-      if (browseOwner !== 'All' && (m.owningBody || m.authority) !== browseOwner) return false;
-
-      // Search term
-      if (browseSearch.trim()) {
-        const q = browseSearch.toLowerCase();
-        const matchesName = m.sorName.toLowerCase().includes(q);
-        const matchesOwner = (m.owningBody || m.authority || '').toLowerCase().includes(q);
-        const matchesState = (m.state || '').toLowerCase().includes(q);
-        const matchesType = (m.scheduleType || '').toLowerCase().includes(q);
-        if (!matchesName && !matchesOwner && !matchesState && !matchesType) return false;
-      }
-
-      return true;
-    });
-  }, [sorMasters, browseCategoryTab, browseCountry, browseState, browseType, browseOwner, browseSearch]);
-
-  // Group filtered masters by Region / State
-  const groupedBrowseMasters = useMemo(() => {
-    const groups: { [key: string]: SorMaster[] } = {};
-    for (const m of filteredBrowseMasters) {
-      let groupKey = '';
-      if (m.state && m.state !== 'All-India' && m.state !== '—') {
-        groupKey = m.state;
-      } else if (m.scheduleType?.toLowerCase().includes('private')) {
-        groupKey = '— (Private)';
-      } else {
-        groupKey = '— (Central Govt)';
-      }
-      if (!groups[groupKey]) groups[groupKey] = [];
-      groups[groupKey].push(m);
-    }
-    return groups;
-  }, [filteredBrowseMasters]);
-
-  const uniqueCountries = Array.from(new Set(sorMasters.map((m) => m.country || 'India'))).filter(Boolean);
-  const uniqueStates = Array.from(new Set(sorMasters.map((m) => m.state || 'All-India'))).filter(Boolean);
-  const uniqueTypes = Array.from(new Set(sorMasters.map((m) => m.scheduleType || 'Central Govt'))).filter(Boolean);
-  const uniqueOwners = Array.from(new Set(sorMasters.map((m) => m.owningBody || m.authority || 'CPWD'))).filter(Boolean);
-
+  // Datalist collections for autocomplete
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 pb-20 select-none">
+      {/* Autocomplete Datalists */}
+      <datalist id="states-datalist">
+        {COMMON_STATES.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
+      <datalist id="units-datalist">
+        {COMMON_UNITS.map((u) => (
+          <option key={u} value={u} />
+        ))}
+      </datalist>
+      <datalist id="categories-datalist">
+        {dynamicCategories.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+
       {/* Toast Alert */}
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-[#111927] border border-blue-500/40 text-blue-300 shadow-2xl shadow-blue-500/20 text-sm font-medium animate-in fade-in slide-in-from-top-4">
@@ -528,7 +628,7 @@ export const RateMaster: React.FC = () => {
           <button
             onClick={() => navigate(-1)}
             title="Go Back"
-            className="w-10 h-10 rounded-xl bg-[#101524] border border-slate-750 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center transition-all shadow-sm flex-shrink-0"
+            className="w-10 h-10 rounded-xl bg-[#101524] border border-slate-750 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center transition-all shadow-sm flex-shrink-0 cursor-pointer"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -565,7 +665,7 @@ export const RateMaster: React.FC = () => {
             >
               <Printer className="w-4 h-4 text-blue-400" />
               <span>
-                {activeMaster ? `${activeMaster.sorName} (${totalItemsCount} items)` : 'Select Department'}
+                {activeMaster ? `${activeMaster.sorName} (${activeMaster.itemCount ?? items.length} items)` : 'Select Department'}
               </span>
               <ChevronDown className="w-4 h-4 text-slate-400 ml-1" />
             </button>
@@ -582,7 +682,7 @@ export const RateMaster: React.FC = () => {
                   country: 'India',
                   state: '',
                   owningBody: '',
-                  year: '2023',
+                  year: new Date().getFullYear().toString(),
                   notes: '',
                 });
                 setIsNewDeptModalOpen(true);
@@ -622,10 +722,10 @@ export const RateMaster: React.FC = () => {
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                {activeMaster?.sorName || 'CPWD SOR 2023'}
+                {activeMaster?.sorName || 'Schedule of Rates'}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5 font-medium">
-                {totalItemsCount} items
+                {activeMaster?.itemCount ?? items.length} items
               </p>
             </div>
           </div>
@@ -785,14 +885,14 @@ export const RateMaster: React.FC = () => {
               {search && (
                 <button
                   onClick={() => setSearch('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
                 >
                   <X className="w-3 h-3" />
                 </button>
               )}
             </div>
 
-            {/* Type selector */}
+            {/* Dynamic Type selector from real categories in active schedule */}
             <select
               value={selectedType}
               onChange={(e) => {
@@ -801,14 +901,12 @@ export const RateMaster: React.FC = () => {
               }}
               className="bg-[#0f1524] border border-slate-750 hover:border-slate-600 rounded-lg text-xs text-slate-200 px-3 py-1.5 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
             >
-              <option value="">All Types</option>
-              <option value="EARTH WORK">EARTH WORK</option>
-              <option value="CONCRETE WORK">CONCRETE WORK</option>
-              <option value="RCC WORK">RCC WORK</option>
-              <option value="STEEL REINFORCEMENT">STEEL REINFORCEMENT</option>
-              <option value="BRICK WORK">BRICK WORK</option>
-              <option value="FINISHING WORK">FINISHING WORK</option>
-              <option value="FLOORING">FLOORING</option>
+              <option value="">All Types ({dynamicCategories.length || 'All'})</option>
+              {dynamicCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
             </select>
 
             {/* Limit selector */}
@@ -869,8 +967,25 @@ export const RateMaster: React.FC = () => {
                   </tr>
                 ) : items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-16 text-center text-slate-400">
-                      No Rate Master items found matching your filters.
+                    <td colSpan={7} className="py-16 text-center text-slate-400 space-y-2">
+                      <p>No items in this Schedule of Rates yet.</p>
+                      <div className="flex items-center justify-center gap-3 pt-2">
+                        <button
+                          onClick={() => {
+                            setResumeImportId(null);
+                            setIsImportModalOpen(true);
+                          }}
+                          className="px-3.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 text-xs font-semibold border border-blue-500/30 cursor-pointer"
+                        >
+                          Import from Excel / PDF
+                        </button>
+                        <button
+                          onClick={() => setIsManualEntryModalOpen(true)}
+                          className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+                        >
+                          Add Item Manually
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -937,7 +1052,7 @@ export const RateMaster: React.FC = () => {
                         {/* TYPE */}
                         <td className="py-3 px-4 whitespace-nowrap">
                           <span className="text-[11px] font-semibold text-slate-400 tracking-wider uppercase">
-                            {item.workCategory || item.chapter || 'EARTH WORK'}
+                            {item.workCategory || item.chapter || 'GENERAL'}
                           </span>
                         </td>
 
@@ -1020,7 +1135,7 @@ export const RateMaster: React.FC = () => {
         </div>
       </div>
 
-      {/* FLOATING BOT ASSISTANT (Vibrant Magenta button at bottom right) */}
+      {/* FLOATING BOT ASSISTANT */}
       <div className="fixed bottom-6 right-6 z-40">
         <button
           onClick={() => setIsBotOpen(!isBotOpen)}
@@ -1039,7 +1154,7 @@ export const RateMaster: React.FC = () => {
               <Bot className="w-5 h-5" />
               <div>
                 <h4 className="text-xs font-bold">BuildForce Rate Assistant</h4>
-                <p className="text-[10px] text-pink-100">Instant CPWD & State SOR Lookup</p>
+                <p className="text-[10px] text-pink-100">Live SOR Lookup & Analysis</p>
               </div>
             </div>
             <button onClick={() => setIsBotOpen(false)} className="text-white/80 hover:text-white cursor-pointer">
@@ -1049,28 +1164,22 @@ export const RateMaster: React.FC = () => {
 
           <div className="p-4 space-y-3">
             <p className="text-xs text-slate-300 leading-relaxed">
-              Ask anything about CPWD rate codes, concrete ratios, excavation specifications, or material breakups:
+              Search by work category or keyword across the current schedule:
             </p>
 
             <div className="space-y-1.5">
-              <button
-                onClick={() => setSearch('Earth work in surface excavation')}
-                className="w-full text-left p-2 rounded-lg bg-[#111827] hover:bg-blue-600/20 border border-slate-750 text-xs text-slate-300 cursor-pointer"
-              >
-                🔍 Item 2.1 — Surface Excavation
-              </button>
-              <button
-                onClick={() => setSearch('cement concrete of specified grade')}
-                className="w-full text-left p-2 rounded-lg bg-[#111827] hover:bg-blue-600/20 border border-slate-750 text-xs text-slate-300 cursor-pointer"
-              >
-                🔍 Item 4.1.3 — 1:2:4 PCC Plinth Concrete
-              </button>
-              <button
-                onClick={() => setSearch('Reinforced cement concrete work in beams')}
-                className="w-full text-left p-2 rounded-lg bg-[#111827] hover:bg-blue-600/20 border border-slate-750 text-xs text-slate-300 cursor-pointer"
-              >
-                🔍 Item 5.1.2 — 1:1.5:3 RCC Beams & Slabs
-              </button>
+              {dynamicCategories.slice(0, 4).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setSelectedType(cat);
+                    setIsBotOpen(false);
+                  }}
+                  className="w-full text-left p-2 rounded-lg bg-[#111827] hover:bg-blue-600/20 border border-slate-750 text-xs text-slate-300 cursor-pointer truncate"
+                >
+                  🔍 {cat}
+                </button>
+              ))}
             </div>
 
             <div className="relative pt-2">
@@ -1084,7 +1193,7 @@ export const RateMaster: React.FC = () => {
                     setIsBotOpen(false);
                   }
                 }}
-                placeholder="Ask or search item code..."
+                placeholder="Ask or search item..."
                 className="w-full pl-3 pr-8 py-2 bg-[#121929] border border-slate-750 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-pink-500"
               />
               <button
@@ -1104,7 +1213,7 @@ export const RateMaster: React.FC = () => {
       )}
 
       {/* =========================================================================
-          POPUP 1: "New SOR Department" (MATCHES IMAGE 1 & IMAGE 2 PRECISELY)
+          POPUP 1: "New SOR Department" (COMPLETELY DYNAMIC INPUTS)
          ========================================================================= */}
       {isNewDeptModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
@@ -1137,7 +1246,7 @@ export const RateMaster: React.FC = () => {
                   required
                   value={deptForm.departmentName}
                   onChange={(e) => setDeptForm({ ...deptForm, departmentName: e.target.value })}
-                  placeholder="e.g., CPWD SOR 2023"
+                  placeholder="e.g., CPWD SOR 2023 or State PWD Roads"
                   className="w-full px-3.5 py-2.5 bg-[#141a29] border border-slate-750 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none transition-all"
                 />
               </div>
@@ -1148,19 +1257,20 @@ export const RateMaster: React.FC = () => {
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                     Type *
                   </label>
-                  <select
+                  <input
+                    type="text"
                     required
+                    list="dept-types-list"
                     value={deptForm.type}
                     onChange={(e) => setDeptForm({ ...deptForm, type: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-[#141a29] border border-blue-500/80 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 rounded-xl text-sm text-white focus:outline-none transition-all cursor-pointer"
-                  >
-                    <option value="">-- Select Type --</option>
-                    {DEPARTMENT_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
+                    placeholder="-- Select or Type --"
+                    className="w-full px-3.5 py-2.5 bg-[#141a29] border border-blue-500/80 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none transition-all"
+                  />
+                  <datalist id="dept-types-list">
+                    {uniqueTypes.map((t) => (
+                      <option key={t} value={t} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
 
                 <div>
@@ -1172,35 +1282,28 @@ export const RateMaster: React.FC = () => {
                     required
                     value={deptForm.country}
                     onChange={(e) => setDeptForm({ ...deptForm, country: e.target.value })}
-                    placeholder="India"
+                    placeholder="India / Any Country"
                     className="w-full px-3.5 py-2.5 bg-[#141a29] border border-slate-750 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none transition-all"
                   />
                 </div>
               </div>
 
-              {/* Conditional State field if Type is State Govt or State PSU */}
-              {(deptForm.type === 'State Govt' || deptForm.type === 'State PSU') && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                    State *
-                  </label>
-                  <select
-                    required
-                    value={deptForm.state}
-                    onChange={(e) => setDeptForm({ ...deptForm, state: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-[#141a29] border border-slate-750 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl text-sm text-white focus:outline-none transition-all cursor-pointer"
-                  >
-                    <option value="">-- Select State --</option>
-                    {INDIAN_STATES.filter((s) => s !== 'All-India').map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* State Field with dynamic datalist autocomplete */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  State / Region {deptForm.type.toLowerCase().includes('state') ? '*' : '(Optional)'}
+                </label>
+                <input
+                  type="text"
+                  list="states-datalist"
+                  value={deptForm.state}
+                  onChange={(e) => setDeptForm({ ...deptForm, state: e.target.value })}
+                  placeholder="e.g., Maharashtra, Chhattisgarh, All-India..."
+                  className="w-full px-3.5 py-2.5 bg-[#141a29] border border-slate-750 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none transition-all"
+                />
+              </div>
 
-              {/* Field 3: Owning Body / Company & Year (2 Columns) */}
+              {/* Field 3: Owning Body / Company & Year */}
               <div className="grid grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5">
@@ -1210,7 +1313,7 @@ export const RateMaster: React.FC = () => {
                     type="text"
                     value={deptForm.owningBody}
                     onChange={(e) => setDeptForm({ ...deptForm, owningBody: e.target.value })}
-                    placeholder="e.g., CPWD, NHAI, MES"
+                    placeholder="e.g., CPWD, NHAI, MES, PWD"
                     className="w-full px-3.5 py-2.5 bg-[#141a29] border border-slate-750 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none transition-all"
                   />
                 </div>
@@ -1223,7 +1326,7 @@ export const RateMaster: React.FC = () => {
                     type="text"
                     value={deptForm.year}
                     onChange={(e) => setDeptForm({ ...deptForm, year: e.target.value })}
-                    placeholder="2023"
+                    placeholder="2023 / 2024"
                     className="w-full px-3.5 py-2.5 bg-[#141a29] border border-slate-750 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none transition-all"
                   />
                 </div>
@@ -1243,7 +1346,7 @@ export const RateMaster: React.FC = () => {
                 />
               </div>
 
-              {/* Info block (matches Image 1) */}
+              {/* Info block */}
               <div className="p-3 bg-[#111726]/60 border border-slate-800 rounded-xl flex items-start gap-2 text-[11px] text-slate-400 leading-relaxed">
                 <Info className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
                 <div>
@@ -1279,12 +1382,12 @@ export const RateMaster: React.FC = () => {
       )}
 
       {/* =========================================================================
-          POPUP 2: "Browse Schedule of Rates" (MATCHES IMAGE 3 PRECISELY)
+          POPUP 2: "Browse Schedule of Rates" (FULLY DYNAMIC WITH REAL DATA)
          ========================================================================= */}
       {isBrowseModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-sm animate-in fade-in">
           <div className="w-full max-w-4xl max-h-[90vh] bg-[#0c101c] border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-            {/* 1. Modal Top Bar (Document Icon, Title, Search bar, Category Pills, Close X) */}
+            {/* 1. Modal Top Bar */}
             <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400">
@@ -1309,14 +1412,14 @@ export const RateMaster: React.FC = () => {
                   {browseSearch && (
                     <button
                       onClick={() => setBrowseSearch('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
 
-                {/* Scope Pills: All, Govt, Private */}
+                {/* Scope Pills */}
                 <div className="flex items-center p-0.5 rounded-xl bg-[#121828] border border-slate-750">
                   {(['All', 'Govt', 'Private'] as const).map((tab) => (
                     <button
@@ -1343,7 +1446,7 @@ export const RateMaster: React.FC = () => {
               </div>
             </div>
 
-            {/* 2. Secondary Filter Bar (All Countries, All States, All Types, All Owners) */}
+            {/* 2. Secondary Filter Bar (Dynamic counts and values) */}
             <div className="px-5 py-3 border-b border-slate-800/80 bg-[#090d18] flex items-center gap-3 flex-wrap">
               {/* Country */}
               <select
@@ -1402,40 +1505,62 @@ export const RateMaster: React.FC = () => {
               </select>
             </div>
 
-            {/* 3. Recent Tags Row */}
-            <div className="px-5 py-2.5 bg-[#0a0e19] border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto text-xs">
-              <div className="flex items-center gap-1.5 text-slate-500 text-[11px] font-semibold whitespace-nowrap">
-                <Clock className="w-3.5 h-3.5" />
-                <span>Recent:</span>
+            {/* 3. Real Recent Tags Row */}
+            {recentMasters.length > 0 && (
+              <div className="px-5 py-2.5 bg-[#0a0e19] border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto text-xs">
+                <div className="flex items-center gap-1.5 text-slate-500 text-[11px] font-semibold whitespace-nowrap">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Recent:</span>
+                </div>
+                {recentMasters.map((m) => (
+                  <button
+                    key={m._id}
+                    onClick={() => {
+                      setSelectedSorId(m._id);
+                      recordRecentSchedule(m._id);
+                      setIsBrowseModalOpen(false);
+                      setPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg border text-xs whitespace-nowrap transition-colors cursor-pointer ${
+                      selectedSorId === m._id
+                        ? 'bg-blue-600/25 border-blue-500/50 text-blue-300 font-semibold'
+                        : 'bg-[#121828] hover:bg-blue-600/20 border-slate-750 hover:border-blue-500/40 text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    {m.sorName}
+                  </button>
+                ))}
               </div>
-              {sorMasters.slice(0, 5).map((m) => (
-                <button
-                  key={m._id}
-                  onClick={() => {
-                    setSelectedSorId(m._id);
-                    setIsBrowseModalOpen(false);
-                    setPage(1);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-[#121828] hover:bg-blue-600/20 border border-slate-750 hover:border-blue-500/40 text-slate-300 hover:text-white text-xs whitespace-nowrap transition-colors cursor-pointer"
-                >
-                  {m.sorName}
-                </button>
-              ))}
-            </div>
+            )}
 
-            {/* 4. Grouped Department List */}
+            {/* 4. Grouped Real Department List */}
             <div className="flex-1 overflow-y-auto p-5 space-y-6 divide-y divide-slate-800/50">
               {Object.keys(groupedBrowseMasters).length === 0 ? (
-                <div className="py-16 text-center text-slate-400">
-                  No Schedule of Rates found matching your filter criteria.
+                <div className="py-16 text-center text-slate-400 space-y-3">
+                  <p>No Schedule of Rates found matching your filters.</p>
+                  <button
+                    onClick={() => {
+                      setBrowseSearch('');
+                      setBrowseCategoryTab('All');
+                      setBrowseCountry('All');
+                      setBrowseState('All');
+                      setBrowseType('All');
+                      setBrowseOwner('All');
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-400 text-xs font-semibold cursor-pointer"
+                  >
+                    Reset Filters
+                  </button>
                 </div>
               ) : (
                 Object.entries(groupedBrowseMasters).map(([regionName, depts]) => (
                   <div key={regionName} className="space-y-3 pt-4 first:pt-0">
-                    {/* Region Header: INDIA / State / Count */}
+                    {/* Region Header */}
                     <div className="flex items-center justify-between text-xs font-semibold text-slate-400 tracking-wider">
                       <div className="flex items-center gap-2">
-                        <span className="text-blue-400 font-bold uppercase">INDIA</span>
+                        <span className="text-blue-400 font-bold uppercase">
+                          {depts[0]?.country || 'INDIA'}
+                        </span>
                         <span>/</span>
                         <span className="text-slate-300">{regionName}</span>
                       </div>
@@ -1447,16 +1572,17 @@ export const RateMaster: React.FC = () => {
                     {/* Department Cards */}
                     <div className="space-y-2.5">
                       {depts.map((d) => {
-                        const count = d.itemCount !== undefined ? d.itemCount : 4060;
+                        const count = d.itemCount ?? 0;
                         const isSelected = selectedSorId === d._id;
-                        const isStateGovt = d.scheduleType?.toLowerCase().includes('state');
-                        const isPrivate = d.scheduleType?.toLowerCase().includes('private');
+                        const isStateGovt = (d.scheduleType || '').toLowerCase().includes('state');
+                        const isPrivate = (d.scheduleType || '').toLowerCase().includes('private');
 
                         return (
                           <div
                             key={d._id}
                             onClick={() => {
                               setSelectedSorId(d._id);
+                              recordRecentSchedule(d._id);
                               setIsBrowseModalOpen(false);
                               setPage(1);
                             }}
@@ -1475,9 +1601,8 @@ export const RateMaster: React.FC = () => {
                                 </h4>
                               </div>
 
-                              {/* Badges: Type (green/blue), State (pin), Owner (building) */}
+                              {/* Badges */}
                               <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                                {/* Type Badge */}
                                 <span
                                   className={`px-2 py-0.5 rounded-md font-semibold border ${
                                     isStateGovt
@@ -1487,24 +1612,22 @@ export const RateMaster: React.FC = () => {
                                       : 'bg-blue-500/15 text-blue-400 border-blue-500/30'
                                   }`}
                                 >
-                                  {d.scheduleType || 'Central Govt'}
+                                  {d.scheduleType || 'General'}
                                 </span>
 
-                                {/* Location Badge */}
                                 <span className="px-2 py-0.5 rounded-md bg-[#161d2e] border border-slate-750 text-slate-300 flex items-center gap-1 font-medium">
                                   <MapPin className="w-3 h-3 text-slate-400" />
                                   <span>{d.state || 'All-India'}</span>
                                 </span>
 
-                                {/* Owning Body Badge */}
                                 <span className="px-2 py-0.5 rounded-md bg-[#161d2e] border border-slate-750 text-slate-300 flex items-center gap-1 font-medium">
                                   <Building2 className="w-3 h-3 text-slate-400" />
-                                  <span>{d.owningBody || d.authority || 'CPWD'}</span>
+                                  <span>{d.owningBody || d.authority || 'Default'}</span>
                                 </span>
                               </div>
                             </div>
 
-                            {/* Right Side: Items count & Edit button */}
+                            {/* Right Side: Real Live Items count & Edit button */}
                             <div className="flex items-center gap-3 flex-shrink-0">
                               <span className="text-sm font-bold font-mono text-blue-400">
                                 {count.toLocaleString()} items
@@ -1530,7 +1653,7 @@ export const RateMaster: React.FC = () => {
               )}
             </div>
 
-            {/* 5. Footer Bar (Clear button, Count, + New SOR button) */}
+            {/* 5. Footer Bar */}
             <div className="p-4 border-t border-slate-800 bg-[#090d18] flex items-center justify-between gap-4">
               <button
                 onClick={() => {
@@ -1561,7 +1684,7 @@ export const RateMaster: React.FC = () => {
                       country: 'India',
                       state: '',
                       owningBody: '',
-                      year: '2023',
+                      year: new Date().getFullYear().toString(),
                       notes: '',
                     });
                     setIsNewDeptModalOpen(true);
@@ -1579,7 +1702,7 @@ export const RateMaster: React.FC = () => {
 
       {/* OTHER MODALS */}
 
-      {/* 2. Rename Department Modal */}
+      {/* Rename Department Modal */}
       <Modal
         isOpen={isRenameDeptModalOpen}
         onClose={() => setIsRenameDeptModalOpen(false)}
@@ -1610,7 +1733,7 @@ export const RateMaster: React.FC = () => {
         </form>
       </Modal>
 
-      {/* 3. Manual Entry Modal */}
+      {/* Manual Entry Modal */}
       <Modal
         isOpen={isManualEntryModalOpen}
         onClose={() => setIsManualEntryModalOpen(false)}
@@ -1633,20 +1756,14 @@ export const RateMaster: React.FC = () => {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Unit</label>
-              <select
+              <input
+                type="text"
+                list="units-datalist"
                 value={manualItemForm.unit}
                 onChange={(e) => setManualItemForm({ ...manualItemForm, unit: e.target.value })}
-                className="w-full px-3 py-2 bg-[#101524] border border-slate-750 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
-              >
-                <option value="">- None (Header) -</option>
-                <option value="CUM">CUM</option>
-                <option value="SQM">SQM</option>
-                <option value="METRE">METRE</option>
-                <option value="KG">KG</option>
-                <option value="TONNE">TONNE</option>
-                <option value="NOS">NOS</option>
-                <option value="LITRE">LITRE</option>
-              </select>
+                placeholder="CUM / SQM / KG..."
+                className="w-full px-3 py-2 bg-[#101524] border border-slate-750 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 font-mono uppercase"
+              />
             </div>
           </div>
 
@@ -1677,12 +1794,13 @@ export const RateMaster: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Type / Work Category</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Type / Category</label>
               <input
                 type="text"
+                list="categories-datalist"
                 value={manualItemForm.workCategory}
                 onChange={(e) => setManualItemForm({ ...manualItemForm, workCategory: e.target.value })}
-                placeholder="e.g. EARTH WORK"
+                placeholder="e.g. EARTH WORK, CONCRETE"
                 className="w-full px-3 py-2 bg-[#101524] border border-slate-750 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 uppercase"
               />
             </div>
@@ -1699,7 +1817,7 @@ export const RateMaster: React.FC = () => {
         </form>
       </Modal>
 
-      {/* 4. Edit Item Modal */}
+      {/* Edit Item Modal */}
       {itemToEdit && (
         <Modal
           isOpen={isEditItemModalOpen}
@@ -1727,6 +1845,7 @@ export const RateMaster: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Unit</label>
                 <input
                   type="text"
+                  list="units-datalist"
                   value={itemToEdit.unit || ''}
                   onChange={(e) => setItemToEdit({ ...itemToEdit, unit: e.target.value })}
                   placeholder="e.g. CUM, SQM"
@@ -1761,6 +1880,7 @@ export const RateMaster: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Type</label>
                 <input
                   type="text"
+                  list="categories-datalist"
                   value={itemToEdit.workCategory || ''}
                   onChange={(e) => setItemToEdit({ ...itemToEdit, workCategory: e.target.value })}
                   className="w-full px-3 py-2 bg-[#101524] border border-slate-750 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 uppercase"
@@ -1787,7 +1907,7 @@ export const RateMaster: React.FC = () => {
         </Modal>
       )}
 
-      {/* 5. Clear All Confirmation Modal */}
+      {/* Clear All Confirmation Modal */}
       <Modal
         isOpen={confirmClearOpen}
         onClose={() => setConfirmClearOpen(false)}
@@ -1799,7 +1919,7 @@ export const RateMaster: React.FC = () => {
           <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2.5 text-amber-300 text-xs">
             <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-400" />
             <p>
-              Are you sure you want to clear all {totalItemsCount} items? This action cannot be undone.
+              Are you sure you want to clear all {activeMaster?.itemCount ?? items.length} items? This action cannot be undone.
             </p>
           </div>
           <div className="flex justify-end gap-2">
@@ -1813,7 +1933,7 @@ export const RateMaster: React.FC = () => {
         </div>
       </Modal>
 
-      {/* 6. Delete Department Confirmation Modal */}
+      {/* Delete Department Confirmation Modal */}
       <Modal
         isOpen={confirmDeleteDeptOpen}
         onClose={() => setConfirmDeleteDeptOpen(false)}
@@ -1825,7 +1945,7 @@ export const RateMaster: React.FC = () => {
           <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2.5 text-red-300 text-xs">
             <AlertTriangle className="w-5 h-5 flex-shrink-0 text-red-400" />
             <p>
-              This will permanently delete the schedule container and all {totalItemsCount} associated items.
+              This will permanently delete the schedule container and all {activeMaster?.itemCount ?? items.length} associated items.
             </p>
           </div>
           <div className="flex justify-end gap-2">
@@ -1839,44 +1959,33 @@ export const RateMaster: React.FC = () => {
         </div>
       </Modal>
 
-      {/* 7. Keywords Quick Filter Modal */}
+      {/* Keywords Quick Filter Modal */}
       <Modal
         isOpen={isKeywordsModalOpen}
         onClose={() => setIsKeywordsModalOpen(false)}
-        title="Quick Filter by Keywords"
-        subtitle="Filter SOR items by commonly searched civil construction keywords"
+        title="Filter by Work Category"
+        subtitle="Quickly filter items in this schedule by category"
         maxWidth="md"
       >
         <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {[
-              'Excavation',
-              'Earth work',
-              'Soil',
-              'Concrete',
-              'RCC',
-              'Brick work',
-              'Plaster',
-              'Flooring',
-              'Steel',
-              'Foundation',
-              'Centering',
-              'Shuttering',
-              'Drains',
-              'Embankments',
-            ].map((kw) => (
-              <button
-                key={kw}
-                onClick={() => {
-                  setSearch(kw);
-                  setIsKeywordsModalOpen(false);
-                }}
-                className="px-3 py-1.5 rounded-lg bg-[#101524] hover:bg-blue-600/20 border border-slate-750 text-xs text-slate-200 hover:text-blue-300 hover:border-blue-500/40 transition-colors cursor-pointer"
-              >
-                {kw}
-              </button>
-            ))}
-          </div>
+          {dynamicCategories.length === 0 ? (
+            <p className="text-xs text-slate-400">No categories found in current schedule.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {dynamicCategories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setSelectedType(cat);
+                    setIsKeywordsModalOpen(false);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-[#101524] hover:bg-blue-600/20 border border-slate-750 text-xs text-slate-200 hover:text-blue-300 hover:border-blue-500/40 transition-colors cursor-pointer"
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="pt-2 flex justify-end">
             <Button variant="outline" size="sm" onClick={() => setIsKeywordsModalOpen(false)}>
@@ -1886,48 +1995,86 @@ export const RateMaster: React.FC = () => {
         </div>
       </Modal>
 
-      {/* 8. Compare Rates Modal */}
+      {/* Real Rate Comparison Modal */}
       <Modal
         isOpen={isCompareModalOpen}
         onClose={() => setIsCompareModalOpen(false)}
         title="Compare Rates Across Schedules"
-        subtitle="Side-by-side comparison of rates between CPWD SOR and State PWD"
+        subtitle="Evaluate real rate differences between two actual schedules in your system"
         maxWidth="lg"
       >
         <div className="space-y-4 text-xs text-slate-300">
-          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center gap-2 text-blue-300">
-            <GitCompare className="w-4 h-4 text-blue-400" />
-            <span>Select items to evaluate variance and price escalation across versions.</span>
+          <div className="flex items-center gap-3 bg-[#101524] p-3 rounded-xl border border-slate-750">
+            <span className="font-semibold text-slate-300 whitespace-nowrap">Compare against:</span>
+            <select
+              value={compareTargetSorId}
+              onChange={(e) => setCompareTargetSorId(e.target.value)}
+              className="flex-1 bg-[#141a29] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="">-- Choose target schedule to compare --</option>
+              {sorMasters
+                .filter((m) => m._id !== selectedSorId)
+                .map((m) => (
+                  <option key={m._id} value={m._id}>
+                    {m.sorName} ({m.itemCount ?? 0} items)
+                  </option>
+                ))}
+            </select>
           </div>
 
-          <div className="border border-slate-750 rounded-xl overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#090e1a] text-slate-400 border-b border-slate-750 uppercase">
-                <tr>
-                  <th className="p-2.5">Code</th>
-                  <th className="p-2.5">Description</th>
-                  <th className="p-2.5 text-right">{activeMaster?.sorName || 'CPWD 2023'}</th>
-                  <th className="p-2.5 text-right">Previous / Comparison</th>
-                  <th className="p-2.5 text-right">Variance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {items.slice(0, 5).map((it) => (
-                  <tr key={it._id}>
-                    <td className="p-2.5 font-mono font-bold text-white">{it.itemCode}</td>
-                    <td className="p-2.5 truncate max-w-xs">{it.descriptionEnglish}</td>
-                    <td className="p-2.5 text-right font-mono font-bold text-emerald-400">
-                      ₹{it.rate?.toFixed(2) || '0.00'}
-                    </td>
-                    <td className="p-2.5 text-right font-mono text-slate-400">
-                      ₹{((it.rate || 100) * 0.94).toFixed(2)}
-                    </td>
-                    <td className="p-2.5 text-right font-mono font-semibold text-amber-400">+6.4%</td>
+          {!compareTargetSorId ? (
+            <div className="p-8 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+              Select another schedule from the dropdown above to compare real item rates.
+            </div>
+          ) : compareTargetItems.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+              The selected target schedule has no items recorded yet.
+            </div>
+          ) : (
+            <div className="border border-slate-750 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#090e1a] text-slate-400 border-b border-slate-750 uppercase">
+                  <tr>
+                    <th className="p-2.5">Code</th>
+                    <th className="p-2.5">Description</th>
+                    <th className="p-2.5 text-right">{activeMaster?.sorName}</th>
+                    <th className="p-2.5 text-right">Target Rate</th>
+                    <th className="p-2.5 text-right">Variance</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {items.map((it) => {
+                    const match = compareTargetItems.find((target) => target.itemCode === it.itemCode);
+                    const currentRate = it.rate || 0;
+                    const targetRate = match?.rate || 0;
+                    const diff = targetRate > 0 && currentRate > 0 ? ((currentRate - targetRate) / targetRate) * 100 : null;
+
+                    return (
+                      <tr key={it._id}>
+                        <td className="p-2.5 font-mono font-bold text-white">{it.itemCode}</td>
+                        <td className="p-2.5 truncate max-w-xs">{it.descriptionEnglish}</td>
+                        <td className="p-2.5 text-right font-mono font-bold text-emerald-400">
+                          {formatCurrency(currentRate, 'INR')}
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-slate-300">
+                          {match ? formatCurrency(targetRate, 'INR') : '—'}
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-semibold">
+                          {diff !== null ? (
+                            <span className={diff >= 0 ? 'text-amber-400' : 'text-blue-400'}>
+                              {diff > 0 ? `+${diff.toFixed(1)}%` : `${diff.toFixed(1)}%`}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <div className="flex justify-end pt-2">
             <Button variant="outline" size="sm" onClick={() => setIsCompareModalOpen(false)}>
@@ -1937,7 +2084,7 @@ export const RateMaster: React.FC = () => {
         </div>
       </Modal>
 
-      {/* 9. Full SOR Import Modal (Upload PDF/Excel/CSV with OCR & Staging) */}
+      {/* Full SOR Import Modal */}
       <SorImportModal
         isOpen={isImportModalOpen}
         onClose={() => {
@@ -1952,7 +2099,7 @@ export const RateMaster: React.FC = () => {
         }}
       />
 
-      {/* 10. Import History Modal */}
+      {/* Import History Modal */}
       <Modal
         isOpen={isHistoryModalOpen}
         onClose={() => setIsHistoryModalOpen(false)}
