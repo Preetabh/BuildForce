@@ -330,7 +330,7 @@ export const SorImportModal: React.FC<SorImportModalProps> = ({
     }
   };
 
-  // Publish to Active Rate Master
+  // Publish to Active Schedule of Rates
   const handlePublish = async () => {
     if (!activeImportId) return;
     setIsPublishing(true);
@@ -339,7 +339,7 @@ export const SorImportModal: React.FC<SorImportModalProps> = ({
       onPublished();
       onClose();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to publish to Rate Master');
+      alert(err.response?.data?.message || 'Failed to publish to Schedule of Rates');
     } finally {
       setIsPublishing(false);
     }
@@ -848,7 +848,7 @@ export const SorImportModal: React.FC<SorImportModalProps> = ({
                 isLoading={isPublishing}
                 leftIcon={<Check className="w-4 h-4" />}
               >
-                Publish to Rate Master
+                Publish to Schedule of Rates
               </Button>
             </div>
           </div>

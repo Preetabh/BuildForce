@@ -82,7 +82,7 @@ export interface PaginationMeta {
 }
 
 /* ======================================================================
-   SOR & Rate Master Types
+   Schedule of Rates (SOR) Types
    ====================================================================== */
 export interface SorMaster {
   _id: string;

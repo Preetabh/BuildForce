@@ -1489,8 +1489,8 @@ export const ProjectWorkspace: React.FC = () => {
         </form>
       </Modal>
 
-      {/* 2. Modal: Select Item from Rate Master / SOR */}
-      <Modal isOpen={isSorSelectModalOpen} onClose={() => setIsSorSelectModalOpen(false)} title="Select from Rate Master (SOR)" maxWidth="xl">
+      {/* 2. Modal: Select Item from Schedule of Rates (SOR) */}
+      <Modal isOpen={isSorSelectModalOpen} onClose={() => setIsSorSelectModalOpen(false)} title="Select from Schedule of Rates (SOR)" maxWidth="xl">
         <form onSubmit={handleAddSorItemToBoq} className="space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-erp-text-muted" />

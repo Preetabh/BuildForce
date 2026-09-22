@@ -98,7 +98,7 @@ export class SorService {
       return {
         isDuplicate: true,
         reason: 'VERSION_MATCH',
-        message: `This SOR schedule and version (${existingSchedule.sorName} v${existingSchedule.version}) already exists in Rate Master.`,
+        message: `This SOR schedule and version (${existingSchedule.sorName} v${existingSchedule.version}) already exists in Schedule of Rates.`,
       };
     }
 
@@ -1441,7 +1441,7 @@ export class SorService {
 
     return {
       success: true,
-      message: `Published ${insertedCount} items to Rate Master (${sorMaster.sorName} - ${sorMaster.version})`,
+      message: `Published ${insertedCount} items to Schedule of Rates (${sorMaster.sorName} - ${sorMaster.version})`,
       sorMaster,
     };
   }

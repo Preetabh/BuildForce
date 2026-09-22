@@ -46,7 +46,7 @@ export const AiAssistantWidget: React.FC = () => {
       } else if (lower.includes('formula') || lower.includes('lxwxd') || lower.includes('volume')) {
         reply = 'Volumetric items (Earthwork excavation, RCC, Masonry) use Length × Width × Depth (L × W × D) to produce cubic quantity (CUM / m³). Surface items (Plastering, Painting, Flooring) use Length × Width (L × W) to produce square area (SQM / m²).';
       } else {
-        reply = `I have analyzed "${text}". You can search matching clauses directly in Smart Measurement Entry or navigate to Rate Master to check verified CPWD / State SOR rate items.`;
+        reply = `I have analyzed "${text}". You can search matching clauses directly in Smart Measurement Entry or navigate to Schedule of Rates (SOR) to check verified CPWD / State SOR rate items.`;
       }
 
       setMessages((prev) => [

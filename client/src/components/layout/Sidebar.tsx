@@ -84,9 +84,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, deletedCount 
       label: 'PLANNING',
       icon: CalendarRange,
       items: [
-        { label: 'Schedule of Rates', path: '/rate-master', icon: BookOpen, isComingSoon: false },
+        { label: 'Schedule of Rates', path: '/sor', icon: BookOpen, isComingSoon: false },
         { label: 'Quantity Master', path: '/planning/quantity-master', icon: Calculator, isComingSoon: false },
-        { label: 'Rate Master', path: '/rate-master', icon: FileSpreadsheet, isComingSoon: false },
         { label: 'QC Master', path: '/planning/qc-master', icon: ClipboardCheck, isComingSoon: true },
       ],
     },

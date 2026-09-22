@@ -83,7 +83,8 @@ export const AppRouter: React.FC = () => {
         >
           {/* Functional Core */}
           <Route path="/" element={<Home />} />
-          <Route path="/rate-master" element={<RateMaster />} />
+          <Route path="/sor" element={<RateMaster />} />
+          <Route path="/rate-master" element={<Navigate to="/sor" replace />} />
           <Route path="/projects/:projectId" element={<ProjectWorkspace />} />
           <Route path="/recycle-bin" element={<RecycleBin />} />
 

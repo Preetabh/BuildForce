@@ -132,6 +132,7 @@ export const RateMaster: React.FC = () => {
   const [isEditItemModalOpen, setIsEditItemModalOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<SorItem | null>(null);
   const [deptToEdit, setDeptToEdit] = useState<SorMaster | null>(null);
+  const [deptToDelete, setDeptToDelete] = useState<SorMaster | null>(null);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [compareTargetSorId, setCompareTargetSorId] = useState<string>('');
   const [isKeywordsModalOpen, setIsKeywordsModalOpen] = useState(false);
@@ -485,13 +486,21 @@ export const RateMaster: React.FC = () => {
   };
 
   const handleDeleteDepartment = async () => {
-    if (!activeMaster) return;
+    const target = deptToDelete || activeMaster;
+    if (!target) return;
     try {
-      await api.delete(`/sor/masters/${activeMaster._id}`);
-      showToast(`Deleted department "${activeMaster.sorName}"`);
+      await api.delete(`/sor/masters/${target._id}`);
+      showToast(`Deleted department "${target.sorName}"`);
       setConfirmDeleteDeptOpen(false);
+      setDeptToDelete(null);
+      if (deptToEdit?._id === target._id) {
+        setIsNewDeptModalOpen(false);
+        setDeptToEdit(null);
+      }
       await refetchMasters();
-      setSelectedSorId('');
+      if (selectedSorId === target._id) {
+        setSelectedSorId('');
+      }
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Failed to delete department');
     }
@@ -1356,25 +1365,42 @@ export const RateMaster: React.FC = () => {
                 </div>
               </div>
 
-              {/* Footer Buttons: Cancel & ✓ Save */}
-              <div className="pt-2 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsNewDeptModalOpen(false);
-                    setDeptToEdit(null);
-                  }}
-                  className="px-4 py-2 rounded-xl border border-slate-750 bg-[#161c2c] hover:bg-slate-800 text-slate-200 font-semibold text-xs transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-lg shadow-blue-600/25 transition-all cursor-pointer"
-                >
-                  <Check className="w-4 h-4 stroke-[2.5]" />
-                  <span>Save</span>
-                </button>
+              {/* Footer Buttons: Delete (if editing), Cancel & ✓ Save */}
+              <div className="pt-2 flex items-center justify-between gap-3">
+                {deptToEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeptToDelete(deptToEdit);
+                      setConfirmDeleteDeptOpen(true);
+                    }}
+                    className="px-3.5 py-2 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsNewDeptModalOpen(false);
+                      setDeptToEdit(null);
+                    }}
+                    className="px-4 py-2 rounded-xl border border-slate-750 bg-[#161c2c] hover:bg-slate-800 text-slate-200 font-semibold text-xs transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-lg shadow-blue-600/25 transition-all cursor-pointer"
+                  >
+                    <Check className="w-4 h-4 stroke-[2.5]" />
+                    <span>Save</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1627,9 +1653,9 @@ export const RateMaster: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* Right Side: Real Live Items count & Edit button */}
-                            <div className="flex items-center gap-3 flex-shrink-0">
-                              <span className="text-sm font-bold font-mono text-blue-400">
+                            {/* Right Side: Real Live Items count, Edit button & Delete button */}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-sm font-bold font-mono text-blue-400 mr-1">
                                 {count.toLocaleString()} items
                               </span>
 
@@ -1642,6 +1668,18 @@ export const RateMaster: React.FC = () => {
                                 className="p-2 rounded-lg border border-slate-750 bg-[#161c2c] hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeptToDelete(d);
+                                  setConfirmDeleteDeptOpen(true);
+                                }}
+                                title="Delete Department"
+                                className="p-2 rounded-lg border border-slate-750 bg-[#161c2c] hover:bg-red-500/20 text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
@@ -1738,7 +1776,7 @@ export const RateMaster: React.FC = () => {
         isOpen={isManualEntryModalOpen}
         onClose={() => setIsManualEntryModalOpen(false)}
         title="Manual SOR Item Entry"
-        subtitle={`Add a new rate master specification to ${activeMaster?.sorName}`}
+        subtitle={`Add a new specification item to ${activeMaster?.sorName}`}
         maxWidth="md"
       >
         <form onSubmit={handleCreateItem} className="space-y-4">
@@ -1936,24 +1974,35 @@ export const RateMaster: React.FC = () => {
       {/* Delete Department Confirmation Modal */}
       <Modal
         isOpen={confirmDeleteDeptOpen}
-        onClose={() => setConfirmDeleteDeptOpen(false)}
-        title="Delete Department?"
-        subtitle={`Delete ${activeMaster?.sorName} and all its rates.`}
+        onClose={() => {
+          setConfirmDeleteDeptOpen(false);
+          setDeptToDelete(null);
+        }}
+        title={`Delete "${(deptToDelete || activeMaster)?.sorName || 'Department'}"?`}
+        subtitle={`Delete ${(deptToDelete || activeMaster)?.sorName} and all its rates.`}
         maxWidth="sm"
       >
         <div className="space-y-4">
           <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2.5 text-red-300 text-xs">
             <AlertTriangle className="w-5 h-5 flex-shrink-0 text-red-400" />
             <p>
-              This will permanently delete the schedule container and all {activeMaster?.itemCount ?? items.length} associated items.
+              This will permanently delete <strong>{(deptToDelete || activeMaster)?.sorName}</strong> and all{' '}
+              {(deptToDelete || activeMaster)?.itemCount ?? 0} associated items. This action cannot be undone.
             </p>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setConfirmDeleteDeptOpen(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setConfirmDeleteDeptOpen(false);
+                setDeptToDelete(null);
+              }}
+            >
               Cancel
             </Button>
             <Button variant="danger" size="sm" onClick={handleDeleteDepartment}>
-              Delete Schedule
+              Yes, Delete
             </Button>
           </div>
         </div>

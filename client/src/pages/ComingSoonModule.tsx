@@ -147,7 +147,7 @@ export const ComingSoonModule: React.FC = () => {
         'Built-in deduction rules for openings in masonry, plastering, and RCC',
         'Digital signature and audit trail for Junior Engineer & Executive Engineer',
         'Direct synchronization into BOQ, Abstract, and RA Bill line items',
-        'Real-time rate extraction from dynamic CPWD / State SOR rate masters',
+        'Real-time rate extraction from dynamic CPWD / State Schedule of Rates',
       ],
       workflowSteps: ['Site Dimension Take-Off', 'Deduction Application', 'Engineer Verification', 'Abstract Generation', 'Billing Approval'],
     },
@@ -409,7 +409,7 @@ export const ComingSoonModule: React.FC = () => {
         { label: 'EMD Under Track', value: '₹12.5 Lakhs' },
       ],
       features: [
-        'Direct rate master clause matching for rapid tender BOQ estimation',
+        'Direct Schedule of Rates (SOR) clause matching for rapid tender BOQ estimation',
         'Material cost sensitivity modeling (Steel price volatility impact)',
         'Equipment ownership vs hire rate analysis for bid pricing',
         'Competitor historical bid intelligence and L1 pricing trends',
