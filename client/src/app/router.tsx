@@ -44,7 +44,11 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     );
   }
 
+<<<<<<< HEAD
   if (isAuthenticated) {
+=======
+  if (!isAuthenticated) {
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
     return <Navigate to="/" replace />;
   }
 

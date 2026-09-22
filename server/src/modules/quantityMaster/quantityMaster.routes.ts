@@ -1,5 +1,8 @@
 import { Router } from 'express';
+<<<<<<< HEAD
 import multer from 'multer';
+=======
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
 import { QuantityMasterController } from './quantityMaster.controller';
 import { authenticate } from '../../middleware/auth.middleware';
 import { requireCompany } from '../../middleware/company.middleware';
@@ -44,6 +47,7 @@ router.get('/rate-lists/:id', QuantityMasterController.getRateListById);
 router.put('/rate-lists/:id/overrides', QuantityMasterController.updateRateListOverrides);
 router.delete('/rate-lists/:id', QuantityMasterController.deleteRateList);
 
+<<<<<<< HEAD
 import path from 'path';
 
 const uploadMemory = multer({
@@ -80,4 +84,9 @@ router.post(
 );
 router.post('/import-pdf/commit', QuantityMasterController.commitPdfImport);
 
+=======
+// Import History
+router.get('/import-history', QuantityMasterController.getImportHistory);
+
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
 export default router;

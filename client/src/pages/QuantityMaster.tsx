@@ -46,6 +46,7 @@ import {
   SorImport,
 } from '../types';
 import { cn } from '../utils/cn';
+<<<<<<< HEAD
 import {
   exportMaterialsPdf,
   exportManpowerPdf,
@@ -62,6 +63,8 @@ import {
   QuantityMasterPdfImportModal,
   MasterType,
 } from '../components/quantityMaster/QuantityMasterPdfImportModal';
+=======
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
 
 interface OutletContextType {
   setSidebarOpen: (open: boolean) => void;
@@ -106,11 +109,14 @@ export const QuantityMaster: React.FC = () => {
   const [isRateListModalOpen, setIsRateListModalOpen] = useState(false);
   const [rateListToEdit, setRateListToEdit] = useState<MasterRateList | null>(null);
 
+<<<<<<< HEAD
   // PDF Bulk Import & Export State
   const [isPdfImportModalOpen, setIsPdfImportModalOpen] = useState(false);
   const [pdfImportType, setPdfImportType] = useState<MasterType>('materials');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
+=======
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -118,6 +124,7 @@ export const QuantityMaster: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+<<<<<<< HEAD
   const handleOpenPdfImport = (type: MasterType) => {
     setPdfImportType(type);
     setIsPdfImportModalOpen(true);
@@ -327,6 +334,8 @@ export const QuantityMaster: React.FC = () => {
     }
   };
 
+=======
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
     setSearch('');
@@ -777,6 +786,7 @@ export const QuantityMaster: React.FC = () => {
               {/* Action Buttons */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
+<<<<<<< HEAD
                   onClick={handleExportMaterialsExcel}
                   disabled={isExportingPdf}
                   title="Export Materials to Excel Spreadsheet (.xlsx)"
@@ -803,6 +813,8 @@ export const QuantityMaster: React.FC = () => {
                   <span>Import (PDF/Excel)</span>
                 </button>
                 <button
+=======
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
                   onClick={() => {
                     setMaterialToEdit(null);
                     setIsMaterialModalOpen(true);
@@ -1024,6 +1036,7 @@ export const QuantityMaster: React.FC = () => {
                 </select>
               </div>
 
+<<<<<<< HEAD
               {/* Action Buttons */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -1063,6 +1076,18 @@ export const QuantityMaster: React.FC = () => {
                   <span>Add Manpower</span>
                 </button>
               </div>
+=======
+              <button
+                onClick={() => {
+                  setManpowerToEdit(null);
+                  setIsManpowerModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Manpower</span>
+              </button>
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
             </div>
 
             <div className="rounded-xl border border-slate-800 bg-[#0E1320] overflow-hidden shadow-lg">
@@ -1245,6 +1270,7 @@ export const QuantityMaster: React.FC = () => {
                 </select>
               </div>
 
+<<<<<<< HEAD
               {/* Action Buttons */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -1284,6 +1310,18 @@ export const QuantityMaster: React.FC = () => {
                   <span>Add Machinery</span>
                 </button>
               </div>
+=======
+              <button
+                onClick={() => {
+                  setMachineryToEdit(null);
+                  setIsMachineryModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Machinery</span>
+              </button>
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
             </div>
 
             <div className="rounded-xl border border-slate-800 bg-[#0E1320] overflow-hidden shadow-lg">
@@ -1445,6 +1483,7 @@ export const QuantityMaster: React.FC = () => {
                 </button>
               </div>
 
+<<<<<<< HEAD
               {/* Action Buttons */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -1484,6 +1523,18 @@ export const QuantityMaster: React.FC = () => {
                   <span>New Formula</span>
                 </button>
               </div>
+=======
+              <button
+                onClick={() => {
+                  setFormulaToEdit(null);
+                  setIsFormulaModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Formula</span>
+              </button>
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
             </div>
 
             {/* Formulas Table */}
@@ -1603,6 +1654,7 @@ export const QuantityMaster: React.FC = () => {
                 </p>
               </div>
 
+<<<<<<< HEAD
               {/* Action Buttons */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -1642,6 +1694,18 @@ export const QuantityMaster: React.FC = () => {
                   <span>New Rate List</span>
                 </button>
               </div>
+=======
+              <button
+                onClick={() => {
+                  setRateListToEdit(null);
+                  setIsRateListModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Rate List</span>
+              </button>
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
             </div>
 
             <div className="rounded-xl border border-slate-800 bg-[#0E1320] overflow-hidden shadow-lg">
@@ -1975,6 +2039,7 @@ export const QuantityMaster: React.FC = () => {
           }}
         />
       )}
+<<<<<<< HEAD
 
       {/* PDF BULK IMPORT & EXTRACTION MODAL */}
       {isPdfImportModalOpen && (
@@ -1993,6 +2058,8 @@ export const QuantityMaster: React.FC = () => {
           }}
         />
       )}
+=======
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
     </div>
   );
 };

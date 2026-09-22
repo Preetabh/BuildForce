@@ -283,6 +283,7 @@ export class QuantityMasterController {
       next(err);
     }
   }
+<<<<<<< HEAD
 
   // PDF / Excel / CSV Bulk Extraction
   public static async parsePdfImport(req: Request, res: Response, next: NextFunction) {
@@ -331,4 +332,6 @@ export class QuantityMasterController {
       next(err);
     }
   }
+=======
+>>>>>>> 7105e507109a0f25bec798e26fcc2deddf22922d
 }
