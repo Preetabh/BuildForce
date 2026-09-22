@@ -1,0 +1,31 @@
+<USER_REQUEST>
+Use the attached DSR OCR text as the primary source for importing SOR data.
+
+IMPORTANT:
+- Do NOT re-process the original PDF.
+- Do NOT run OCR again.
+- Read the complete text page-by-page (225 pages).
+- Extract ALL valid SOR items into MongoDB.
+- Extract: item code, description, unit, rate, chapter, subchapter and source page.
+- Preserve page/chapter context.
+- Do NOT stop at 29 items or any fixed limit.
+- Do NOT invent, guess or modify rates.
+- Invalid/uncertain rows → REVIEW_REQUIRED.
+- Remove only true duplicates.
+- Store the source page for every item.
+- Show total rows found, saved, rejected and duplicate counts.
+- Reuse the existing SOR/Rate Master models and company isolation.
+- Do not recreate the PDF upload/OCR system.
+
+After import, verify the MongoDB count and report the final number of valid SOR items imported.
+STOP after this task. upload this 
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-19T15:24:48+05:30.
+
+The user's current state is as follows:
+Active Document: g:\civil_guruji\server\.env (LANGUAGE_UNSPECIFIED)
+Cursor is on line: 17
+Other open documents:
+- g:\civil_guruji\server\.env (LANGUAGE_UNSPECIFIED)
+</ADDITIONAL_METADATA>

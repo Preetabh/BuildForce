@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg-primary: #0B0F17;
+  --bg-card: #111726;
+  --border-subtle: #1E293B;
+  --primary-accent: #2563EB;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: #0B0F17;
+  color: #F8FAFC;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom modern scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0B0F17;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1E293B;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Card glass glow and border highlights */
+.glass-panel {
+  background: rgba(17, 23, 38, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(30, 41, 59, 0.8);
+}
+
+.glass-panel-hover:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 20px -2px rgba(37, 99, 235, 0.15);
+}
+
+/* Custom subtle gradient badges */
+.badge-active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-draft {
+  background: rgba(148, 163, 184, 0.12);
+  color: #CBD5E1;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.badge-completed {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60A5FA;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge-on_hold {
+  background: rgba(245, 158, 11, 0.12);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-archived {
+  background: rgba(168, 85, 247, 0.12);
+  color: #C084FC;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}

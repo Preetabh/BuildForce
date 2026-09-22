@@ -1,0 +1,190 @@
+import mongoose, { Document, Schema, Types } from 'mongoose';
+
+export interface ISorMaster extends Document {
+  companyId: Types.ObjectId;
+  authority: string; // e.g. CPWD, State PWD, CGPWD, Maharashtra PWD, MES, Railways
+  department: string; // e.g. Civil, Electrical, Horticulture
+  scheduleType: string; // e.g. DSR, SOR, DAR
+  sorName: string; // e.g. CPWD DSR 2023 Civil
+  version: string; // e.g. 2023.1
+  category?: string; // e.g. Buildings & Roads, Infrastructure
+  effectiveFrom: Date;
+  effectiveTo?: Date;
+  sourceDocument?: string;
+  status: 'DRAFT' | 'ACTIVE' | 'SUPERSEDED' | 'ARCHIVED';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const sorMasterSchema = new Schema<ISorMaster>(
+  {
+    companyId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Company',
+      required: true,
+      index: true,
+    },
+    authority: {
+      type: String,
+      required: true,
+      trim: true,
+      default: 'CPWD',
+    },
+    department: {
+      type: String,
+      default: 'Civil',
+      trim: true,
+    },
+    scheduleType: {
+      type: String,
+      default: 'DSR',
+      trim: true,
+    },
+    sorName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    version: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    category: {
+      type: String,
+      default: 'Civil Works',
+      trim: true,
+    },
+    effectiveFrom: {
+      type: Date,
+      required: true,
+    },
+    effectiveTo: {
+      type: Date,
+      default: null,
+    },
+    sourceDocument: {
+      type: String,
+      default: '',
+    },
+    status: {
+      type: String,
+      enum: ['DRAFT', 'ACTIVE', 'SUPERSEDED', 'ARCHIVED'],
+      default: 'ACTIVE',
+      index: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+sorMasterSchema.index({ companyId: 1, authority: 1, version: 1 });
+sorMasterSchema.index({ companyId: 1, department: 1, scheduleType: 1, version: 1 });
+
+export const SorMaster = mongoose.model<ISorMaster>('SorMaster', sorMasterSchema);
+
+export interface ISorItem extends Document {
+  sorId: Types.ObjectId;
+  srNo?: number;
+  itemCode: string;
+  descriptionEnglish: string;
+  descriptionHindi?: string;
+  unit: string;
+  rate: number;
+  chapter?: string;
+  subChapter?: string;
+  workCategory?: string; // e.g. Earthwork, Concrete, RCC, Brickwork, Plastering, Flooring, Steel
+  measurementFormula?: string; // e.g. LxWxD, LxWxH, LxW, Weight, Count, Custom
+  applicableDimensions?: string[]; // e.g. ['length', 'width', 'depth', 'nos']
+  formulaExpression?: string; // e.g. 'Length × Width × Depth × Nos'
+  sourcePage?: number;
+  sourceReference?: string;
+  status: string;
+}
+
+const sorItemSchema = new Schema<ISorItem>(
+  {
+    sorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'SorMaster',
+      required: true,
+      index: true,
+    },
+    srNo: {
+      type: Number,
+      default: null,
+      index: true,
+    },
+    itemCode: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
+    },
+    descriptionEnglish: {
+      type: String,
+      required: true,
+    },
+    descriptionHindi: {
+      type: String,
+      default: '',
+    },
+    unit: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    rate: {
+      type: Number,
+      default: 0,
+    },
+    chapter: {
+      type: String,
+      default: '',
+    },
+    subChapter: {
+      type: String,
+      default: '',
+    },
+    workCategory: {
+      type: String,
+      default: '',
+      index: true,
+    },
+    measurementFormula: {
+      type: String,
+      default: '',
+    },
+    applicableDimensions: {
+      type: [String],
+      default: [],
+    },
+    formulaExpression: {
+      type: String,
+      default: '',
+    },
+    sourcePage: {
+      type: Number,
+      default: null,
+    },
+    sourceReference: {
+      type: String,
+      default: '',
+    },
+    status: {
+      type: String,
+      enum: ['ACTIVE', 'INACTIVE'],
+      default: 'ACTIVE',
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+sorItemSchema.index({ sorId: 1, itemCode: 1 }, { unique: true });
+sorItemSchema.index({ descriptionEnglish: 'text', itemCode: 'text', chapter: 'text' });
+
+export const SorItem = mongoose.model<ISorItem>('SorItem', sorItemSchema);
+

@@ -1,0 +1,112 @@
+import { Router } from 'express';
+import multer from 'multer';
+import path from 'path';
+import crypto from 'crypto';
+import fs from 'fs';
+import { SorController } from './sor.controller';
+import { authenticate } from '../../middleware/auth.middleware';
+import { requirePermission } from '../../middleware/rbac.middleware';
+import { env } from '../../config/env';
+
+const router = Router();
+
+// Ensure temporary upload directory exists
+const tempUploadDir = path.resolve(process.cwd(), 'uploads/sor_temp');
+if (!fs.existsSync(tempUploadDir)) {
+  fs.mkdirSync(tempUploadDir, { recursive: true });
+}
+
+// Multer Disk Storage: Bypasses Node.js heap memory, writing chunks directly to disk
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, tempUploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = crypto.randomUUID();
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `sor_${uniqueSuffix}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    // Configurable maximum file size in MB (default 250MB)
+    fileSize: env.MAX_SOR_FILE_SIZE_MB * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowed = ['.pdf', '.xlsx', '.xls', '.csv'];
+    if (allowed.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Unsupported file type: ${ext}. Allowed types: ${allowed.join(', ')}`));
+    }
+  },
+});
+
+// 1. Configuration Endpoint (Public system limits)
+router.get('/config', SorController.getConfig);
+
+// Authentication on all remaining SOR endpoints
+router.use(authenticate);
+
+// 2. Rate Master Queries
+router.get('/items/smart-search', requirePermission('sor.view'), SorController.smartSearchSorItems);
+router.get('/schedules/hierarchy', requirePermission('sor.view'), SorController.getScheduleHierarchy);
+router.get('/export', requirePermission('sor.view'), SorController.exportSor);
+router.get('/items', requirePermission('sor.view'), SorController.getSorItems);
+router.get('/masters', requirePermission('sor.view'), SorController.getSorMasters);
+router.delete('/masters/:masterId', requirePermission('sor.import'), SorController.deleteSorMaster);
+
+
+// 3. Import History & Upload
+router.get('/imports', requirePermission('sor.view'), SorController.listImports);
+router.post(
+  '/import/upload',
+  requirePermission('sor.import'),
+  upload.single('file'),
+  SorController.uploadImport
+);
+
+// 4. Staging, Status, Review, and Batches
+router.get('/import/:importId', requirePermission('sor.view'), SorController.getImportById);
+router.get('/import/:importId/status', requirePermission('sor.view'), SorController.getImportStatus);
+router.get('/import/:importId/rows', requirePermission('sor.view'), SorController.getStagedRows);
+router.patch(
+  '/import/:importId/rows/:rowId',
+  requirePermission('sor.edit'),
+  SorController.updateStagedRow
+);
+router.post(
+  '/import/:importId/rows/bulk-approve',
+  requirePermission('sor.edit'),
+  SorController.bulkApproveStagedRows
+);
+router.post(
+  '/import/:importId/batches/:batchNumber/retry',
+  requirePermission('sor.import'),
+  SorController.retryBatch
+);
+router.post(
+  '/import/:importId/publish',
+  requirePermission('sor.publish'),
+  SorController.publishImport
+);
+router.delete(
+  '/import/:importId',
+  requirePermission('sor.import'),
+  SorController.deleteImport
+);
+router.post(
+  '/imports/reject-all',
+  requirePermission('sor.import'),
+  SorController.rejectAllImports
+);
+router.delete(
+  '/imports/reject-all',
+  requirePermission('sor.import'),
+  SorController.rejectAllImports
+);
+
+export default router;
