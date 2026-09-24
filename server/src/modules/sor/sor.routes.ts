@@ -77,6 +77,13 @@ router.post('/masters/options', requirePermission('sor.import'), SorController.c
 router.post('/recent/:sorId', requirePermission('sor.view'), SorController.recordRecentSor);
 router.get('/recents', requirePermission('sor.view'), SorController.getRecentSors);
 
+// Keyword Aliases
+router.get('/keyword-aliases', requirePermission('sor.view'), SorController.getKeywordAliases);
+router.post('/keyword-aliases', requirePermission('sor.import'), SorController.createKeywordAlias);
+router.patch('/keyword-aliases/:id', requirePermission('sor.import'), SorController.updateKeywordAlias);
+router.delete('/keyword-aliases/:id', requirePermission('sor.import'), SorController.deleteKeywordAlias);
+router.post('/keyword-aliases/bulk-import', requirePermission('sor.import'), SorController.bulkImportKeywordAliases);
+
 
 // 3. Import History & Upload
 router.get('/imports', requirePermission('sor.view'), SorController.listImports);

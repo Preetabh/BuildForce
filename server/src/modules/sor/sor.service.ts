@@ -15,6 +15,7 @@ import { logger } from '../../config/logger';
 import { UserRecentSor } from '../../models/UserRecentSor';
 import { MasterOption } from '../../models/MasterOption';
 import { CurrencyUtil } from '../../utils/currency';
+import { KeywordAlias } from '../../models/KeywordAlias';
 import * as XLSX from 'xlsx';
 
 export interface SorQueryFilters {
@@ -2568,5 +2569,155 @@ export class SorService {
       workCategories: workCategories.filter(Boolean).sort(),
       chapters: chapters.filter(Boolean).sort(),
     };
+  }
+
+  /**
+   * Get Keyword Aliases for Company / SOR
+   */
+  public static async getKeywordAliases(companyId: string, options?: { sorId?: string; search?: string }) {
+    const filter: Record<string, unknown> = {
+      companyId: new Types.ObjectId(companyId),
+    };
+
+    if (options?.search && options.search.trim()) {
+      const q = options.search.trim();
+      filter.$or = [
+        { keyword: new RegExp(q, 'i') },
+        { clause: new RegExp(q, 'i') },
+        { subclause: new RegExp(q, 'i') },
+        { workCategory: new RegExp(q, 'i') },
+        { stage: new RegExp(q, 'i') },
+      ];
+    }
+
+    let aliases = await KeywordAlias.find(filter).sort({ clause: 1, subclause: 1, keyword: 1 }).lean();
+
+    // If company has no aliases yet, generate or seed initial aliases from real active SorItems & reference set
+    if (aliases.length === 0 && (!options?.search || !options.search.trim())) {
+      const referenceAliases = [
+        { keyword: 'Site Cleaning / Clearing & Gn', clause: '2.28', subclause: '2.28.1', extra: '', workCategory: 'Earth Work / Excavation', stage: 'Site Preparation', rate: 14.5, unit: 'SQM' },
+        { keyword: 'Site Cleaning and Grubbing', clause: '2.28', subclause: '2.28.1', extra: '', workCategory: 'Earth Work / Excavation', stage: 'Site Preparation', rate: 18.2, unit: 'SQM' },
+        { keyword: 'Excavation for Foundation', clause: '2.8', subclause: '2.8.1', extra: '', workCategory: 'Earth Work / Excavation', stage: 'Foundation', rate: 245.5, unit: 'CUM' },
+        { keyword: 'Sand Filling in Plinth Foundat', clause: '2.27', subclause: '', extra: '', workCategory: 'Earth Work / Excavation', stage: 'Foundation', rate: 890.0, unit: 'CUM' },
+        { keyword: 'PCC 1:4:8 Below Footing (M10)', clause: '4.1', subclause: '4.1.6', extra: '', workCategory: 'Concrete Work', stage: 'Foundation', rate: 5420.0, unit: 'CUM' },
+        { keyword: 'RCC M25 for Footing', clause: '5.33', subclause: '5.33.1', extra: '5.33.1.1', workCategory: 'Concrete Work', stage: 'Foundation', rate: 7120.0, unit: 'CUM' },
+        { keyword: '12mm Internal Plaster (12 mm 1:4)', clause: '13.1', subclause: '13.1.1', extra: '', workCategory: 'Plaster Work', stage: 'Finishing', rate: 347.05, unit: 'SQM', clauseDesc: '12 mm cement plaster of mix', subclauseDesc: '1:4 (1 cement: 4 fine sand)' },
+        { keyword: '15mm External Plaster (15 mm 1:4)', clause: '13.2', subclause: '13.2.1', extra: '', workCategory: 'Plaster Work', stage: 'Finishing', rate: 399.45, unit: 'SQM', clauseDesc: '15 mm cement plaster on the rough side of single or half brick wall of mix', subclauseDesc: '1:4 (1 cement: 4 fine sand)' },
+        { keyword: '6mm Plaster Ceiling (6 mm 1:3)', clause: '13.16', subclause: '13.16.1', extra: '', workCategory: 'Plaster Work', stage: 'Finishing', rate: 300.45, unit: 'SQM', clauseDesc: '6 mm cement plaster of mix', subclauseDesc: '1:3 (1 cement: 3 fine sand)' },
+        { keyword: 'White Washing with Lime', clause: '13.37', subclause: '13.37.1', extra: '', workCategory: 'Painting', stage: 'Finishing', rate: 28.5, unit: 'SQM' },
+        { keyword: 'Distempering with Oil Bound Washable', clause: '13.41', subclause: '13.41.1', extra: '', workCategory: 'Painting', stage: 'Finishing', rate: 85.0, unit: 'SQM' },
+        { keyword: 'Painting Two or More Coats (Synthetic Enamel)', clause: '13.61', subclause: '13.61.1', extra: '', workCategory: 'Painting', stage: 'Finishing', rate: 112.0, unit: 'SQM' },
+        { keyword: 'Brick Work with Common Burnt Clay F.P.S.', clause: '6.1', subclause: '6.1.1', extra: '', workCategory: 'Brick Work', stage: 'Superstructure', rate: 5850.0, unit: 'CUM' },
+        { keyword: 'Damp Proof Course (DPC) 50mm thick', clause: '4.11', subclause: '4.11.1', extra: '', workCategory: 'Concrete Work', stage: 'Plinth', rate: 420.0, unit: 'SQM' },
+        { keyword: 'Thermo-Mechanically Treated bars (TMT Fe 500D)', clause: '5.22', subclause: '5.22.6', extra: '', workCategory: 'Steel Work', stage: 'Superstructure', rate: 78.5, unit: 'KG' },
+        { keyword: 'Vitrified Tile Flooring 600x600 mm', clause: '11.41', subclause: '11.41.2', extra: '', workCategory: 'Flooring', stage: 'Finishing', rate: 1250.0, unit: 'SQM' },
+        { keyword: 'Ceramic Glazed Wall Tiles', clause: '11.36', subclause: '', extra: '', workCategory: 'Flooring', stage: 'Finishing', rate: 980.0, unit: 'SQM' },
+        { keyword: 'Aluminium Sliding Doors / Windows (3 Track)', clause: '21.1', subclause: '21.1.1', extra: '', workCategory: 'Aluminium Work', stage: 'Finishing', rate: 4500.0, unit: 'SQM' },
+        { keyword: 'Flush Door Shutters 35mm thick', clause: '9.21', subclause: '9.21.1', extra: '', workCategory: 'Wood Work', stage: 'Finishing', rate: 2400.0, unit: 'SQM' },
+        { keyword: 'Structural Steel Work in Beams & Columns', clause: '10.1', subclause: '10.1.1', extra: '', workCategory: 'Steel Work', stage: 'Superstructure', rate: 92.0, unit: 'KG' },
+      ];
+
+      // Also incorporate real items from active database
+      try {
+        const realItems = await SorItem.find({ status: 'ACTIVE' }).limit(30).lean();
+        for (const item of realItems) {
+          if (!referenceAliases.some((r) => r.clause === item.itemCode)) {
+            referenceAliases.push({
+              keyword: item.descriptionEnglish ? (item.descriptionEnglish.length > 50 ? item.descriptionEnglish.substring(0, 50) + '...' : item.descriptionEnglish) : `Item ${item.itemCode}`,
+              clause: item.itemCode,
+              subclause: item.subclauseCode || '',
+              extra: '',
+              workCategory: item.workCategory || item.chapter || 'Civil Work',
+              stage: item.projectStage || 'Construction',
+              rate: item.rate || 0,
+              unit: item.unit || 'SQM',
+              clauseDesc: item.chapter || '',
+              subclauseDesc: item.descriptionEnglish || '',
+            });
+          }
+        }
+      } catch (err) {
+        // ignore fallback
+      }
+
+      const docsToInsert = referenceAliases.map((r) => ({
+        ...r,
+        companyId: new Types.ObjectId(companyId),
+        sorId: options?.sorId && Types.ObjectId.isValid(options.sorId) ? new Types.ObjectId(options.sorId) : null,
+        isSaved: true,
+      }));
+
+      await KeywordAlias.insertMany(docsToInsert);
+      aliases = await KeywordAlias.find(filter).sort({ clause: 1, subclause: 1, keyword: 1 }).lean();
+    }
+
+    return aliases;
+  }
+
+  /**
+   * Create Keyword Alias
+   */
+  public static async createKeywordAlias(companyId: string, data: any) {
+    const alias = new KeywordAlias({
+      ...data,
+      companyId: new Types.ObjectId(companyId),
+      isSaved: true,
+    });
+    await alias.save();
+    return alias;
+  }
+
+  /**
+   * Update Keyword Alias (inline editing)
+   */
+  public static async updateKeywordAlias(companyId: string, id: string, data: any) {
+    const alias = await KeywordAlias.findOneAndUpdate(
+      { _id: new Types.ObjectId(id), companyId: new Types.ObjectId(companyId) },
+      { $set: data },
+      { new: true }
+    );
+    if (!alias) {
+      throw new AppError('Keyword alias not found', 404);
+    }
+    return alias;
+  }
+
+  /**
+   * Delete Keyword Alias
+   */
+  public static async deleteKeywordAlias(companyId: string, id: string) {
+    await KeywordAlias.findOneAndDelete({
+      _id: new Types.ObjectId(id),
+      companyId: new Types.ObjectId(companyId),
+    });
+    return { success: true, message: 'Keyword alias deleted' };
+  }
+
+  /**
+   * Bulk Import Keyword Aliases
+   */
+  public static async bulkImportKeywordAliases(companyId: string, items: any[]) {
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new AppError('No items provided for import', 400);
+    }
+    const docs = items.map((it) => ({
+      companyId: new Types.ObjectId(companyId),
+      keyword: (it.keyword || it.name || it.title || '').trim(),
+      clause: (it.clause || it.code || it.itemCode || '').trim(),
+      subclause: (it.subclause || it.subclauseCode || '').trim(),
+      extra: (it.extra || '').trim(),
+      workCategory: (it.workCategory || it.category || it.chapter || '').trim(),
+      stage: (it.stage || it.projectStage || '').trim(),
+      rate: Number(it.rate) || 0,
+      unit: (it.unit || 'SQM').trim().toUpperCase(),
+      isSaved: true,
+    })).filter((d) => d.keyword && d.clause);
+
+    if (docs.length === 0) {
+      throw new AppError('No valid keyword and clause pairs found', 400);
+    }
+
+    const inserted = await KeywordAlias.insertMany(docs);
+    return { success: true, count: inserted.length };
   }
 }

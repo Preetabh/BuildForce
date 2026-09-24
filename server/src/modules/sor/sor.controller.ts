@@ -582,6 +582,78 @@ export class SorController {
       next(error);
     }
   }
+
+  /**
+   * Get Keyword Aliases
+   */
+  public static async getKeywordAliases(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { sorId, search } = req.query;
+      const result = await SorService.getKeywordAliases(companyId, {
+        sorId: sorId as string,
+        search: search as string,
+      });
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Create Keyword Alias
+   */
+  public static async createKeywordAlias(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const result = await SorService.createKeywordAlias(companyId, req.body);
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Update Keyword Alias (inline edit)
+   */
+  public static async updateKeywordAlias(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { id } = req.params;
+      const result = await SorService.updateKeywordAlias(companyId, id, req.body);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Delete Keyword Alias
+   */
+  public static async deleteKeywordAlias(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { id } = req.params;
+      const result = await SorService.deleteKeywordAlias(companyId, id);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Bulk Import Keyword Aliases
+   */
+  public static async bulkImportKeywordAliases(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { items } = req.body;
+      const result = await SorService.bulkImportKeywordAliases(companyId, items);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 
