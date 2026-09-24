@@ -1610,7 +1610,8 @@ export class SorService {
     }
 
     if (filters.search && filters.search.trim() !== '') {
-      const searchRegex = new RegExp(filters.search.trim(), 'i');
+      const safeSearch = filters.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(safeSearch, 'i');
       query.$or = [
         { itemCode: searchRegex },
         { descriptionEnglish: searchRegex },
@@ -2181,7 +2182,8 @@ export class SorService {
 
     if (filters.search && filters.search.trim()) {
       const s = filters.search.trim();
-      const sRegex = new RegExp(s, 'i');
+      const safeSearch = s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const sRegex = new RegExp(safeSearch, 'i');
       query.$or = [
         { itemCode: sRegex },
         { descriptionEnglish: sRegex },

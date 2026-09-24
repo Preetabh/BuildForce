@@ -535,13 +535,45 @@ export class CalculationEngine {
       });
     }
 
-    // 5. Update Project Overall Progress
+    // 5. Update Project Overall Progress & Value Rollups
     const allItems = await BoqItem.find({ companyId: compObjectId, projectId: projObjectId });
     if (allItems.length > 0) {
-      const totalAmount = allItems.reduce((s, it) => s + it.amount, 0);
-      const executedAmount = allItems.reduce((s, it) => s + (it.executedQuantity * it.rate), 0);
+      const totalAmount = allItems.reduce((s, it) => s + (it.amount || 0), 0);
+      const executedAmount = allItems.reduce((s, it) => s + ((it.executedQuantity || 0) * (it.rate || 0)), 0);
       const overallProgress = totalAmount > 0 ? Number(((executedAmount / totalAmount) * 100).toFixed(0)) : 0;
-      await Project.findByIdAndUpdate(projObjectId, { progress: overallProgress });
+      
+      const currentProj = await Project.findById(projObjectId);
+      if (currentProj) {
+        const updateData: Record<string, unknown> = { progress: overallProgress };
+        if (!currentProj.contractValue && (!currentProj.estimatedValue || currentProj.estimatedValue < totalAmount)) {
+          updateData.estimatedValue = totalAmount;
+        }
+        await Project.findByIdAndUpdate(projObjectId, updateData);
+
+        // Rollup to parent project if this is a subproject
+        if (currentProj.parentId) {
+          const siblingSubs = await Project.find({
+            parentId: currentProj.parentId,
+            deletedAt: null,
+          }).lean();
+
+          let parentTotal = 0;
+          let parentExecuted = 0;
+          for (const sub of siblingSubs) {
+            const subBoqs = await BoqItem.find({ projectId: sub._id }).lean();
+            const subTotal = subBoqs.reduce((s, b) => s + (b.amount || 0), 0) || sub.contractValue || sub.estimatedValue || 0;
+            const subExec = subBoqs.reduce((s, b) => s + ((b.executedQuantity || 0) * (b.rate || 0)), 0) || (subTotal * (sub.progress || 0)) / 100;
+            parentTotal += subTotal;
+            parentExecuted += subExec;
+          }
+
+          const parentProgress = parentTotal > 0 ? Number(((parentExecuted / parentTotal) * 100).toFixed(0)) : 0;
+          await Project.findByIdAndUpdate(currentProj.parentId, {
+            estimatedValue: parentTotal,
+            progress: parentProgress,
+          });
+        }
+      }
     }
   }
 }

@@ -59,8 +59,21 @@ export class ProjectService {
       Project.countDocuments(filter),
     ]);
 
+    const enhancedProjects = await Promise.all(
+      projects.map(async (p) => {
+        const subProjectsCount = await Project.countDocuments({
+          parentId: p._id,
+          deletedAt: null,
+        });
+        return {
+          ...p,
+          subProjectsCount,
+        };
+      })
+    );
+
     return {
-      projects,
+      projects: enhancedProjects,
       pagination: {
         total,
         page,

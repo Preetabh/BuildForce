@@ -12,18 +12,14 @@ import { RecycleBin } from '../pages/RecycleBin';
 import { ComingSoonModule } from '../pages/ComingSoonModule';
 import { Help } from '../pages/Help';
 import { Settings } from '../pages/Settings';
-import { Loader2 } from 'lucide-react';
+import { ClassyAppLoader } from '../components/common/ClassyAppLoader';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0B0F17] flex items-center justify-center text-blue-500">
-        <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
-    );
+    return <ClassyAppLoader message="Authenticating Secure Session..." />;
   }
 
   if (!isAuthenticated) {
@@ -37,11 +33,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0B0F17] flex items-center justify-center text-blue-500">
-        <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
-    );
+    return <ClassyAppLoader message="Loading Portal..." />;
   }
 
   if (isAuthenticated) {

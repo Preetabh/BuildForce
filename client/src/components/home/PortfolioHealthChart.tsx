@@ -4,7 +4,7 @@ import { ChevronRight, BarChart2 } from 'lucide-react';
 
 interface MonthlyData {
   month: string;
-  planned: number; // in Cr or L
+  planned: number;
   actual: number;
   forecast: number;
   isFuture: boolean;
@@ -26,45 +26,111 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
   const avgProgress = useMemo(() => {
     if (projects.length === 0) return 0;
     const totalProg = projects.reduce((sum, p) => sum + (p.progress || 0), 0);
-    return totalProg / projects.length;
+    return Math.min(100, Math.max(0, totalProg / projects.length));
   }, [projects]);
 
-  // Generate 12 months of dynamic data based on current calendar year
+  // Dynamic Scale: Cr (>=1Cr), L (>=1L), k (>=1k), or raw INR
+  const scaleConfig = useMemo(() => {
+    if (totalBudgetValue >= 10000000) {
+      return { divisor: 10000000, unit: 'Cr', decimals: 2 };
+    }
+    if (totalBudgetValue >= 100000) {
+      return { divisor: 100000, unit: 'L', decimals: 2 };
+    }
+    if (totalBudgetValue >= 1000) {
+      return { divisor: 1000, unit: 'k', decimals: 1 };
+    }
+    return { divisor: 1, unit: '', decimals: 0 };
+  }, [totalBudgetValue]);
+
+  const formatTooltipVal = (val: number) => {
+    const rawNum = val * scaleConfig.divisor;
+    if (scaleConfig.unit === 'Cr') return `₹${val.toFixed(2)} Cr`;
+    if (scaleConfig.unit === 'L') return `₹${val.toFixed(2)} L`;
+    if (scaleConfig.unit === 'k') return `₹${val.toFixed(1)}k (₹${Math.round(rawNum).toLocaleString('en-IN')})`;
+    return `₹${Math.round(rawNum).toLocaleString('en-IN')}`;
+  };
+
+  // Generate dynamic data based on selected timeRange
   const chartData = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const currentMonthIdx = new Date().getMonth(); // 0-indexed (e.g. 8 for Sept)
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthIdx = now.getMonth(); // 0-indexed (e.g. 8 for Sept)
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    // In Crores (1 Cr = 10,000,000)
-    const budgetInCr = totalBudgetValue / 10000000;
-    const actualSpendTotalCr = budgetInCr * (avgProgress / 100);
+    const scaledBudget = totalBudgetValue > 0 ? totalBudgetValue / scaleConfig.divisor : 0;
+    const actualSpendTotalScaled = scaledBudget * (avgProgress / 100);
 
-    return monthNames.map((name, idx) => {
-      const isFuture = idx > currentMonthIdx;
-      const progressFraction = (idx + 1) / 12;
+    const monthsList: { name: string; year: number; isFuture: boolean; progressFraction: number; monthWeight: number }[] = [];
 
-      // Planned S-curve accumulation
-      const planned = budgetInCr > 0 ? Number((budgetInCr * progressFraction).toFixed(2)) : 0;
+    if (timeRange === '6M') {
+      const startIdx = Math.max(0, Math.min(6, currentMonthIdx - 3));
+      for (let i = startIdx; i < startIdx + 6; i++) {
+        const isFuture = i > currentMonthIdx;
+        const progressFraction = (i + 1) / 12;
+        const monthWeight = (i + 1) / (currentMonthIdx + 1);
+        monthsList.push({
+          name: monthNames[i % 12],
+          year: currentYear,
+          isFuture,
+          progressFraction,
+          monthWeight: Math.min(1, Math.max(0, monthWeight)),
+        });
+      }
+    } else if (timeRange === '24M') {
+      for (let i = 0; i < 12; i++) {
+        monthsList.push({
+          name: monthNames[i],
+          year: currentYear - 1,
+          isFuture: false,
+          progressFraction: ((i + 1) / 24),
+          monthWeight: (i + 1) / (12 + currentMonthIdx + 1),
+        });
+      }
+      for (let i = 0; i < 12; i++) {
+        const isFuture = i > currentMonthIdx;
+        monthsList.push({
+          name: monthNames[i],
+          year: currentYear,
+          isFuture,
+          progressFraction: ((12 + i + 1) / 24),
+          monthWeight: Math.min(1, (12 + i + 1) / (12 + currentMonthIdx + 1)),
+        });
+      }
+    } else {
+      for (let i = 0; i < 12; i++) {
+        const isFuture = i > currentMonthIdx;
+        const progressFraction = (i + 1) / 12;
+        const monthWeight = Math.min(1, (i + 1) / (currentMonthIdx + 1));
+        monthsList.push({
+          name: monthNames[i],
+          year: currentYear,
+          isFuture,
+          progressFraction,
+          monthWeight,
+        });
+      }
+    }
 
-      // Actual spend accrued up to current month based on actual project progress
+    return monthsList.map((m) => {
+      const planned = scaledBudget > 0 ? Number((scaledBudget * m.progressFraction).toFixed(scaleConfig.decimals)) : 0;
+
       let actual = 0;
-      if (!isFuture && actualSpendTotalCr > 0) {
-        const monthWeight = (idx + 1) / (currentMonthIdx + 1);
-        actual = Number((actualSpendTotalCr * monthWeight).toFixed(2));
+      if (!m.isFuture && actualSpendTotalScaled > 0) {
+        actual = Number((actualSpendTotalScaled * m.monthWeight).toFixed(scaleConfig.decimals));
       }
 
-      // Forecast curve
-      const forecast = budgetInCr > 0 ? Number((budgetInCr * Math.min(1, progressFraction * 0.98)).toFixed(2)) : 0;
+      const forecast = scaledBudget > 0 ? Number((scaledBudget * Math.min(1, m.progressFraction * 0.98)).toFixed(scaleConfig.decimals)) : 0;
 
       return {
-        month: `${name} ${currentYear}`,
+        month: `${m.name} ${m.year}`,
         planned,
         actual,
         forecast,
-        isFuture,
+        isFuture: m.isFuture,
       };
     });
-  }, [totalBudgetValue, avgProgress]);
+  }, [totalBudgetValue, avgProgress, timeRange, scaleConfig]);
 
   // Dynamic max scale calculation
   const maxVal = useMemo(() => {
@@ -74,10 +140,13 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
 
   const formatYAxis = (fraction: number) => {
     if (totalBudgetValue === 0) {
-      return `₹${(fraction * 1).toFixed(1)} Cr`;
+      return `₹0.00`;
     }
     const val = maxVal * fraction;
-    return val >= 1 ? `₹${val.toFixed(1)} Cr` : `₹${(val * 100).toFixed(0)} L`;
+    if (scaleConfig.unit) {
+      return `₹${val.toFixed(val >= 10 ? 1 : scaleConfig.decimals)} ${scaleConfig.unit}`;
+    }
+    return `₹${Math.round(val).toLocaleString('en-IN')}`;
   };
 
   return (
@@ -118,18 +187,18 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
         {hoveredMonth && totalBudgetValue > 0 && (
           <div className="absolute top-0 right-4 z-20 bg-slate-900/90 dark:bg-slate-800/95 backdrop-blur text-white text-xs px-3 py-1.5 rounded-lg shadow-lg border border-slate-700 pointer-events-none flex items-center gap-3">
             <span className="font-semibold text-blue-300">{hoveredMonth.month}</span>
-            <span>Planned: ₹{hoveredMonth.planned} Cr</span>
+            <span>Planned: {formatTooltipVal(hoveredMonth.planned)}</span>
             {!hoveredMonth.isFuture && (
-              <span className="text-teal-400">Actual: ₹{hoveredMonth.actual} Cr</span>
+              <span className="text-teal-400">Actual: {formatTooltipVal(hoveredMonth.actual)}</span>
             )}
-            <span className="text-amber-300">Forecast: ₹{hoveredMonth.forecast} Cr</span>
+            <span className="text-amber-300">Forecast: {formatTooltipVal(hoveredMonth.forecast)}</span>
           </div>
         )}
 
         {/* Grid and Bars Area */}
         <div className="relative h-56 flex">
           {/* Y-Axis Labels */}
-          <div className="w-14 h-full flex flex-col justify-between text-[10.5px] font-medium text-slate-400 dark:text-slate-500 pr-2 select-none text-right shrink-0">
+          <div className="w-16 h-full flex flex-col justify-between text-[10.5px] font-medium text-slate-400 dark:text-slate-500 pr-2 select-none text-right shrink-0">
             <span>{formatYAxis(1.0)}</span>
             <span>{formatYAxis(0.75)}</span>
             <span>{formatYAxis(0.5)}</span>
@@ -203,8 +272,12 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
             {/* Bars for Each Month */}
             <div className="relative w-full h-full flex justify-between items-end px-1 sm:px-2 z-0">
               {chartData.map((item) => {
-                const plannedH = totalBudgetValue > 0 ? `${(item.planned / maxVal) * 100}%` : '2px';
-                const actualH = totalBudgetValue > 0 && !item.isFuture ? `${(item.actual / maxVal) * 100}%` : '0px';
+                const plannedH = totalBudgetValue > 0 && item.planned > 0
+                  ? `${Math.max(4, (item.planned / maxVal) * 100)}%`
+                  : '2px';
+                const actualH = totalBudgetValue > 0 && !item.isFuture && item.actual > 0
+                  ? `${Math.max(4, (item.actual / maxVal) * 100)}%`
+                  : '0px';
 
                 return (
                   <div
@@ -218,7 +291,7 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
                       <div
                         style={{ height: plannedH }}
                         className="w-2 sm:w-2.5 bg-blue-600/80 hover:bg-blue-600 rounded-t-sm transition-all duration-300 group-hover:brightness-110 shadow-sm"
-                        title={`Planned: ₹${item.planned} Cr`}
+                        title={`Planned: ${formatTooltipVal(item.planned)}`}
                       />
 
                       {/* Actual Bar (Teal) */}
@@ -226,7 +299,7 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
                         <div
                           style={{ height: actualH }}
                           className="w-2 sm:w-2.5 bg-teal-500 hover:bg-teal-400 rounded-t-sm transition-all duration-300 group-hover:brightness-110 shadow-sm"
-                          title={`Actual: ₹${item.actual} Cr`}
+                          title={`Actual: ${formatTooltipVal(item.actual)}`}
                         />
                       )}
                     </div>
@@ -238,7 +311,7 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
         </div>
 
         {/* X-Axis Month Labels */}
-        <div className="flex ml-14 px-1 sm:px-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex ml-16 px-1 sm:px-2 pt-2 border-t border-slate-200 dark:border-slate-800">
           {chartData.map((item) => (
             <div
               key={item.month}

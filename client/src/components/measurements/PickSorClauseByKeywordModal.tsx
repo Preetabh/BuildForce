@@ -11,6 +11,7 @@ import {
   Loader2,
   Lightbulb,
   Bot,
+  Plus,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import api from '../../services/api';
@@ -265,33 +266,45 @@ export const PickSorClauseByKeywordModal: React.FC<PickSorClauseByKeywordModalPr
 
         {/* Modal Dialog Card matching Reference Screenshot 1 */}
         <div
-          className="relative w-full max-w-xl bg-[#0b0f19] border border-slate-700/80 rounded-2xl shadow-2xl z-10 overflow-hidden my-4 flex flex-col max-h-[90vh]"
+          className="relative w-full max-w-xl bg-[#0b0f19] border border-slate-700/80 rounded-2xl shadow-2xl z-10 overflow-hidden my-4 flex flex-col h-[650px] max-h-[88vh]"
           role="dialog"
           aria-modal="true"
         >
           {/* ======================================================================
-              HEADER: Deep Royal Blue Banner with Lightbulb icon matching Screenshot 1
+              HEADER: Deep Royal Blue Banner with Lightbulb icon & Manage/Add Button
              ====================================================================== */}
-          <div className="flex items-center justify-between px-4 py-3 bg-[#1e40af] text-white select-none shadow-md">
+          <div className="flex items-center justify-between px-4 py-3 bg-[#1e40af] text-white select-none shadow-md shrink-0">
             <div className="flex items-center gap-2">
               <Lightbulb className="w-4 h-4 text-white fill-white" />
               <h3 className="text-sm font-bold tracking-wide">Pick SOR Clause by Keyword</h3>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-white/80 hover:text-white hover:bg-white/10 p-1 rounded-md transition-colors cursor-pointer"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsManageModalOpen(true)}
+                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-700 hover:bg-blue-600 text-white flex items-center gap-1.5 transition-colors border border-blue-400/40 cursor-pointer shadow-sm"
+                title="Manage or Add Keyword Aliases"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Manage / Add</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-white/80 hover:text-white hover:bg-white/10 p-1 rounded-md transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* ======================================================================
-              BODY: Search Bar & Cards List matching Screenshot 1
+              BODY: Search Bar & Cards List matching Screenshot 1 (min-h-0 keeps footer visible)
              ====================================================================== */}
-          <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+          <div className="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto">
             {/* Search Box matching Screenshot 1 */}
             <div className="relative">
               <input
@@ -340,6 +353,14 @@ export const PickSorClauseByKeywordModal: React.FC<PickSorClauseByKeywordModalPr
                   <p className="text-[11px] text-slate-500 mt-1">
                     Click "Manage" below to add custom keyword aliases or use "AI Match".
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsManageModalOpen(true)}
+                    className="mt-3 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-md transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Manage / Add Keywords</span>
+                  </button>
                 </div>
               ) : (
                 displayCards.map((card) => (
@@ -362,7 +383,7 @@ export const PickSorClauseByKeywordModal: React.FC<PickSorClauseByKeywordModalPr
                         )}
 
                         <span className="text-slate-400 font-medium flex items-center gap-1">
-                          <Layers className="w-3 h-3 text-slate-400" />
+                          <Layers className="w-3.5 h-3.5 text-slate-400" />
                           <span>{card.workCategory}</span>
                         </span>
 
@@ -424,14 +445,12 @@ export const PickSorClauseByKeywordModal: React.FC<PickSorClauseByKeywordModalPr
           </div>
 
           {/* ======================================================================
-              FOOTER matching Reference Screenshot 1:
-              Left: ⓘ Not in your keywords? Use AI Match.
-              Right: [ 🤖 AI Match ]  [ ✏️ Manage ]
+              FOOTER: Always visible at bottom with Manage / Add & AI Match
              ====================================================================== */}
-          <div className="px-4 py-3 bg-[#090d16] border-t border-slate-800/80 flex items-center justify-between flex-wrap gap-2 text-xs">
+          <div className="px-4 py-3 bg-[#090d16] border-t border-slate-800/80 flex items-center justify-between flex-wrap gap-2 text-xs shrink-0 z-10">
             <div className="flex items-center gap-1.5 text-slate-400">
               <Info className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-              <span>Not in your keywords? Use AI Match.</span>
+              <span>Not in your keywords? Use AI Match or Manage.</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -446,14 +465,14 @@ export const PickSorClauseByKeywordModal: React.FC<PickSorClauseByKeywordModalPr
                 <span>{isAiMatching ? 'Matching...' : 'AI Match'}</span>
               </button>
 
-              {/* Manage Button matching Reference Screenshot 1 */}
+              {/* Manage / Add Button */}
               <button
                 type="button"
                 onClick={() => setIsManageModalOpen(true)}
-                className="px-3 py-1.5 rounded-lg bg-[#141a29] hover:bg-[#1c2438] border border-slate-700/80 hover:border-slate-600 text-slate-200 hover:text-white font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg bg-[#141a29] hover:bg-[#1c2438] border border-slate-700/80 hover:border-blue-500/60 text-slate-200 hover:text-white font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
               >
-                <Edit className="w-3.5 h-3.5 text-slate-400" />
-                <span>Manage</span>
+                <Plus className="w-3.5 h-3.5 text-blue-400" />
+                <span>Manage / Add</span>
               </button>
             </div>
           </div>

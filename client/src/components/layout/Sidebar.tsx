@@ -192,14 +192,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, deletedCount 
         {/* Brand Header */}
         <div className="p-3.5 border-b border-[#161D2E] flex items-center justify-between bg-[#0E1528]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl overflow-hidden shadow-md shrink-0 border border-blue-400/30 bg-blue-600 flex items-center justify-center">
-              <img src="/logo.png" alt="BudgetPilot Logo" className="w-full h-full object-cover" />
+            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-blue-500/20 shrink-0 border border-cyan-500/40 bg-gradient-to-br from-[#0c1426] via-[#080d19] to-black p-1 flex items-center justify-center">
+              <img
+                src={isDark ? '/logo-dark.png' : '/logo.png'}
+                alt="BudgetPilot Logo"
+                className="w-full h-full object-contain filter drop-shadow-[0_0_6px_rgba(56,189,248,0.5)]"
+              />
             </div>
             <div>
-              <h1 className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5">
-                <span>BudgetPilot</span>
+              <h1 className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5 font-mono">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-cyan-300">
+                  BudgetPilot
+                </span>
               </h1>
-              <p className="text-[10px] font-medium tracking-wide text-slate-400">
+              <p className="text-[10px] font-medium tracking-wider uppercase text-cyan-400/80">
                 Plan • Build • Control
               </p>
             </div>

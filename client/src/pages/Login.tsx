@@ -53,10 +53,10 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md relative z-10">
         {/* Header Branding */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 shadow-glow mb-4 text-white">
-            <HardHat className="w-8 h-8 text-amber-300" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#0c1426] via-[#080d19] to-black border border-cyan-500/40 shadow-2xl shadow-blue-500/30 mb-4 p-2.5">
+            <img src="/logo-dark.png" alt="BudgetPilot Logo" className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-erp-text tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             BudgetPilot
           </h1>
           <p className="text-sm text-erp-text-muted mt-1">

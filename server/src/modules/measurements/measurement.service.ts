@@ -11,6 +11,7 @@ import { CalculationEngine, MeasurementDimensions } from '../engine/calculation.
 import { UnitDimensionEngine } from '../engine/unit.validator';
 import { AppError } from '../../middleware/error.middleware';
 import { AuditService } from '../audit/audit.service';
+import { Formula } from '../../models/Formula';
 
 export interface CreateMeasurementEntryInput {
   sorId?: string;
@@ -176,13 +177,14 @@ export class MeasurementService {
         };
       }
     }
-
+  
     const rateAnalysis = await RateAnalysisService.resolveAnalysisForBoqItem(companyId, dummyBoqItem);
     const activeUnitRate = input.rate !== undefined && input.rate > 0 ? input.rate : (dummyBoqItem.rate || 0);
     const impact = CalculationEngine.calculateImpactPreview(
       totalQty,
       activeUnitRate,
-      rateAnalysis
+      rateAnalysis,
+      
     );
 
     return {

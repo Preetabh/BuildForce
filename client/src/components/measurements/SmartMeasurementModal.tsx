@@ -55,6 +55,7 @@ import {
   PickSorMeasurementBookModal,
 } from './PickSorMeasurementBookModal';
 import { CurrencyUtil } from '../../utils/currency';
+import { useDebounce } from '../../hooks/useDebounce';
 
 interface SmartMeasurementModalProps {
   isOpen: boolean;
@@ -359,14 +360,18 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
   }, [existingMeasurementsData]);
 
   // 7. Smart SOR Clause Search
-  const searchQueryForSor =
-    activeInputTab === 'KEYWORDS'
-      ? selectedKeywords.length > 0
-        ? selectedKeywords.join(' ')
-        : keywordsText
-      : clauseSearchTerm || itemHeading;
+  const debouncedClauseSearchTerm = useDebounce(clauseSearchTerm, 300);
 
-  const { data: smartSearchData, isLoading: isClausesLoading } = useQuery<{ items: SorItem[] }>({
+  const searchQueryForSor = isClausePickerOpen
+    ? debouncedClauseSearchTerm.trim()
+    : debouncedClauseSearchTerm.trim() ||
+      (activeInputTab === 'KEYWORDS'
+        ? selectedKeywords.length > 0
+          ? selectedKeywords.join(' ')
+          : keywordsText
+        : itemHeading);
+
+  const { data: smartSearchData, isLoading: isClausesLoading, refetch: refetchSmartSearch } = useQuery<{ items: SorItem[] }>({
     queryKey: ['smartSorSearchModal', selectedScheduleId, searchQueryForSor, workCategory],
     queryFn: async () => {
       if (!selectedScheduleId) return { items: [] };
@@ -374,7 +379,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
       params.append('sorId', selectedScheduleId);
       if (searchQueryForSor) params.append('search', searchQueryForSor);
       if (workCategory) params.append('chapter', workCategory);
-      params.append('limit', '40');
+      params.append('limit', '100');
       const res = await api.get(`/sor/items/smart-search?${params.toString()}`);
       const raw = res.data?.data;
       const items = Array.isArray(raw) ? raw : (Array.isArray(raw?.items) ? raw.items : []);
@@ -2995,15 +3000,49 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
           <div className="space-y-3.5">
             {/* Clause Search & Category Filter */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-              <div className="sm:col-span-8 relative">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  value={clauseSearchTerm}
-                  onChange={(e) => setClauseSearchTerm(e.target.value)}
-                  placeholder="Search item code (e.g. 14.78, 2.16) or description..."
-                  className="w-full pl-9 pr-3 py-2 bg-[#080b11] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-500"
-                />
+              <div className="sm:col-span-8 flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={clauseSearchTerm}
+                    onChange={(e) => setClauseSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        refetchSmartSearch();
+                      }
+                    }}
+                    placeholder="Search item code (e.g. 14.78, 2.16) or description..."
+                    autoFocus
+                    className="w-full pl-9 pr-8 py-2 bg-[#080b11] border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-white focus:outline-none transition-colors"
+                  />
+                  {clauseSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setClauseSearchTerm('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 rounded-full cursor-pointer"
+                      title="Clear search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => refetchSmartSearch()}
+                  disabled={isClausesLoading}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 disabled:opacity-60 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors shadow-sm cursor-pointer"
+                  title="Search clauses"
+                >
+                  {isClausesLoading ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Search className="w-3.5 h-3.5" />
+                  )}
+                  <span>Search</span>
+                </button>
               </div>
 
               <div className="sm:col-span-4">
@@ -3030,8 +3069,22 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
                   Loading clauses...
                 </div>
               ) : sorSearchResults.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-500">
-                  No clauses found for {activeSchedule?.sorName} matching "{clauseSearchTerm || searchQueryForSor}".
+                <div className="p-8 text-center text-xs text-slate-500 space-y-2">
+                  <p>
+                    No clauses found for {activeSchedule?.sorName} matching "{clauseSearchTerm || searchQueryForSor}".
+                  </p>
+                  {(clauseSearchTerm || workCategory) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setClauseSearchTerm('');
+                        setWorkCategory('');
+                      }}
+                      className="text-xs text-cyan-400 hover:underline font-medium cursor-pointer"
+                    >
+                      Clear filters & show all clauses
+                    </button>
+                  )}
                 </div>
               ) : (
                 sorSearchResults.map((item) => {
