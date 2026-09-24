@@ -66,8 +66,16 @@ router.delete('/items/:itemId', requirePermission('sor.import'), SorController.d
 router.get('/masters', requirePermission('sor.view'), SorController.getSorMasters);
 router.post('/masters', requirePermission('sor.import'), SorController.createSorMaster);
 router.patch('/masters/:masterId', requirePermission('sor.import'), SorController.updateSorMaster);
+router.post('/masters/:masterId/duplicate', requirePermission('sor.import'), SorController.duplicateSorMaster);
+router.patch('/masters/:masterId/archive', requirePermission('sor.import'), SorController.archiveSorMaster);
 router.delete('/masters/:masterId/items', requirePermission('sor.import'), SorController.clearSorMasterItems);
 router.delete('/masters/:masterId', requirePermission('sor.import'), SorController.deleteSorMaster);
+
+// Dynamic Master Options & Recents
+router.get('/masters/options', requirePermission('sor.view'), SorController.getMasterOptions);
+router.post('/masters/options', requirePermission('sor.import'), SorController.createMasterOption);
+router.post('/recent/:sorId', requirePermission('sor.view'), SorController.recordRecentSor);
+router.get('/recents', requirePermission('sor.view'), SorController.getRecentSors);
 
 
 // 3. Import History & Upload

@@ -12,6 +12,9 @@ import { AppError } from '../../middleware/error.middleware';
 import { AuditService } from '../audit/audit.service';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
+import { UserRecentSor } from '../../models/UserRecentSor';
+import { MasterOption } from '../../models/MasterOption';
+import { CurrencyUtil } from '../../utils/currency';
 import * as XLSX from 'xlsx';
 
 export interface SorQueryFilters {
@@ -1742,12 +1745,24 @@ export class SorService {
       throw new AppError('Department / Schedule name is required', 400);
     }
 
+    const compObjectId = new Types.ObjectId(companyId);
+
+    // Prevent duplicate SOR names within the same organization
+    const existing = await SorMaster.findOne({
+      companyId: compObjectId,
+      sorName: { $regex: new RegExp(`^${finalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      status: { $ne: 'ARCHIVED' },
+    });
+    if (existing) {
+      throw new AppError(`A Schedule with the name "${finalName}" already exists in your organization.`, 409);
+    }
+
     const typeVal = (data.type || data.scheduleType || 'Central Govt').trim();
     const owningBodyVal = (data.owningBody || data.authority || 'CPWD').trim();
-    const yearVal = (data.year || data.version || '2023').trim();
+    const yearVal = (data.year || data.version || new Date().getFullYear().toString()).trim();
 
     const master = await SorMaster.create({
-      companyId: new Types.ObjectId(companyId),
+      companyId: compObjectId,
       authority: owningBodyVal,
       sorName: finalName,
       version: yearVal,
@@ -1755,7 +1770,7 @@ export class SorService {
       category: data.category?.trim() || 'Civil Works',
       scheduleType: typeVal,
       country: data.country?.trim() || 'India',
-      state: data.state?.trim() || (typeVal.includes('State') ? 'State Specific' : 'All-India'),
+      state: data.state?.trim() || '',
       owningBody: owningBodyVal,
       year: yearVal,
       notes: data.notes?.trim() || '',
@@ -1772,14 +1787,39 @@ export class SorService {
   public static async updateSorMaster(
     companyId: string,
     masterId: string,
-    data: { sorName?: string; authority?: string; version?: string; department?: string }
+    data: {
+      sorName?: string;
+      authority?: string;
+      version?: string;
+      department?: string;
+      country?: string;
+      state?: string;
+      scheduleType?: string;
+      owningBody?: string;
+      notes?: string;
+    }
   ) {
     if (!Types.ObjectId.isValid(masterId)) {
       throw new AppError('Invalid master ID format', 400);
     }
 
+    const compObjectId = new Types.ObjectId(companyId);
+
+    if (data.sorName) {
+      const trimmed = data.sorName.trim();
+      const existing = await SorMaster.findOne({
+        _id: { $ne: new Types.ObjectId(masterId) },
+        companyId: compObjectId,
+        sorName: { $regex: new RegExp(`^${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        status: { $ne: 'ARCHIVED' },
+      });
+      if (existing) {
+        throw new AppError(`Another Schedule with the name "${trimmed}" already exists.`, 409);
+      }
+    }
+
     const master = await SorMaster.findOneAndUpdate(
-      { _id: new Types.ObjectId(masterId) },
+      { _id: new Types.ObjectId(masterId), companyId: compObjectId },
       { $set: data },
       { new: true }
     );
@@ -1792,6 +1832,184 @@ export class SorService {
   }
 
   /**
+   * Duplicate an existing SOR Schedule and all its items
+   */
+  public static async duplicateSorMaster(
+    companyId: string,
+    masterId: string,
+    customName?: string
+  ) {
+    if (!Types.ObjectId.isValid(masterId)) {
+      throw new AppError('Invalid master ID format', 400);
+    }
+
+    const compObjectId = new Types.ObjectId(companyId);
+    const sourceMaster = await SorMaster.findOne({ _id: new Types.ObjectId(masterId), companyId: compObjectId });
+    if (!sourceMaster) {
+      throw new AppError('Source SOR Schedule not found', 404);
+    }
+
+    const newSorName = (customName || `${sourceMaster.sorName} (Copy)`).trim();
+    const existing = await SorMaster.findOne({
+      companyId: compObjectId,
+      sorName: { $regex: new RegExp(`^${newSorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      status: { $ne: 'ARCHIVED' },
+    });
+    if (existing) {
+      throw new AppError(`A Schedule with the name "${newSorName}" already exists.`, 409);
+    }
+
+    const newMaster = await SorMaster.create({
+      companyId: compObjectId,
+      authority: sourceMaster.authority,
+      sorName: newSorName,
+      version: `${sourceMaster.version}.copy`,
+      department: sourceMaster.department,
+      category: sourceMaster.category,
+      scheduleType: sourceMaster.scheduleType,
+      country: sourceMaster.country,
+      state: sourceMaster.state,
+      owningBody: sourceMaster.owningBody,
+      year: sourceMaster.year,
+      notes: sourceMaster.notes ? `Copy of ${sourceMaster.sorName}. ${sourceMaster.notes}` : `Copy of ${sourceMaster.sorName}`,
+      effectiveFrom: new Date(),
+      status: 'ACTIVE',
+    });
+
+    const sourceItems = await SorItem.find({ sorId: sourceMaster._id, status: 'ACTIVE' }).lean();
+    if (sourceItems.length > 0) {
+      const clonedItems = sourceItems.map((item) => ({
+        sorId: newMaster._id,
+        srNo: item.srNo,
+        itemCode: item.itemCode,
+        subclauseCode: (item as any).subclauseCode || '',
+        descriptionEnglish: item.descriptionEnglish,
+        descriptionHindi: item.descriptionHindi,
+        unit: item.unit,
+        rate: item.rate,
+        chapter: item.chapter,
+        subChapter: item.subChapter,
+        workCategory: item.workCategory,
+        projectStage: (item as any).projectStage || '',
+        measurementFormula: item.measurementFormula,
+        applicableDimensions: item.applicableDimensions,
+        formulaExpression: item.formulaExpression,
+        qcChecklist: (item as any).qcChecklist || '',
+        remarks: (item as any).remarks || '',
+        status: 'ACTIVE',
+      }));
+      await SorItem.insertMany(clonedItems);
+    }
+
+    return newMaster;
+  }
+
+  /**
+   * Archive an SOR Master Schedule (Soft delete)
+   */
+  public static async archiveSorMaster(companyId: string, masterId: string) {
+    if (!Types.ObjectId.isValid(masterId)) {
+      throw new AppError('Invalid master ID format', 400);
+    }
+    const compObjectId = new Types.ObjectId(companyId);
+    const master = await SorMaster.findOneAndUpdate(
+      { _id: new Types.ObjectId(masterId), companyId: compObjectId },
+      { $set: { status: 'ARCHIVED' } },
+      { new: true }
+    );
+    if (!master) {
+      throw new AppError('Schedule not found', 404);
+    }
+    return { success: true, message: `Schedule "${master.sorName}" archived successfully` };
+  }
+
+  /**
+   * Record recently opened SOR for authenticated user
+   */
+  public static async recordRecentSor(companyId: string, userId: string, sorId: string) {
+    if (!Types.ObjectId.isValid(sorId)) return { success: false };
+    const compObjectId = new Types.ObjectId(companyId);
+    const userObjectId = new Types.ObjectId(userId);
+    const sorObjectId = new Types.ObjectId(sorId);
+
+    await UserRecentSor.findOneAndUpdate(
+      { companyId: compObjectId, userId: userObjectId, sorId: sorObjectId },
+      { $set: { lastAccessedAt: new Date() } },
+      { upsert: true, new: true }
+    );
+    return { success: true };
+  }
+
+  /**
+   * Get recently opened SORs for authenticated user
+   */
+  public static async getRecentSors(companyId: string, userId: string) {
+    const compObjectId = new Types.ObjectId(companyId);
+    const userObjectId = new Types.ObjectId(userId);
+
+    const recents = await UserRecentSor.find({
+      companyId: compObjectId,
+      userId: userObjectId,
+    })
+      .sort({ lastAccessedAt: -1 })
+      .limit(6)
+      .populate('sorId')
+      .lean();
+
+    return recents
+      .map((r: any) => r.sorId)
+      .filter((s: any) => s && s.status !== 'ARCHIVED');
+  }
+
+  /**
+   * Master options retrieval for organization
+   */
+  public static async getMasterOptions(companyId: string, type?: string) {
+    const compObjectId = new Types.ObjectId(companyId);
+    const query: Record<string, unknown> = {
+      $or: [{ companyId: compObjectId }, { isSystem: true }],
+      status: 'ACTIVE',
+    };
+    if (type) {
+      query.type = type.toUpperCase();
+    }
+    return MasterOption.find(query).sort({ sortOrder: 1, label: 1 }).lean();
+  }
+
+  /**
+   * Create master option for organization
+   */
+  public static async createMasterOption(
+    companyId: string,
+    data: { type: string; label: string; value?: string; description?: string }
+  ) {
+    if (!data.type || !data.label) {
+      throw new AppError('Type and Label are required for master option', 400);
+    }
+    const compObjectId = new Types.ObjectId(companyId);
+    const val = (data.value || data.label).trim();
+
+    const existing = await MasterOption.findOne({
+      companyId: compObjectId,
+      type: data.type.toUpperCase() as any,
+      value: val,
+    });
+    if (existing) {
+      return existing;
+    }
+
+    return MasterOption.create({
+      companyId: compObjectId,
+      type: data.type.toUpperCase(),
+      label: data.label.trim(),
+      value: val,
+      description: data.description?.trim() || '',
+      isSystem: false,
+      status: 'ACTIVE',
+    });
+  }
+
+  /**
    * Clear all items within an SOR Master Schedule
    */
   public static async clearSorMasterItems(companyId: string, masterId: string) {
@@ -1799,7 +2017,7 @@ export class SorService {
       throw new AppError('Invalid master ID format', 400);
     }
 
-    const master = await SorMaster.findById(masterId);
+    const master = await SorMaster.findOne({ _id: new Types.ObjectId(masterId), companyId: new Types.ObjectId(companyId) });
     if (!master) {
       throw new AppError('Department / Schedule not found', 404);
     }
@@ -1999,72 +2217,10 @@ export class SorService {
     // Enhance items with formula config, work category, and rate analysis from DB
     const items = await Promise.all(
       rawItems.map(async (item) => {
-        const u = (item.unit || '').trim().toLowerCase();
-        const desc = (item.descriptionEnglish || '').toLowerCase();
         const code = (item.itemCode || '').trim();
+        const safeRate = CurrencyUtil.round2(item.rate || 0);
 
-        // 1. Work category determination
-        let workCategory = item.workCategory || '';
-        if (!workCategory) {
-          if (desc.includes('earth work') || desc.includes('excavation') || desc.includes('trench')) {
-            workCategory = 'Earthwork Excavation';
-          } else if (desc.includes('r.c.c') || desc.includes('reinforced cement concrete') || desc.includes('beam') || desc.includes('column') || desc.includes('slab') || desc.includes('footing')) {
-            workCategory = 'Reinforced Cement Concrete';
-          } else if (desc.includes('p.c.c') || desc.includes('plain cement concrete') || desc.includes('cement concrete') || desc.includes('1:2:4') || desc.includes('1:4:8')) {
-            workCategory = 'Plain Cement Concrete';
-          } else if (desc.includes('tmt') || desc.includes('steel') || desc.includes('reinforcement') || desc.includes('bar')) {
-            workCategory = 'Steel Reinforcement';
-          } else if (desc.includes('brick') || desc.includes('masonry')) {
-            workCategory = 'Brick Masonry';
-          } else if (desc.includes('plaster') || desc.includes('pointing')) {
-            workCategory = 'Plastering & Pointing';
-          } else if (desc.includes('tile') || desc.includes('flooring') || desc.includes('marble') || desc.includes('granite')) {
-            workCategory = 'Flooring & Tiling';
-          } else {
-            workCategory = item.chapter || 'Civil General';
-          }
-        }
-
-        // 2. Applicable formula & dimensions
-        let formula = item.measurementFormula || '';
-        let applicableDimensions = item.applicableDimensions || [];
-        let formulaExpression = item.formulaExpression || '';
-
-        if (!formula) {
-          if (u === 'cum' || u === 'm3' || u === 'cubic meter' || u === 'cubic metre') {
-            if (workCategory.includes('Earthwork')) {
-              formula = 'LxWxD';
-              applicableDimensions = ['length', 'width', 'depth', 'nos'];
-              formulaExpression = 'Length × Width × Depth × Nos';
-            } else {
-              formula = 'LxWxH';
-              applicableDimensions = ['length', 'width', 'height', 'nos'];
-              formulaExpression = 'Length × Width × Height × Nos';
-            }
-          } else if (u === 'sqm' || u === 'm2' || u === 'square meter' || u === 'square metre') {
-            formula = 'LxW';
-            applicableDimensions = ['length', 'width', 'height', 'nos'];
-            formulaExpression = 'Length × (Width or Height) × Nos';
-          } else if (u === 'kg' || u === 'tonne' || u === 'quintal') {
-            formula = 'Weight';
-            applicableDimensions = ['length', 'unitWeight', 'weight', 'nos'];
-            formulaExpression = 'Nos × Length × Unit Weight (or Direct Weight)';
-          } else if (u === 'nos' || u === 'each' || u === 'number' || u === 'set' || u === 'item') {
-            formula = 'Count';
-            applicableDimensions = ['nos', 'quantity'];
-            formulaExpression = 'Quantity / Nos';
-          } else if (u === 'm' || u === 'meter' || u === 'metre' || u === 'rm') {
-            formula = 'Length';
-            applicableDimensions = ['length', 'nos'];
-            formulaExpression = 'Length × Nos';
-          } else {
-            formula = 'Custom';
-            applicableDimensions = ['length', 'width', 'height', 'nos', 'quantity'];
-            formulaExpression = 'Length × Width × Height × Nos';
-          }
-        }
-
-        // 3. Find Rate Analysis in DB for this item
+        // Find Rate Analysis in DB for this item if available
         let rateAnalysis: any = null;
         if (compObjectId) {
           rateAnalysis = await SorRateAnalysis.findOne({
@@ -2083,10 +2239,14 @@ export class SorService {
 
         return {
           ...item,
-          workCategory,
-          measurementFormula: formula,
-          applicableDimensions,
-          formulaExpression,
+          rate: safeRate,
+          workCategory: item.workCategory || item.chapter || '',
+          projectStage: (item as any).projectStage || '',
+          qcChecklist: (item as any).qcChecklist || '',
+          remarks: (item as any).remarks || '',
+          measurementFormula: item.measurementFormula || '',
+          applicableDimensions: item.applicableDimensions || [],
+          formulaExpression: item.formulaExpression || '',
           rateAnalysisStatus: rateAnalysis ? 'AVAILABLE' : 'NOT_AVAILABLE',
           rateAnalysis: rateAnalysis
             ? {
@@ -2095,7 +2255,7 @@ export class SorService {
                 machinery: rateAnalysis.machinery || [],
                 waterChargesPercent: rateAnalysis.waterChargesPercent || 1,
                 contractorProfitPercent: rateAnalysis.contractorProfitPercent || 15,
-                analyzedRate: rateAnalysis.analyzedRate || item.rate,
+                analyzedRate: CurrencyUtil.round2(rateAnalysis.analyzedRate || safeRate),
               }
             : null,
         };
@@ -2115,15 +2275,19 @@ export class SorService {
 
   /**
    * Return active Schedule of Rates hierarchy:
-   * Dynamically derived from SorMaster, SorItem, SorImport, and SorRateAnalysis.
-   * Provides real item count, rate analysis availability status, document filename, and volume grouping.
+   * 100% database-driven per organization: live item count, rate analysis availability status, document filename.
+   * Zero hardcoded mocks or synthetic fallbacks.
    */
   public static async getScheduleHierarchy(companyId?: string) {
+    const compObjectId = companyId && Types.ObjectId.isValid(companyId) ? new Types.ObjectId(companyId) : null;
     const masterQuery: Record<string, unknown> = {
       status: { $in: ['ACTIVE', 'Active', 'PUBLISHED', 'Published'] },
     };
+    if (compObjectId) {
+      masterQuery.companyId = compObjectId;
+    }
 
-    // Find all active schedule masters
+    // Find all active schedule masters belonging to this organization
     const schedules = await SorMaster.find(masterQuery)
       .sort({ authority: 1, sorName: 1, version: -1 })
       .lean();
@@ -2133,98 +2297,49 @@ export class SorService {
       schedules.map(async (s) => {
         const itemCount = await SorItem.countDocuments({ sorId: s._id });
 
-        // Resolve attached import metadata (uploaded file / document name)
+        // Resolve attached import metadata
         const attachedImport = await SorImport.findOne({
-          $or: [{ sorId: s._id }, { scheduleName: s.sorName, version: s.version }],
+          sorId: s._id,
         })
           .select('fileName fileType stats authority scheduleName version')
           .lean();
 
         // Check Rate Analysis (DAR) availability count
         const rateAnalysisCount = await SorRateAnalysis.countDocuments({
-          $or: [{ sorId: s._id }, { scheduleName: s.sorName }],
+          sorId: s._id,
           status: 'ACTIVE',
         });
 
         let rateAnalysisStatus: 'Available' | 'Partial' | 'Not Available' = 'Not Available';
         if (rateAnalysisCount > 0 && itemCount > 0) {
-          if (rateAnalysisCount >= itemCount * 0.3) {
-            rateAnalysisStatus = 'Available';
-          } else {
-            rateAnalysisStatus = 'Partial';
-          }
+          rateAnalysisStatus = rateAnalysisCount >= itemCount * 0.3 ? 'Available' : 'Partial';
         } else if (rateAnalysisCount > 0) {
           rateAnalysisStatus = 'Available';
         }
 
-        // Determine volume name if present in name or filename
-        let volumeName = '';
-        const combinedText = `${s.sorName} ${s.category || ''} ${attachedImport?.fileName || ''}`.toLowerCase();
-        if (combinedText.includes('vol 1') || combinedText.includes('volume 1') || combinedText.includes('volume i') || combinedText.includes('vol_1') || combinedText.includes('vol-1')) {
-          volumeName = 'Volume I';
-        } else if (combinedText.includes('vol 2') || combinedText.includes('volume 2') || combinedText.includes('volume ii') || combinedText.includes('vol_2') || combinedText.includes('vol-2')) {
-          volumeName = 'Volume II';
-        }
-
-        const documentName = s.sourceDocument || attachedImport?.fileName || `${s.authority} ${s.scheduleType || 'DSR'} ${s.version}`;
-
-        const nameLower = (s.sorName || '').toLowerCase();
-        const authLower = (s.authority || '').toLowerCase();
-        let state = (s as any).state || '';
-        if (!state) {
-          if (nameLower.includes('chhattisgarh') || nameLower.includes('cgpwd') || authLower.includes('cgpwd') || authLower.includes('cg pwd')) {
-            state = 'Chhattisgarh';
-          } else if (nameLower.includes('maharashtra') || authLower.includes('mh') || authLower.includes('maharashtra')) {
-            state = 'Maharashtra';
-          } else if (nameLower.includes('delhi')) {
-            state = 'Delhi';
-          } else if (authLower.includes('central') || authLower.includes('cpwd') || nameLower.includes('cpwd')) {
-            state = 'All India';
-          } else {
-            state = 'All India';
-          }
-        }
-
-        let owningBody = (s as any).owningBody || '';
-        if (!owningBody) {
-          if (nameLower.includes('cgpwd') || authLower.includes('cgpwd') || state === 'Chhattisgarh') {
-            owningBody = 'CG PWD';
-          } else if (nameLower.includes('maharashtra') || authLower.includes('mh pwd') || state === 'Maharashtra') {
-            owningBody = 'MH PWD';
-          } else if (nameLower.includes('cpwd') || authLower.includes('cpwd')) {
-            owningBody = 'CPWD';
-          } else {
-            owningBody = s.authority || 'PWD';
-          }
-        }
-
-        let type = 'Govt';
-        if (nameLower.includes('private') || (s as any).scheduleType === 'Private') {
-          type = 'Private';
-        } else if (state !== 'All India' && state !== 'Central Govt') {
-          type = 'State Govt';
-        } else {
-          type = 'Central Govt';
-        }
+        const documentName = s.sourceDocument || attachedImport?.fileName || '';
+        const state = (s as any).state || '';
+        const owningBody = (s as any).owningBody || s.authority || '';
+        const scheduleType = (s as any).scheduleType || ((s as any).type) || 'Govt';
 
         return {
           _id: s._id.toString(),
-          authority: s.authority || 'CPWD',
-          department: s.department || 'Civil',
-          scheduleType: s.scheduleType || type,
+          authority: s.authority || owningBody,
+          department: s.department || '',
+          scheduleType,
           sorName: s.sorName,
-          version: s.version || '2023.1',
-          category: s.category || 'Civil Works',
-          country: (s as any).country || 'India',
+          version: s.version || '',
+          category: s.category || '',
+          country: (s as any).country || '',
           state,
           owningBody,
-          type,
+          type: scheduleType,
           effectiveFrom: s.effectiveFrom,
           itemCount,
           rateAnalysisCount,
           rateAnalysisStatus,
           documentName,
-          volume: volumeName,
+          volume: '',
         };
       })
     );

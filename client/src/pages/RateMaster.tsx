@@ -42,68 +42,7 @@ import { SorImportModal } from '../components/sor/SorImportModal';
 import { formatCurrency } from '../utils/formatters';
 import { useDebounce } from '../hooks/useDebounce';
 
-const DEFAULT_TYPES = [
-  'Central Govt',
-  'State Govt',
-  'Central PSU',
-  'State PSU',
-  'Defence',
-  'Railways',
-  'Private (Personal / Company)',
-  'Other',
-];
 
-const COMMON_STATES = [
-  'All-India',
-  'Andhra Pradesh',
-  'Arunachal Pradesh',
-  'Assam',
-  'Bihar',
-  'Chhattisgarh',
-  'Delhi',
-  'Goa',
-  'Gujarat',
-  'Haryana',
-  'Himachal Pradesh',
-  'Jharkhand',
-  'Karnataka',
-  'Kerala',
-  'Madhya Pradesh',
-  'Maharashtra',
-  'Manipur',
-  'Meghalaya',
-  'Mizoram',
-  'Nagaland',
-  'Odisha',
-  'Punjab',
-  'Rajasthan',
-  'Sikkim',
-  'Tamil Nadu',
-  'Telangana',
-  'Tripura',
-  'Uttar Pradesh',
-  'Uttarakhand',
-  'West Bengal',
-];
-
-const COMMON_UNITS = [
-  'CUM',
-  'SQM',
-  'METRE',
-  'RMT',
-  'KG',
-  'TONNE',
-  'QUINTAL',
-  'NOS',
-  'LITRE',
-  'BAG',
-  'SET',
-  'TRIP',
-  'HOUR',
-  'DAY',
-  'POINT',
-  'EACH',
-];
 
 export const RateMaster: React.FC = () => {
   const navigate = useNavigate();
@@ -303,33 +242,32 @@ export const RateMaster: React.FC = () => {
 
   // Dynamically extract filter lists from real database masters
   const uniqueCountries = useMemo(() => {
-    const list = Array.from(new Set(sorMasters.map((m) => m.country?.trim()).filter(Boolean))) as string[];
-    return list.length > 0 ? list : ['India'];
+    return Array.from(new Set(sorMasters.map((m) => m.country?.trim()).filter(Boolean))) as string[];
   }, [sorMasters]);
 
   const uniqueStates = useMemo(() => {
-    const list = Array.from(new Set(sorMasters.map((m) => m.state?.trim()).filter(Boolean))) as string[];
-    return list.length > 0 ? list : ['All-India'];
+    return Array.from(new Set(sorMasters.map((m) => m.state?.trim()).filter(Boolean))) as string[];
   }, [sorMasters]);
 
   const uniqueTypes = useMemo(() => {
-    const list = Array.from(new Set(sorMasters.map((m) => m.scheduleType?.trim()).filter(Boolean))) as string[];
-    return list.length > 0 ? list : DEFAULT_TYPES;
+    return Array.from(new Set(sorMasters.map((m) => m.scheduleType?.trim()).filter(Boolean))) as string[];
   }, [sorMasters]);
 
   const uniqueOwners = useMemo(() => {
-    const list = Array.from(
+    return Array.from(
       new Set(sorMasters.map((m) => (m.owningBody || m.authority)?.trim()).filter(Boolean))
     ) as string[];
-    return list;
   }, [sorMasters]);
+
+  const dynamicUnits = useMemo(() => {
+    return Array.from(new Set(items.map((i) => i.unit?.trim()).filter(Boolean))) as string[];
+  }, [items]);
 
   // Real Recent schedules from user history
   const recentMasters = useMemo(() => {
-    if (recentScheduleIds.length === 0) return sorMasters.slice(0, 5);
+    if (recentScheduleIds.length === 0) return [];
     const map = new Map(sorMasters.map((m) => [m._id, m]));
-    const list = recentScheduleIds.map((id) => map.get(id)).filter(Boolean) as SorMaster[];
-    return list.length > 0 ? list : sorMasters.slice(0, 5);
+    return recentScheduleIds.map((id) => map.get(id)).filter(Boolean) as SorMaster[];
   }, [recentScheduleIds, sorMasters]);
 
   // Filtered list for "Browse Schedule of Rates" modal
@@ -607,12 +545,12 @@ export const RateMaster: React.FC = () => {
     <div className="min-h-screen bg-[#07090e] text-slate-100 pb-20 select-none">
       {/* Autocomplete Datalists */}
       <datalist id="states-datalist">
-        {COMMON_STATES.map((s) => (
+        {uniqueStates.map((s) => (
           <option key={s} value={s} />
         ))}
       </datalist>
       <datalist id="units-datalist">
-        {COMMON_UNITS.map((u) => (
+        {dynamicUnits.map((u) => (
           <option key={u} value={u} />
         ))}
       </datalist>

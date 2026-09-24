@@ -119,6 +119,7 @@ export interface ISorItem extends Document {
   sorId: Types.ObjectId;
   srNo?: number;
   itemCode: string;
+  subclauseCode?: string;
   descriptionEnglish: string;
   descriptionHindi?: string;
   unit: string;
@@ -126,9 +127,12 @@ export interface ISorItem extends Document {
   chapter?: string;
   subChapter?: string;
   workCategory?: string; // e.g. Earthwork, Concrete, RCC, Brickwork, Plastering, Flooring, Steel
+  projectStage?: string; // e.g. Substructure, Superstructure, Finishing
   measurementFormula?: string; // e.g. LxWxD, LxWxH, LxW, Weight, Count, Custom
   applicableDimensions?: string[]; // e.g. ['length', 'width', 'depth', 'nos']
   formulaExpression?: string; // e.g. 'Length × Width × Depth × Nos'
+  qcChecklist?: string;
+  remarks?: string;
   sourcePage?: number;
   sourceReference?: string;
   status: string;
@@ -152,6 +156,11 @@ const sorItemSchema = new Schema<ISorItem>(
       required: true,
       trim: true,
       index: true,
+    },
+    subclauseCode: {
+      type: String,
+      default: '',
+      trim: true,
     },
     descriptionEnglish: {
       type: String,
@@ -183,6 +192,11 @@ const sorItemSchema = new Schema<ISorItem>(
       default: '',
       index: true,
     },
+    projectStage: {
+      type: String,
+      default: '',
+      index: true,
+    },
     measurementFormula: {
       type: String,
       default: '',
@@ -192,6 +206,14 @@ const sorItemSchema = new Schema<ISorItem>(
       default: [],
     },
     formulaExpression: {
+      type: String,
+      default: '',
+    },
+    qcChecklist: {
+      type: String,
+      default: '',
+    },
+    remarks: {
       type: String,
       default: '',
     },

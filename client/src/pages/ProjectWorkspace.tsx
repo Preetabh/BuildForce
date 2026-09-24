@@ -324,6 +324,16 @@ export const ProjectWorkspace: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['project', projectId] });
   };
 
+  // Dynamic schedules from authenticated organization database
+  const { data: workspaceSchedules = [] } = useQuery<any[]>({
+    queryKey: ['scheduleHierarchy'],
+    queryFn: async () => {
+      const res = await api.get('/sor/schedules/hierarchy');
+      return Array.isArray(res.data?.data) ? res.data.data : [];
+    },
+  });
+  const activeWorkspaceSor = workspaceSchedules[0] || null;
+
   // Search SOR items for BOQ
   const { data: sorResults = [] } = useQuery<SorItem[]>({
     queryKey: ['sorSearchForBoq', sorSearch],
@@ -1326,7 +1336,9 @@ export const ProjectWorkspace: React.FC = () => {
               <div className="flex items-center gap-2 flex-wrap text-xs">
                 {/* Active SOR Schedule Pill */}
                 <div className="px-3 py-1.5 rounded-lg bg-[#121620] border border-slate-750 text-xs font-medium text-slate-300">
-                  CPWD SOR 2023 (4060 items)
+                  {activeWorkspaceSor
+                    ? `${activeWorkspaceSor.sorName} (${(activeWorkspaceSor.itemCount || 0).toLocaleString()} items)`
+                    : 'Schedule of Rates'}
                 </div>
 
                 {/* Browse Button */}
@@ -1344,10 +1356,12 @@ export const ProjectWorkspace: React.FC = () => {
                   aria-label="BOM Rate List"
                   className="px-3 py-1.5 rounded-lg bg-[#121620] border border-slate-750 text-xs text-slate-300 focus:outline-none cursor-pointer"
                 >
-                  <option>-- BOM Rate List --</option>
-                  <option>CPWD Standard Norms</option>
-                  <option>Market Rates 2026</option>
-                  <option>Delhi DSR Schedule</option>
+                  <option value="">-- BOM Rate List --</option>
+                  {workspaceSchedules.map((ws: any) => (
+                    <option key={ws._id} value={ws._id}>
+                      {ws.sorName}
+                    </option>
+                  ))}
                 </select>
 
                 {/* Export Button */}
@@ -2257,7 +2271,7 @@ export const ProjectWorkspace: React.FC = () => {
               type="text"
               value={sorSearch}
               onChange={(e) => setSorSearch(e.target.value)}
-              placeholder="Type to search CPWD / DSR standard items..."
+              placeholder="Type to search SOR standard items..."
               className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-erp-border rounded-lg text-sm text-erp-text"
             />
           </div>
@@ -2383,7 +2397,7 @@ export const ProjectWorkspace: React.FC = () => {
                   <div>
                     {currentAnalysisDetail.rateAnalysisStatus === 'AVAILABLE' && (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        <Sparkles className="w-3 h-3" /> Standard CPWD DAR Active
+                        <Sparkles className="w-3 h-3" /> Standard Rate Analysis Active
                       </span>
                     )}
                     {currentAnalysisDetail.rateAnalysisStatus === 'CUSTOM' && (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Search,
@@ -21,10 +21,20 @@ import {
   FileText,
   HelpCircle,
   ChevronDown,
+  ChevronUp,
   Tag,
   Check,
   Building2,
   BookOpen,
+  MapPin,
+  Clock,
+  Edit,
+  Filter,
+  ArrowRight,
+  Bookmark,
+  Building,
+  RotateCcw,
+  Copy,
 } from 'lucide-react';
 import api from '../../services/api';
 import {
@@ -37,6 +47,14 @@ import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { formatCurrency } from '../../utils/formatters';
 import { cn } from '../../utils/cn';
+import {
+  PickSorClauseByKeywordModal,
+  KeywordClauseCard,
+} from './PickSorClauseByKeywordModal';
+import {
+  PickSorMeasurementBookModal,
+} from './PickSorMeasurementBookModal';
+import { CurrencyUtil } from '../../utils/currency';
 
 interface SmartMeasurementModalProps {
   isOpen: boolean;
@@ -47,16 +65,26 @@ interface SmartMeasurementModalProps {
   initialBoqItem?: BoqItem | null;
 }
 
-interface MeasurementRowItem {
+export interface MeasurementRowItem {
   id: string;
   isSubheading?: boolean;
   description: string;
-  nos: number | '';
-  length: number | '';
-  width: number | '';
-  heightDepth: number | '';
+  nos: number | string;
+  length: number | string;
+  width: number | string;
+  heightDepth: number | string;
   formula: string;
   remarks: string;
+}
+
+export interface SlashFormulaDefinition {
+  command: string;
+  name: string;
+  code: string;
+  category: 'AREA' | 'VOLUME' | 'PERIMETER' | 'DEDUCTIONS' | 'CUSTOM';
+  expressionDesc: string;
+  calculate: (params: { nos: number; l: number; w: number; h: number }) => number;
+  highlightCols?: ('NOS' | 'L' | 'B' | 'H')[];
 }
 
 interface SubclauseItem {
@@ -75,6 +103,8 @@ interface DynamicKeyword {
   count: number;
   category: string;
 }
+
+export type { KeywordClauseCard };
 
 export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
   isOpen,
@@ -128,6 +158,61 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
   const [activeRowIndexForSlash, setActiveRowIndexForSlash] = useState<number>(0);
   const [importedFormulaNotice, setImportedFormulaNotice] = useState<string | null>(null);
 
+  // Floating coordinates and keyboard navigation for Slash Menu (never clipped by table overflow)
+  const [slashMenuCoords, setSlashMenuCoords] = useState<{
+    left: number;
+    top: number;
+    bottom: number;
+    width: number;
+    placeAbove: boolean;
+  } | null>(null);
+  const [highlightedFormulaIndex, setHighlightedFormulaIndex] = useState<number>(0);
+  const slashMenuRef = useRef<HTMLDivElement | null>(null);
+  const rowInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+
+  // Column Dropdown state (for NOS ▾, LENGTH (M) ▾, BREADTH (M) ▾, H/DEPTH (M) ▾, QTY ▾)
+  const [activeColumnDropdown, setActiveColumnDropdown] = useState<'NOS' | 'LENGTH' | 'BREADTH' | 'H_DEPTH' | 'QTY' | null>(null);
+  const columnDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Right-click row context menu state
+  const [rowContextMenu, setRowContextMenu] = useState<{ x: number; y: number; rowIndex: number } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Manage Formulas Modal state
+  const [isManageFormulasModalOpen, setIsManageFormulasModalOpen] = useState(false);
+  const [customFormulasList, setCustomFormulasList] = useState<SlashFormulaDefinition[]>(() => {
+    try {
+      const saved = localStorage.getItem('budgetpilot_custom_formulas');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return [];
+  });
+
+  // Global click outside listener for popups & menus
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        isSlashMenuOpen &&
+        slashMenuRef.current &&
+        !slashMenuRef.current.contains(target) &&
+        !Object.values(rowInputRefs.current).some((el) => el && el.contains(target))
+      ) {
+        setIsSlashMenuOpen(false);
+      }
+      if (columnDropdownRef.current && !columnDropdownRef.current.contains(target)) {
+        setActiveColumnDropdown(null);
+      }
+      if (contextMenuRef.current && !contextMenuRef.current.contains(target)) {
+        setRowContextMenu(null);
+      }
+    };
+    window.addEventListener('mousedown', handleGlobalClick);
+    return () => window.removeEventListener('mousedown', handleGlobalClick);
+  }, [isSlashMenuOpen, activeColumnDropdown, rowContextMenu]);
+
   // Selection Modals State
   const [isSorModalOpen, setIsSorModalOpen] = useState(false);
   const [sorSearchTerm, setSorSearchTerm] = useState('');
@@ -137,6 +222,20 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
   const [clauseSearchTerm, setClauseSearchTerm] = useState('');
   const [isSubclausePickerOpen, setIsSubclausePickerOpen] = useState(false);
 
+  // Sub-popup 1: "Pick SOR Clause by Keyword" states
+  const [keywordClauseSearch, setKeywordClauseSearch] = useState<string>('');
+  const [isAiMatching, setIsAiMatching] = useState<boolean>(false);
+  const [aiMatchMessage, setAiMatchMessage] = useState<string | null>(null);
+
+  // Sub-popup 2: "Pick SOR for Measurement Book" states & filters
+  const [sorModalSearch, setSorModalSearch] = useState<string>('');
+  const [countryFilter, setCountryFilter] = useState<string>('All Countries');
+  const [stateFilter, setStateFilter] = useState<string>('All States');
+  const [typeFilter, setTypeFilter] = useState<string>('All Types');
+  const [ownerFilter, setOwnerFilter] = useState<string>('All Owners');
+  const [ownerTypeSegment, setOwnerTypeSegment] = useState<'ALL' | 'GOVT' | 'PRIVATE'>('ALL');
+  const [recentSorNames, setRecentSorNames] = useState<string[]>([]);
+
   // Aux Modals
   const [isExcelPasteModalOpen, setIsExcelPasteModalOpen] = useState(false);
   const [excelPasteText, setExcelPasteText] = useState('');
@@ -144,7 +243,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
   const [isCellFormulaHelpOpen, setIsCellFormulaHelpOpen] = useState(false);
   const [isDrawingNoticeOpen, setIsDrawingNoticeOpen] = useState(false);
 
-  // 1. Fetch Dynamic Schedule Hierarchy from Master Database (ONLY uploaded/imported SORs)
+  // 1. Fetch Dynamic Schedule Hierarchy from Master Database (ONLY real database SORs)
   const { data: scheduleList = [], isLoading: isSchedulesLoading } = useQuery<ScheduleHierarchyItem[]>({
     queryKey: ['scheduleHierarchy'],
     queryFn: async () => {
@@ -154,30 +253,27 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
     enabled: isOpen,
   });
 
-  // Filtered SORs for Modal
-  const filteredScheduleList = useMemo(() => {
-    if (!sorSearchTerm.trim()) return scheduleList;
-    const q = sorSearchTerm.toLowerCase();
-    return scheduleList.filter(
-      (s) =>
-        s.sorName?.toLowerCase().includes(q) ||
-        s.authority?.toLowerCase().includes(q) ||
-        s.version?.toLowerCase().includes(q) ||
-        s.category?.toLowerCase().includes(q)
-    );
-  }, [scheduleList, sorSearchTerm]);
+  // Database-driven Schedules ONLY
+  const allSchedules: ScheduleHierarchyItem[] = useMemo(() => {
+    return scheduleList;
+  }, [scheduleList]);
 
   // Current Active Schedule
   const activeSchedule = useMemo(() => {
-    return scheduleList.find((s) => s._id === selectedScheduleId) || scheduleList[0] || null;
-  }, [scheduleList, selectedScheduleId]);
+    return (
+      allSchedules.find((s) => s._id === selectedScheduleId) ||
+      allSchedules[0] ||
+      null
+    );
+  }, [allSchedules, selectedScheduleId]);
 
   // Auto-select first schedule on initial load if none set
   useEffect(() => {
-    if (scheduleList.length > 0 && !selectedScheduleId) {
-      setSelectedScheduleId(scheduleList[0]._id);
+    if (allSchedules.length > 0 && !selectedScheduleId) {
+      setSelectedScheduleId(allSchedules[0]._id);
     }
-  }, [scheduleList, selectedScheduleId]);
+  }, [allSchedules, selectedScheduleId]);
+
 
   // 2. Fetch Dynamic Work Categories for currently selected SOR
   const { data: categoriesData } = useQuery<{ workCategories: string[]; chapters: string[] }>({
@@ -287,6 +383,179 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
     enabled: isOpen && !!selectedScheduleId,
   });
   const sorSearchResults = smartSearchData?.items || [];
+
+  // 7b. Filtered SOR Catalog for "Pick SOR for Measurement Book"
+  const filteredSorCatalog = useMemo(() => {
+    return allSchedules.filter((sor) => {
+      if (sorModalSearch.trim()) {
+        const q = sorModalSearch.toLowerCase();
+        const matchesName = sor.sorName?.toLowerCase().includes(q);
+        const matchesOwner = sor.owningBody?.toLowerCase().includes(q) || sor.authority?.toLowerCase().includes(q);
+        const matchesState = sor.state?.toLowerCase().includes(q);
+        const matchesType = sor.scheduleType?.toLowerCase().includes(q) || sor.type?.toLowerCase().includes(q);
+        if (!matchesName && !matchesOwner && !matchesState && !matchesType) return false;
+      }
+      if (countryFilter !== 'All Countries' && sor.country && sor.country.toLowerCase() !== countryFilter.toLowerCase()) {
+        return false;
+      }
+      if (stateFilter !== 'All States' && sor.state && sor.state.toLowerCase() !== stateFilter.toLowerCase()) {
+        return false;
+      }
+      if (typeFilter !== 'All Types') {
+        const sorType = (sor.type || sor.scheduleType || '').toLowerCase();
+        if (typeFilter === 'Govt' && !sorType.includes('govt')) return false;
+        if (typeFilter === 'Private' && !sorType.includes('private')) return false;
+        if (typeFilter === 'State Govt' && !sorType.includes('state')) return false;
+        if (typeFilter === 'Central Govt' && !sorType.includes('central')) return false;
+      }
+      if (ownerFilter !== 'All Owners') {
+        const owner = sor.owningBody || sor.authority || '';
+        if (owner.toLowerCase() !== ownerFilter.toLowerCase()) return false;
+      }
+      if (ownerTypeSegment === 'GOVT') {
+        const t = (sor.type || sor.scheduleType || '').toLowerCase();
+        if (t.includes('private')) return false;
+      } else if (ownerTypeSegment === 'PRIVATE') {
+        const t = (sor.type || sor.scheduleType || '').toLowerCase();
+        if (!t.includes('private') && sor.authority !== 'Private') return false;
+      }
+      return true;
+    });
+  }, [allSchedules, sorModalSearch, countryFilter, stateFilter, typeFilter, ownerFilter, ownerTypeSegment]);
+
+  // Grouped by region / department hierarchy matching screenshot
+  const groupedSorHierarchy = useMemo(() => {
+    const groups: { [key: string]: ScheduleHierarchyItem[] } = {};
+    for (const sor of filteredSorCatalog) {
+      const country = (sor.country || 'INDIA').toUpperCase();
+      let subGroup = sor.state;
+      if (!subGroup || subGroup === 'All India' || subGroup === 'Central') {
+        if (sor.type === 'Private' || sor.scheduleType === 'Private') {
+          subGroup = '— (Private)';
+        } else {
+          subGroup = '— (Central Govt)';
+        }
+      }
+      const groupKey = `${country} / ${subGroup}`;
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(sor);
+    }
+    return groups;
+  }, [filteredSorCatalog]);
+
+  // Database Keyword Cards
+  const databaseKeywordCards: KeywordClauseCard[] = useMemo(() => {
+    if (!sorSearchResults || sorSearchResults.length === 0) return [];
+    return sorSearchResults.map((item) => ({
+      id: item._id,
+      title: item.descriptionEnglish?.split('\n')[0]?.slice(0, 60) || item.itemCode,
+      itemCode: item.itemCode,
+      subclauseCode: '',
+      workCategory: item.chapter || item.workCategory || 'Plaster Work',
+      stage: 'Residential Building',
+      clauseDesc: item.descriptionEnglish || '',
+      subclauseDesc: item.descriptionHindi || item.descriptionEnglish || '',
+      rate: item.rate || 0,
+      unit: item.unit || 'SQM',
+      isSaved: false,
+      formula: item.measurementFormula,
+    }));
+  }, [sorSearchResults]);
+
+  // Combined Keyword Cards for "Pick SOR Clause by Keyword"
+  const combinedKeywordCards = useMemo(() => {
+    const allCards = [...databaseKeywordCards];
+    if (!keywordClauseSearch.trim()) return allCards;
+    const q = keywordClauseSearch.toLowerCase();
+    return allCards.filter(
+      (card) =>
+        card.title.toLowerCase().includes(q) ||
+        card.itemCode.toLowerCase().includes(q) ||
+        (card.subclauseCode && card.subclauseCode.toLowerCase().includes(q)) ||
+        card.workCategory.toLowerCase().includes(q) ||
+        card.clauseDesc.toLowerCase().includes(q) ||
+        (card.subclauseDesc && card.subclauseDesc.toLowerCase().includes(q))
+    );
+  }, [keywordClauseSearch, databaseKeywordCards]);
+
+  // Select Keyword Card Action
+  const handleSelectKeywordCard = (card: KeywordClauseCard) => {
+    setItemHeading(card.title);
+    setKeywordsText(card.title);
+    setSelectedKeywords([card.title]);
+    setSorClauseInput(`${card.itemCode} - ${card.clauseDesc}`);
+    if (card.subclauseCode && card.subclauseDesc) {
+      setSubClause(`${card.subclauseCode} - ${card.subclauseDesc}`);
+    } else {
+      setSubClause('');
+    }
+    const cleanCategory = card.workCategory.split('•')[0].trim();
+    setWorkCategory(cleanCategory);
+    if (card.stage) setStage(card.stage);
+    setRate(card.rate);
+    setUnit(card.unit.toLowerCase());
+
+    if (card.formula) {
+      const f = qmFormulas.find(
+        (formula: any) =>
+          formula.name.toLowerCase().includes(card.formula!.toLowerCase()) ||
+          card.formula!.toLowerCase().includes(formula.name.toLowerCase())
+      );
+      if (f) setSelectedFormulaId(f._id);
+    } else {
+      const f = qmFormulas.find(
+        (formula: any) =>
+          formula.name.toLowerCase().includes('ceiling') ||
+          formula.name.toLowerCase().includes('plaster')
+      );
+      if (f) setSelectedFormulaId(f._id);
+    }
+
+    setImportedFormulaNotice(`Selected "${card.title}" (${card.itemCode}) • Rate ₹${card.rate}/${card.unit}`);
+    setTimeout(() => setImportedFormulaNotice(null), 4000);
+    setIsKeywordsModalOpen(false);
+  };
+
+  // AI Match Action
+  const handleAiMatch = () => {
+    if (combinedKeywordCards.length === 0) {
+      setAiMatchMessage('No database clauses available to match.');
+      return;
+    }
+    setIsAiMatching(true);
+    setAiMatchMessage('AI Match analyzing query against real schedule clauses...');
+    setTimeout(() => {
+      setIsAiMatching(false);
+      const query = (keywordClauseSearch || keywordsText || itemHeading).toLowerCase();
+      const best =
+        combinedKeywordCards.find(
+          (c) =>
+            c.title.toLowerCase().includes(query) ||
+            query.split(' ').some((word) => word.length > 3 && c.title.toLowerCase().includes(word))
+        ) || combinedKeywordCards[0];
+
+      if (best) {
+        setAiMatchMessage(`AI Match found match: "${best.title}"`);
+        setTimeout(() => {
+          handleSelectKeywordCard(best);
+          setAiMatchMessage(null);
+        }, 500);
+      }
+    }, 500);
+  };
+
+  // Switch Recent SOR
+  const handleSelectRecentSor = (name: string) => {
+    const target =
+      allSchedules.find((s) => s.sorName.toLowerCase() === name.toLowerCase()) ||
+      allSchedules.find((s) => s.sorName.toLowerCase().includes(name.toLowerCase()));
+    if (target) {
+      handleSwitchSor(target);
+      setRecentSorNames((prev) => [target.sorName, ...prev.filter((n) => n !== target.sorName)]);
+    }
+  };
 
   // Initialize or populate when editing
   useEffect(() => {
@@ -457,42 +726,436 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
     });
   };
 
-  // Import Formula from Quantity Master
-  const handleImportFormula = (formula: any) => {
-    setSelectedFormulaId(formula._id);
-    if (formula.unit) setUnit(formula.unit);
-    if (formula.category && !workCategory) setWorkCategory(formula.category);
+  // Safe arithmetic evaluator for cell formulas (e.g. 10.5 + 2.5, =15*2, 100/4, 2*(5+3))
+  const evaluateCellMath = (val: number | string | undefined | null): number => {
+    if (val === undefined || val === null || val === '') return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    const str = String(val).trim().replace(/^=/, '');
+    if (!str) return 0;
+
+    const directNum = Number(str);
+    if (!isNaN(directNum)) return directNum;
+
+    try {
+      const sanitised = str
+        .replace(/pi/gi, String(Math.PI))
+        .replace(/×/g, '*')
+        .replace(/÷/g, '/')
+        .replace(/\^/g, '**');
+
+      if (/^[0-9+\-*/().\s*]+$/.test(sanitised)) {
+        const result = Function(`"use strict"; return (${sanitised})`)();
+        if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
+          return Number(result.toFixed(4));
+        }
+      }
+    } catch {
+      return 0;
+    }
+    return 0;
+  };
+
+  // Standard civil formulas matching Reference Screenshot 2
+  const STANDARD_SLASH_FORMULAS: SlashFormulaDefinition[] = [
+    // AREA (Exact match to Reference Screenshot 2)
+    {
+      command: '/area',
+      name: 'Area = L×B',
+      code: '/area',
+      category: 'AREA',
+      expressionDesc: 'Nos × Length × Breadth',
+      calculate: ({ nos, l, w, h }) => {
+        const dimL = l > 0 ? l : 0;
+        const dimW = w > 0 ? w : (h > 0 ? h : 0);
+        return nos * dimL * dimW;
+      },
+      highlightCols: ['NOS', 'L', 'B'],
+    },
+    {
+      command: '/circarea',
+      name: 'Circle Area = π/4×D²',
+      code: '/circarea',
+      category: 'AREA',
+      expressionDesc: 'Nos × (π / 4) × D²',
+      calculate: ({ nos, l, w, h }) => {
+        const d = l > 0 ? l : (w > 0 ? w : h);
+        return nos * (Math.PI / 4) * d * d;
+      },
+      highlightCols: ['NOS', 'L'],
+    },
+    {
+      command: '/cylarea',
+      name: 'Cylinder Surface = π×D×H',
+      code: '/cylarea',
+      category: 'AREA',
+      expressionDesc: 'Nos × π × Diameter × Height',
+      calculate: ({ nos, l, w, h }) => {
+        const d = l > 0 ? l : w;
+        return nos * Math.PI * d * h;
+      },
+      highlightCols: ['NOS', 'L', 'H'],
+    },
+    {
+      command: '/cyltotal',
+      name: 'Cylinder Total SA = π×D×H + 2×π/4×D²',
+      code: '/cyltotal',
+      category: 'AREA',
+      expressionDesc: 'Nos × (π×D×H + 2×(π/4)×D²)',
+      calculate: ({ nos, l, w, h }) => {
+        const d = l > 0 ? l : w;
+        const sa = Math.PI * d * h;
+        const ends = 2 * (Math.PI / 4) * d * d;
+        return nos * (sa + ends);
+      },
+      highlightCols: ['NOS', 'L', 'H'],
+    },
+    {
+      command: '/spherearea',
+      name: 'Sphere Surface = 4×π×R²',
+      code: '/spherearea',
+      category: 'AREA',
+      expressionDesc: 'Nos × 4 × π × R²',
+      calculate: ({ nos, l, w, h }) => {
+        const r = (l > 0 ? l : (w > 0 ? w : h)) / 2;
+        return nos * 4 * Math.PI * r * r;
+      },
+      highlightCols: ['NOS', 'L'],
+    },
+    {
+      command: '/triarea',
+      name: 'Triangle Area = 1/2×B×H',
+      code: '/triarea',
+      category: 'AREA',
+      expressionDesc: 'Nos × 0.5 × Base × Height',
+      calculate: ({ nos, l, w, h }) => {
+        const b = l > 0 ? l : w;
+        const height = h > 0 ? h : (w > 0 ? w : 0);
+        return nos * 0.5 * b * height;
+      },
+      highlightCols: ['NOS', 'L', 'H'],
+    },
+
+    // VOLUME
+    {
+      command: '/vol',
+      name: 'Volume = L×B×H',
+      code: 'LxWxH',
+      category: 'VOLUME',
+      expressionDesc: 'Nos × Length × Breadth × Height',
+      calculate: ({ nos, l, w, h }) => nos * l * w * h,
+      highlightCols: ['NOS', 'L', 'B', 'H'],
+    },
+    {
+      command: '/cylvol',
+      name: 'Cylinder Volume = π/4×D²×H',
+      code: '/cylvol',
+      category: 'VOLUME',
+      expressionDesc: 'Nos × (π / 4) × D² × Height',
+      calculate: ({ nos, l, w, h }) => {
+        const d = l > 0 ? l : w;
+        return nos * (Math.PI / 4) * d * d * h;
+      },
+      highlightCols: ['NOS', 'L', 'H'],
+    },
+    {
+      command: '/spherevol',
+      name: 'Sphere Volume = 4/3×π×R³',
+      code: '/spherevol',
+      category: 'VOLUME',
+      expressionDesc: 'Nos × (4 / 3) × π × R³',
+      calculate: ({ nos, l, w, h }) => {
+        const r = (l > 0 ? l : (w > 0 ? w : h)) / 2;
+        return nos * (4 / 3) * Math.PI * Math.pow(r, 3);
+      },
+      highlightCols: ['NOS', 'L'],
+    },
+    {
+      command: '/cone',
+      name: 'Cone Volume = 1/3×π×R²×H',
+      code: '/cone',
+      category: 'VOLUME',
+      expressionDesc: 'Nos × (1 / 3) × π × R² × Height',
+      calculate: ({ nos, l, w, h }) => {
+        const r = (l > 0 ? l : w) / 2;
+        return nos * (1 / 3) * Math.PI * r * r * h;
+      },
+      highlightCols: ['NOS', 'L', 'H'],
+    },
+
+    // PERIMETER / LINEAR
+    {
+      command: '/perim',
+      name: 'Perimeter = 2×(L+B)',
+      code: '/perim',
+      category: 'PERIMETER',
+      expressionDesc: 'Nos × 2 × (Length + Breadth)',
+      calculate: ({ nos, l, w }) => nos * 2 * (l + w),
+      highlightCols: ['NOS', 'L', 'B'],
+    },
+    {
+      command: '/circperim',
+      name: 'Circumference = π×D',
+      code: '/circperim',
+      category: 'PERIMETER',
+      expressionDesc: 'Nos × π × Diameter',
+      calculate: ({ nos, l, w, h }) => {
+        const d = l > 0 ? l : (w > 0 ? w : h);
+        return nos * Math.PI * d;
+      },
+      highlightCols: ['NOS', 'L'],
+    },
+    {
+      command: '/length',
+      name: 'Running Length = L',
+      code: '/length',
+      category: 'PERIMETER',
+      expressionDesc: 'Nos × Length',
+      calculate: ({ nos, l }) => nos * l,
+      highlightCols: ['NOS', 'L'],
+    },
+
+    // DEDUCTIONS & OPENINGS
+    {
+      command: '/deduct',
+      name: 'Deduction = -1 × (L×B)',
+      code: '/deduct',
+      category: 'DEDUCTIONS',
+      expressionDesc: '-1 × Nos × Length × Breadth',
+      calculate: ({ nos, l, w }) => -1 * Math.abs(nos * l * w),
+      highlightCols: ['NOS', 'L', 'B'],
+    },
+    {
+      command: '/door',
+      name: 'Door Deduction = -1 × (W×H)',
+      code: '/door',
+      category: 'DEDUCTIONS',
+      expressionDesc: '-1 × Nos × Width × Height',
+      calculate: ({ nos, l, w, h }) => {
+        const width = w > 0 ? w : l;
+        return -1 * Math.abs(nos * width * h);
+      },
+      highlightCols: ['NOS', 'B', 'H'],
+    },
+    {
+      command: '/window',
+      name: 'Window Deduction = -1 × (W×H)',
+      code: '/window',
+      category: 'DEDUCTIONS',
+      expressionDesc: '-1 × Nos × Width × Height',
+      calculate: ({ nos, l, w, h }) => {
+        const width = w > 0 ? w : l;
+        return -1 * Math.abs(nos * width * h);
+      },
+      highlightCols: ['NOS', 'B', 'H'],
+    },
+  ];
+
+  // Combined slash formulas with Quantity Master formulas from DB & custom user formulas
+  const allSlashFormulas: SlashFormulaDefinition[] = useMemo(() => {
+    const list = [...STANDARD_SLASH_FORMULAS, ...customFormulasList];
+    if (Array.isArray(qmFormulas)) {
+      for (const f of qmFormulas) {
+        if (!f?.name) continue;
+        const code = f.code || f.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cmd = `/${code}`;
+        if (!list.some((existing) => existing.command.toLowerCase() === cmd.toLowerCase())) {
+          const expr = (f.expression || f.formula || '').toUpperCase();
+          const cols: ('NOS' | 'L' | 'B' | 'H')[] = ['NOS'];
+          if (/\b(L|LEN|LENGTH|DIA|RADIUS|R|BASE)\b/.test(expr)) cols.push('L');
+          if (/\b(B|W|WIDTH|BREADTH)\b/.test(expr)) cols.push('B');
+          if (/\b(H|D|DEPTH|HEIGHT|THICK)\b/.test(expr)) cols.push('H');
+          if (cols.length === 1) cols.push('L', 'B', 'H');
+
+          list.push({
+            command: cmd,
+            name: `${f.name} = ${f.expression || f.formula || 'Custom'}`,
+            code: f.code || f.name,
+            category: 'CUSTOM',
+            expressionDesc: f.expression || f.formula || 'Custom calculation',
+            highlightCols: cols,
+            calculate: ({ nos, l, w, h }) => {
+              if (f.expression) {
+                const exprStr = f.expression
+                  .replace(/\bL\b/gi, String(l))
+                  .replace(/\bB\b|\bW\b/gi, String(w))
+                  .replace(/\bH\b|\bD\b/gi, String(h))
+                  .replace(/\bN\b|\bNOS\b/gi, String(nos));
+                const res = evaluateCellMath(exprStr);
+                return res !== 0 ? res : nos * l * w;
+              }
+              return nos * l * w * (h > 0 ? h : 1);
+            },
+          });
+        }
+      }
+    }
+    return list;
+  }, [qmFormulas, customFormulasList]);
+
+  // Filter slash formulas by query
+  const filteredSlashFormulas = useMemo(() => {
+    if (!slashQuery.trim()) return allSlashFormulas;
+    const q = slashQuery.toLowerCase().replace(/^\//, '').trim();
+    return allSlashFormulas.filter(
+      (f) =>
+        f.command.toLowerCase().includes(q) ||
+        f.name.toLowerCase().includes(q) ||
+        f.category.toLowerCase().includes(q)
+    );
+  }, [allSlashFormulas, slashQuery]);
+
+  // Group slash formulas by category (e.g. AREA, VOLUME, PERIMETER)
+  const groupedSlashFormulas = useMemo(() => {
+    const groups: { [cat: string]: typeof allSlashFormulas } = {};
+    for (const f of filteredSlashFormulas) {
+      const cat = f.category || 'AREA';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(f);
+    }
+    return groups;
+  }, [filteredSlashFormulas]);
+
+  // Interface for row dimension availability and custom headers/placeholders
+  interface RowDimensionConfig {
+    hasLength: boolean;
+    hasBreadth: boolean;
+    hasHeight: boolean;
+    lengthLabel: string;
+    breadthLabel: string;
+    heightLabel: string;
+    formulaName: string;
+  }
+
+  // Determine enabled dimensions and labels for any row based on its active formula
+  const getRowDimensionConfig = (formulaStr: string | undefined): RowDimensionConfig => {
+    const rawKey = (formulaStr || 'LxWxH').trim();
+    const formulaKey = rawKey.toLowerCase();
+
+    // Default cuboid L x W x H
+    if (!formulaKey || formulaKey === 'lxwxh' || formulaKey === 'volume' || formulaKey === 'default') {
+      return {
+        hasLength: true,
+        hasBreadth: true,
+        hasHeight: true,
+        lengthLabel: 'L',
+        breadthLabel: 'B',
+        heightLabel: 'H',
+        formulaName: 'L×B×H',
+      };
+    }
+
+    // Match in allSlashFormulas (by command, code, or name)
+    const match = allSlashFormulas.find(
+      (f) =>
+        f.command.toLowerCase() === formulaKey ||
+        f.code.toLowerCase() === formulaKey ||
+        formulaKey.includes(f.command.toLowerCase()) ||
+        f.name.toLowerCase() === formulaKey
+    );
+
+    if (match) {
+      const cols = match.highlightCols || ['NOS', 'L', 'B', 'H'];
+      const hasL = cols.includes('L');
+      const hasB = cols.includes('B');
+      const hasH = cols.includes('H');
+
+      let lengthLabel = 'L';
+      let breadthLabel = 'B';
+      let heightLabel = 'H';
+
+      const cmd = (match.command || match.code || '').toLowerCase();
+      if (cmd.includes('circ') || cmd.includes('cyl')) {
+        lengthLabel = 'Dia D';
+      } else if (cmd.includes('sphere') || cmd.includes('cone')) {
+        lengthLabel = 'Radius R';
+      } else if (cmd === '/triarea' || cmd.includes('tri')) {
+        lengthLabel = 'Base B';
+      }
+
+      if (cmd === '/door' || cmd === '/window') {
+        breadthLabel = 'Width W';
+      }
+
+      if (cmd.includes('cyl') || cmd.includes('cone') || cmd.includes('tri')) {
+        heightLabel = 'Height H';
+      }
+
+      return {
+        hasLength: hasL,
+        hasBreadth: hasB,
+        hasHeight: hasH,
+        lengthLabel,
+        breadthLabel,
+        heightLabel,
+        formulaName: match.name || match.code,
+      };
+    }
+
+    // Fallback: check expression tokens
+    const upperKey = rawKey.toUpperCase();
+    const hasL = /\b(L|LENGTH|DIA|RADIUS|R|BASE)\b/.test(upperKey);
+    const hasB = /\b(B|W|WIDTH|BREADTH)\b/.test(upperKey);
+    const hasH = /\b(H|D|DEPTH|HEIGHT|THICK)\b/.test(upperKey);
+
+    if (hasL || hasB || hasH) {
+      return {
+        hasLength: hasL || (!hasB && !hasH),
+        hasBreadth: hasB,
+        hasHeight: hasH,
+        lengthLabel: 'L',
+        breadthLabel: 'B',
+        heightLabel: 'H',
+        formulaName: rawKey,
+      };
+    }
+
+    return {
+      hasLength: true,
+      hasBreadth: true,
+      hasHeight: true,
+      lengthLabel: 'L',
+      breadthLabel: 'B',
+      heightLabel: 'H',
+      formulaName: rawKey,
+    };
+  };
+
+  // Select Slash Formula Action
+  const handleSelectSlashFormula = (formula: SlashFormulaDefinition) => {
+    const formulaCode = formula.code || formula.command;
+    const formulaName = formula.name || formula.code;
 
     if (slashTarget === 'HEADING') {
-      const queryPart = `/${slashQuery}`;
-      if (itemHeading.includes(queryPart)) {
-        setItemHeading(itemHeading.replace(queryPart, formula.name));
-      } else if (!itemHeading.trim()) {
-        setItemHeading(formula.name);
+      const current = activeInputTab === 'KEYWORDS' ? keywordsText : itemHeading;
+      const clean = current.replace(/\/\S*$/, '').trim();
+      const updated = clean ? clean : formulaName;
+      if (activeInputTab === 'KEYWORDS') {
+        setKeywordsText(updated);
       } else {
-        setItemHeading(`${itemHeading} (${formula.name})`);
+        setItemHeading(updated);
       }
-    } else if (slashTarget === 'ROW') {
+    } else {
       const rows = [...measurementRows];
       const targetRow = rows[activeRowIndexForSlash];
       if (targetRow) {
-        const queryPart = `/${slashQuery}`;
-        if (targetRow.description.includes(queryPart)) {
-          targetRow.description = targetRow.description.replace(queryPart, formula.name);
-        } else if (!targetRow.description.trim()) {
-          targetRow.description = formula.name;
-        } else {
-          targetRow.description = `${targetRow.description} - ${formula.name}`;
-        }
-        targetRow.formula = formula.code || 'LxWxH';
+        // Clean trailing slash command from description
+        targetRow.description = targetRow.description.replace(/\/\S*$/, '').trim();
+        targetRow.formula = formulaCode;
+
+        // Auto-clear dimensions that are not used by the selected formula
+        const newDimConfig = getRowDimensionConfig(formulaCode);
+        if (!newDimConfig.hasLength) targetRow.length = '';
+        if (!newDimConfig.hasBreadth) targetRow.width = '';
+        if (!newDimConfig.hasHeight) targetRow.heightDepth = '';
+
         setMeasurementRows(rows);
       }
     }
 
     setIsSlashMenuOpen(false);
     setSlashQuery('');
-    setImportedFormulaNotice(`✨ Linked Quantity Master formula: "${formula.name}"`);
-    setTimeout(() => setImportedFormulaNotice(null), 3500);
+    setImportedFormulaNotice(`Applied formula: "${formulaName}"`);
+    setTimeout(() => setImportedFormulaNotice(null), 3000);
   };
 
   // Monitor text input for slash commands (/)
@@ -500,7 +1163,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
     text: string,
     target: 'HEADING' | 'ROW',
     rowIndex: number = 0,
-    cursorPos?: number
+    inputEl?: HTMLInputElement | null
   ) => {
     if (target === 'HEADING') {
       if (activeInputTab === 'KEYWORDS') {
@@ -511,69 +1174,103 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
     }
 
     const slashIdx = text.lastIndexOf('/');
-    if (slashIdx !== -1 && (cursorPos === undefined || cursorPos > slashIdx)) {
+    if (slashIdx !== -1) {
       const afterSlash = text.slice(slashIdx + 1).split(/\s/)[0];
       setSlashQuery(afterSlash);
       setSlashTarget(target);
       setActiveRowIndexForSlash(rowIndex);
+      setHighlightedFormulaIndex(0);
+
+      if (inputEl) {
+        const rect = inputEl.getBoundingClientRect();
+        setSlashMenuCoords({
+          left: Math.max(16, rect.left),
+          top: rect.bottom + 4,
+          bottom: window.innerHeight - rect.top + 4,
+          width: Math.max(390, rect.width),
+          placeAbove: rect.top > 260,
+        });
+      }
       setIsSlashMenuOpen(true);
     } else {
       setIsSlashMenuOpen(false);
     }
   };
 
-  // Filter Quantity Master formulas by slash query
-  const filteredQmFormulas = useMemo(() => {
-    if (!Array.isArray(qmFormulas)) return [];
-    if (!slashQuery.trim()) return qmFormulas.slice(0, 15);
-    const q = slashQuery.toLowerCase();
-    return qmFormulas
-      .filter(
-        (f: any) =>
-          f?.name?.toLowerCase().includes(q) ||
-          f?.code?.toLowerCase().includes(q) ||
-          f?.category?.toLowerCase().includes(q)
-      )
-      .slice(0, 15);
-  }, [qmFormulas, slashQuery]);
+  // Open Slash Formula Menu from trigger pill
+  const handleOpenSlashMenuForPill = (rowIndex: number, triggerEl: HTMLElement) => {
+    setActiveRowIndexForSlash(rowIndex);
+    setSlashTarget('ROW');
+    setSlashQuery('');
+    setHighlightedFormulaIndex(0);
 
-  // Selected formula object
+    const inputEl = rowInputRefs.current[rowIndex];
+    const rect = inputEl ? inputEl.getBoundingClientRect() : triggerEl.getBoundingClientRect();
+
+    setSlashMenuCoords({
+      left: Math.max(16, rect.left),
+      top: rect.bottom + 4,
+      bottom: window.innerHeight - rect.top + 4,
+      width: Math.max(390, rect.width),
+      placeAbove: rect.top > 260,
+    });
+    setIsSlashMenuOpen(true);
+  };
+
+  // Selected formula object from Estimation dropdown
   const activeFormulaDoc = useMemo(() => {
     if (!Array.isArray(qmFormulas)) return null;
     return qmFormulas.find((f: any) => f?._id === selectedFormulaId) || null;
   }, [qmFormulas, selectedFormulaId]);
 
-  // Calculate Row Quantities
+  // Dynamic formula evaluation engine for each measurement row
+  const calculateRowQuantity = (row: MeasurementRowItem): number => {
+    if (row.isSubheading) return 0;
+
+    const dimConfig = getRowDimensionConfig(row.formula);
+    const nosVal = evaluateCellMath(row.nos);
+    const nos = nosVal !== 0 ? nosVal : (row.nos === '' ? 1 : 0);
+    const l = dimConfig.hasLength ? evaluateCellMath(row.length) : 0;
+    const w = dimConfig.hasBreadth ? evaluateCellMath(row.width) : 0;
+    const h = dimConfig.hasHeight ? evaluateCellMath(row.heightDepth) : 0;
+
+    const formulaKey = (row.formula || '').toLowerCase().trim();
+
+    // Check custom & standard formulas
+    const matchFormula = allSlashFormulas.find(
+      (f) =>
+        f.command.toLowerCase() === formulaKey ||
+        f.code.toLowerCase() === formulaKey ||
+        formulaKey.includes(f.command.toLowerCase())
+    );
+
+    if (matchFormula && typeof matchFormula.calculate === 'function') {
+      const val = matchFormula.calculate({ nos, l, w, h });
+      return Number(val.toFixed(3));
+    }
+
+    // Default cuboid dimension calculation (L x W x H)
+    if (l > 0 && w > 0 && h > 0) {
+      return Number((nos * l * w * h).toFixed(3));
+    } else if (l > 0 && w > 0) {
+      return Number((nos * l * w).toFixed(3));
+    } else if (l > 0 && h > 0) {
+      return Number((nos * l * h).toFixed(3));
+    } else if (l > 0) {
+      return Number((nos * l).toFixed(3));
+    } else if (nos !== 0 && (row.nos !== '' || l > 0)) {
+      return Number(nos.toFixed(3));
+    }
+
+    return 0;
+  };
+
+  // Calculate Row Quantities using formula engine
   const calculatedRows = useMemo(() => {
-    return measurementRows.map((row) => {
-      if (row.isSubheading) {
-        return {
-          ...row,
-          calculatedQuantity: 0,
-        };
-      }
-
-      const nos = typeof row.nos === 'number' && row.nos > 0 ? row.nos : 1;
-      const l = typeof row.length === 'number' ? row.length : 0;
-      const w = typeof row.width === 'number' ? row.width : 0;
-      const h = typeof row.heightDepth === 'number' ? row.heightDepth : 0;
-
-      let qty = 0;
-      if (l > 0 && w > 0 && h > 0) {
-        qty = nos * l * w * h;
-      } else if (l > 0 && w > 0) {
-        qty = nos * l * w;
-      } else if (l > 0) {
-        qty = nos * l;
-      } else {
-        qty = typeof row.nos === 'number' && row.nos > 0 ? row.nos : 0;
-      }
-
-      return {
-        ...row,
-        calculatedQuantity: Number(qty.toFixed(3)),
-      };
-    });
+    return measurementRows.map((row) => ({
+      ...row,
+      calculatedQuantity: calculateRowQuantity(row),
+    }));
   }, [measurementRows]);
 
   // Grand Total Quantity
@@ -583,7 +1280,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
   }, [calculatedRows]);
 
   const activeRateNum = typeof rate === 'number' && rate >= 0 ? rate : 0;
-  const totalBoqAmount = Number((totalCalculatedQuantity * activeRateNum).toFixed(2));
+  const totalBoqAmount = CurrencyUtil.calculateAmount(activeRateNum, totalCalculatedQuantity);
 
   // Live Analysis & Resource Breakdown from Server
   const { data: serverPreview } = useQuery({
@@ -775,17 +1472,24 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
         nos: 1,
         entries: calculatedRows
           .filter((r) => !r.isSubheading)
-          .map((r) => ({
-            description: r.description.trim() || activeTitle,
-            nos: typeof r.nos === 'number' ? r.nos : 1,
-            length: typeof r.length === 'number' ? r.length : 0,
-            width: typeof r.width === 'number' ? r.width : 0,
-            breadth: typeof r.width === 'number' ? r.width : 0,
-            height: typeof r.heightDepth === 'number' ? r.heightDepth : 0,
-            heightDepth: typeof r.heightDepth === 'number' ? r.heightDepth : 0,
-            remarks: r.remarks.trim(),
-            formula: r.formula || 'LxWxH',
-          })),
+          .map((r) => {
+            const dim = getRowDimensionConfig(r.formula);
+            const nosVal = evaluateCellMath(r.nos);
+            const lVal = dim.hasLength ? (typeof r.length === 'number' ? r.length : evaluateCellMath(r.length)) : 0;
+            const wVal = dim.hasBreadth ? (typeof r.width === 'number' ? r.width : evaluateCellMath(r.width)) : 0;
+            const hVal = dim.hasHeight ? (typeof r.heightDepth === 'number' ? r.heightDepth : evaluateCellMath(r.heightDepth)) : 0;
+            return {
+              description: r.description.trim() || activeTitle,
+              nos: nosVal !== 0 ? nosVal : 1,
+              length: lVal,
+              width: wVal,
+              breadth: wVal,
+              height: hVal,
+              heightDepth: hVal,
+              remarks: r.remarks.trim(),
+              formula: r.formula || 'LxWxH',
+            };
+          }),
       };
 
       if (editingMeasurement) {
@@ -857,189 +1561,51 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
             SECTION 1: KEYWORDS & ITEM HEADING
            ====================================================================== */}
         <div className="p-3.5 rounded-xl border border-[#1e2433] bg-[#0c1017] space-y-2.5 relative">
-          {/* Top Tabs */}
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveInputTab('KEYWORDS');
-                  setIsKeywordsModalOpen(true);
-                }}
-                className={cn(
-                  'px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border',
-                  activeInputTab === 'KEYWORDS'
-                    ? 'border-blue-500/60 bg-blue-600/20 text-blue-300 shadow-sm'
-                    : 'border-slate-700 bg-[#161d2b] text-slate-300 hover:text-white'
-                )}
-              >
-                <span>💡 Keywords</span>
-                {selectedKeywords.length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-blue-500 text-white text-[10px] font-bold">
-                    {selectedKeywords.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveInputTab('ITEM_HEADING')}
-                className={cn(
-                  'px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border',
-                  activeInputTab === 'ITEM_HEADING'
-                    ? 'border-blue-500/60 bg-blue-600/20 text-blue-300 shadow-sm'
-                    : 'border-slate-700 bg-[#161d2b] text-slate-300 hover:text-white'
-                )}
-              >
-                <span>ITEM HEADING</span>
-              </button>
-            </div>
-
-            {/* Hint for Slash Command */}
-            <div className="flex items-center gap-1.5 text-[11px] text-blue-400/90 font-medium">
-              <Code2 className="w-3.5 h-3.5" />
-              <span>
-                Type <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono border border-slate-700">/</kbd> to import Quantity Master formula
-              </span>
-            </div>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5 uppercase tracking-wide">
+              <MapPin className="w-3.5 h-3.5 text-blue-400" />
+              <span>Keyword</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setKeywordClauseSearch(keywordsText || itemHeading || '');
+                setIsKeywordsModalOpen(true);
+              }}
+              className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>Pick SOR Clause by Keyword</span>
+            </button>
           </div>
 
-          {/* Active Selected Keyword Chips Bar */}
-          {selectedKeywords.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap p-2 bg-[#080b11] border border-[#1e2433] rounded-lg">
-              <span className="text-[11px] text-slate-400 font-semibold flex items-center gap-1">
-                <Tag className="w-3 h-3 text-blue-400" />
-                Active Keywords:
-              </span>
-              {selectedKeywords.map((kw) => (
-                <span
-                  key={kw}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/40"
-                >
-                  <span>{kw}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveKeyword(kw)}
-                    className="hover:text-white cursor-pointer ml-0.5"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-              <button
-                type="button"
-                onClick={() => setIsKeywordsModalOpen(true)}
-                className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold cursor-pointer underline ml-1"
-              >
-                + Manage Keywords
-              </button>
-            </div>
-          )}
-
-          {/* Text Area */}
           <div className="relative">
-            <textarea
-              rows={2}
-              value={activeInputTab === 'ITEM_HEADING' ? itemHeading : keywordsText}
-              onChange={(e) =>
-                handleTextChangeForSlash(
-                  e.target.value,
-                  'HEADING',
-                  0,
-                  e.target.selectionStart
-                )
-              }
-              placeholder={
-                activeInputTab === 'ITEM_HEADING'
-                  ? 'e.g. Cleaning of under ground sump, Over Head R.C.C. Tank (type / for formulas)...'
-                  : 'Search keywords e.g. excavation, concrete, plaster, RCC (or click Keywords tab above)...'
-              }
-              className="w-full px-3.5 py-2.5 bg-[#080b11] border border-[#1e2536] border-l-4 border-l-blue-500 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 resize-none font-medium placeholder:text-slate-500"
+            <input
+              type="text"
+              value={activeInputTab === 'ITEM_HEADING' ? itemHeading : (keywordsText || itemHeading)}
+              onClick={() => {
+                setKeywordClauseSearch(keywordsText || itemHeading || '');
+                setIsKeywordsModalOpen(true);
+              }}
+              onChange={(e) => {
+                setKeywordsText(e.target.value);
+                setItemHeading(e.target.value);
+              }}
+              placeholder="Search or click to pick from SOR Keyword Library..."
+              className="w-full px-3.5 py-2.5 bg-[#080b11] border border-[#1e2536] border-l-4 border-l-blue-500 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 font-medium placeholder:text-slate-500 cursor-pointer pr-28"
             />
-
-            {/* Slash Command Floating Popover Menu */}
-            {isSlashMenuOpen && (
-              <div className="absolute left-0 top-full mt-1 z-50 w-full max-w-md bg-[#11141f] border border-blue-500/50 rounded-xl shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95">
-                <div className="p-2.5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
-                  <span className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Quantity Master Formulas {slashQuery && `matching "/${slashQuery}"`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsSlashMenuOpen(false)}
-                    className="text-slate-400 hover:text-white cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <div className="max-h-56 overflow-y-auto divide-y divide-slate-800/60 p-1">
-                  {filteredQmFormulas.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-slate-400">
-                      No matching formulas found in Quantity Master.
-                    </div>
-                  ) : (
-                    filteredQmFormulas.map((formula: any) => (
-                      <button
-                        key={formula._id}
-                        type="button"
-                        onClick={() => handleImportFormula(formula)}
-                        className="w-full text-left p-2 rounded-lg hover:bg-blue-600/20 transition-all flex flex-col gap-1 cursor-pointer group"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white group-hover:text-blue-300">
-                            {formula.name}
-                          </span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                            {formula.code}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                          <span>Unit: <strong className="text-slate-200">{formula.unit}</strong></span>
-                          <span>•</span>
-                          <span>Category: <strong className="text-slate-200">{formula.category || 'Standard'}</strong></span>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setKeywordClauseSearch(keywordsText || itemHeading || '');
+                setIsKeywordsModalOpen(true);
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-md bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 text-xs font-semibold flex items-center gap-1 border border-blue-500/40 transition-colors cursor-pointer"
+            >
+              <MapPin className="w-3 h-3" />
+              <span>Pick Clause</span>
+            </button>
           </div>
-
-          {/* Instant SOR Auto-Suggestions dropdown if searching */}
-          {sorSearchResults.length > 0 && !selectedSorItem && (
-            <div className="bg-[#090c13] border border-[#1e2536] rounded-xl p-2.5 space-y-1.5 animate-in fade-in">
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 flex items-center justify-between">
-                <span>Matching Clauses in {activeSchedule?.sorName || 'Selected SOR'} ({sorSearchResults.length})</span>
-                <button
-                  type="button"
-                  onClick={() => setIsClausePickerOpen(true)}
-                  className="text-blue-400 hover:text-blue-300 font-normal lowercase cursor-pointer"
-                >
-                  view all
-                </button>
-              </div>
-              <div className="max-h-36 overflow-y-auto space-y-1">
-                {sorSearchResults.slice(0, 5).map((item) => (
-                  <div
-                    key={item._id}
-                    onClick={() => handleSelectSorItem(item)}
-                    className="p-2 rounded-lg bg-[#111622] hover:bg-blue-600/20 border border-slate-800 hover:border-blue-500/40 cursor-pointer flex items-center justify-between text-xs transition-all"
-                  >
-                    <div className="flex items-center gap-2 truncate pr-2">
-                      <span className="font-mono text-cyan-400 font-bold shrink-0">{item.itemCode}</span>
-                      <span className="text-slate-200 truncate">{item.descriptionEnglish}</span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 font-medium">
-                      <span className="text-slate-400">{item.unit}</span>
-                      <span className="text-emerald-400 font-bold">{formatCurrency(item.rate, 'INR')}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* ======================================================================
@@ -1056,16 +1622,15 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
             <button
               type="button"
               onClick={() => setIsSorModalOpen(true)}
-              className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-md bg-[#0e2a22] text-[#34d399] border border-emerald-500/40 hover:bg-[#143d31] transition-all cursor-pointer tracking-wide"
-              title="Click to switch or select active Schedule of Rates (SOR)"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#0e2a22] text-[#34d399] border border-emerald-500/40 hover:bg-[#143d31] transition-all cursor-pointer tracking-wide shadow-sm"
+              title="Click to pick SOR for Measurement Book"
             >
-              <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+              <FileText className="w-3.5 h-3.5 text-emerald-400" />
               <span>
                 {activeSchedule
-                  ? `${activeSchedule.sorName} (${activeSchedule.authority})`
-                  : 'Select SOR Schedule'}
+                  ? activeSchedule.sorName
+                  : 'Select Schedule of Rates'}
               </span>
-              <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
             </button>
           </div>
 
@@ -1212,8 +1777,28 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
                   if (f) {
                     if (f.unit) setUnit(f.unit);
                     if (f.category && !workCategory) setWorkCategory(f.category);
+                    const fCode = f.code || f.name;
+                    // Automatically link formula to measurement rows that don't have custom slash formula
+                    setMeasurementRows((prev) =>
+                      prev.map((r) => {
+                        if (!r.formula || r.formula === 'LxWxH') {
+                          const updated = { ...r, formula: fCode };
+                          const dim = getRowDimensionConfig(fCode);
+                          if (!dim.hasLength) updated.length = '';
+                          if (!dim.hasBreadth) updated.width = '';
+                          if (!dim.hasHeight) updated.heightDepth = '';
+                          return updated;
+                        }
+                        return r;
+                      })
+                    );
                     setImportedFormulaNotice(`Linked formula "${f.name}" for automated BOM calculations.`);
                     setTimeout(() => setImportedFormulaNotice(null), 3000);
+                  } else {
+                    // Reset rows that used linked QM formula back to standard LxWxH
+                    setMeasurementRows((prev) =>
+                      prev.map((r) => (!r.formula?.startsWith('/') ? { ...r, formula: 'LxWxH' } : r))
+                    );
                   }
                 }}
                 className="w-full px-3 py-2 bg-[#080b11] border border-[#1e2536] rounded-lg text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
@@ -1339,15 +1924,14 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
                 <span>Cell formula help</span>
               </button>
 
-              <a
-                href="/planning/quantity-master"
-                target="_blank"
-                rel="noreferrer"
-                className="text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+              <button
+                type="button"
+                onClick={() => setIsManageFormulasModalOpen(true)}
+                className="text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <Settings className="w-3.5 h-3.5" />
                 <span>Manage Formulas</span>
-              </a>
+              </button>
 
               <button
                 type="button"
@@ -1361,17 +1945,77 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
           </div>
 
           {/* Measurement Spreadsheet Table */}
-          <div className="overflow-x-auto rounded-lg border border-[#1e2433] bg-[#090c13]">
+          <div className="overflow-x-auto rounded-lg border border-[#1e2433] bg-[#090c13] relative">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-[#0b0e16] text-slate-400 font-bold uppercase tracking-wider text-[11px] border-b border-[#1e2433]">
                 <tr>
                   <th className="py-2 px-2 w-10 text-center">#</th>
                   <th className="py-2 px-3 min-w-[260px]">SUB-ITEM NAME</th>
-                  <th className="py-2 px-2 w-24 text-center text-[#22D3EE]">NOS ▾</th>
-                  <th className="py-2 px-2 w-28 text-center text-[#34D399]">LENGTH (M) ▾</th>
-                  <th className="py-2 px-2 w-28 text-center text-[#FBBF24]">BREADTH (M) ▾</th>
-                  <th className="py-2 px-2 w-28 text-center text-[#A78BFA]">H/DEPTH (M) ▾</th>
-                  <th className="py-2 px-2 w-28 text-center text-[#60A5FA]">QTY ▾</th>
+                  <th className="py-2 px-2 w-24 text-center">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveColumnDropdown(activeColumnDropdown === 'NOS' ? null : 'NOS');
+                      }}
+                      className="text-[#22D3EE] hover:text-cyan-200 font-bold inline-flex items-center gap-0.5 cursor-pointer uppercase tracking-wider text-[11px]"
+                    >
+                      <span>NOS</span>
+                      <ChevronDown className="w-3 h-3 text-[#22D3EE]" />
+                    </button>
+                  </th>
+                  <th className="py-2 px-2 w-28 text-center">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveColumnDropdown(activeColumnDropdown === 'LENGTH' ? null : 'LENGTH');
+                      }}
+                      className="text-[#34D399] hover:text-emerald-200 font-bold inline-flex items-center gap-0.5 cursor-pointer uppercase tracking-wider text-[11px]"
+                    >
+                      <span>LENGTH (M)</span>
+                      <ChevronDown className="w-3 h-3 text-[#34D399]" />
+                    </button>
+                  </th>
+                  <th className="py-2 px-2 w-28 text-center">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveColumnDropdown(activeColumnDropdown === 'BREADTH' ? null : 'BREADTH');
+                      }}
+                      className="text-[#FBBF24] hover:text-amber-200 font-bold inline-flex items-center gap-0.5 cursor-pointer uppercase tracking-wider text-[11px]"
+                    >
+                      <span>BREADTH (M)</span>
+                      <ChevronDown className="w-3 h-3 text-[#FBBF24]" />
+                    </button>
+                  </th>
+                  <th className="py-2 px-2 w-28 text-center">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveColumnDropdown(activeColumnDropdown === 'H_DEPTH' ? null : 'H_DEPTH');
+                      }}
+                      className="text-[#A78BFA] hover:text-purple-200 font-bold inline-flex items-center gap-0.5 cursor-pointer uppercase tracking-wider text-[11px]"
+                    >
+                      <span>H/DEPTH (M)</span>
+                      <ChevronDown className="w-3 h-3 text-[#A78BFA]" />
+                    </button>
+                  </th>
+                  <th className="py-2 px-2 w-28 text-center">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveColumnDropdown(activeColumnDropdown === 'QTY' ? null : 'QTY');
+                      }}
+                      className="text-[#60A5FA] hover:text-blue-200 font-bold inline-flex items-center gap-0.5 cursor-pointer uppercase tracking-wider text-[11px]"
+                    >
+                      <span>QTY</span>
+                      <ChevronDown className="w-3 h-3 text-[#60A5FA]" />
+                    </button>
+                  </th>
                   <th className="py-2 px-3 w-32 text-center text-slate-400">REMARKS</th>
                   <th className="py-2 px-2 w-10 text-center"></th>
                 </tr>
@@ -1419,8 +2063,17 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
                     );
                   }
 
+                  const dimConfig = getRowDimensionConfig(row.formula);
+
                   return (
-                    <tr key={row.id} className="hover:bg-[#121622]/60 group transition-colors">
+                    <tr
+                      key={row.id}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setRowContextMenu({ x: e.clientX, y: e.clientY, rowIndex: idx });
+                      }}
+                      className="hover:bg-[#121622]/60 group transition-colors"
+                    >
                       {/* # and drag handle */}
                       <td className="py-2 px-2 text-center text-slate-500 font-mono text-[11px] align-top pt-3">
                         <div className="flex items-center justify-center gap-1">
@@ -1430,33 +2083,83 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
                       </td>
 
                       {/* SUB-ITEM NAME */}
-                      <td className="py-2 px-2 align-top">
-                        <div className="space-y-1.5">
+                      <td className="py-2 px-2 align-top relative">
+                        <div className="space-y-1.5 relative">
                           <input
                             type="text"
+                            ref={(el) => {
+                              rowInputRefs.current[idx] = el;
+                            }}
                             value={row.description}
                             onChange={(e) => {
                               const val = e.target.value;
                               const rows = [...measurementRows];
                               rows[idx].description = val;
                               setMeasurementRows(rows);
-                              handleTextChangeForSlash(val, 'ROW', idx, e.target.selectionStart || 0);
+                              handleTextChangeForSlash(val, 'ROW', idx, e.currentTarget);
                             }}
-                            placeholder="e.g. Bedroom X -> or type @ to pick a saved item"
-                            className="w-full px-3 py-1.5 bg-[#080b11] border border-[#1e2536] focus:border-blue-500 rounded-lg text-xs text-white focus:outline-none transition-colors"
+                            onKeyDown={(e) => {
+                              if (isSlashMenuOpen && slashTarget === 'ROW' && activeRowIndexForSlash === idx) {
+                                if (e.key === 'ArrowDown') {
+                                  e.preventDefault();
+                                  setHighlightedFormulaIndex((prev) => (prev + 1) % Math.max(1, filteredSlashFormulas.length));
+                                } else if (e.key === 'ArrowUp') {
+                                  e.preventDefault();
+                                  setHighlightedFormulaIndex((prev) => (prev - 1 + filteredSlashFormulas.length) % Math.max(1, filteredSlashFormulas.length));
+                                } else if (e.key === 'Enter' || e.key === 'Tab') {
+                                  if (filteredSlashFormulas[highlightedFormulaIndex]) {
+                                    e.preventDefault();
+                                    handleSelectSlashFormula(filteredSlashFormulas[highlightedFormulaIndex]);
+                                  }
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  setIsSlashMenuOpen(false);
+                                }
+                              }
+                            }}
+                            placeholder="e.g. Ceiling Plaster -> type / for formula"
+                            className={cn(
+                              "w-full px-3 py-1.5 bg-[#080b11] border rounded-lg text-xs text-white focus:outline-none transition-all",
+                              isSlashMenuOpen && activeRowIndexForSlash === idx && slashTarget === 'ROW'
+                                ? "border-purple-500 ring-2 ring-purple-500/40 shadow-[0_0_15px_rgba(168,85,247,0.35)]"
+                                : "border-[#1e2536] focus:border-blue-500"
+                            )}
                           />
-                          <div
-                            onClick={() => {
-                              setActiveRowIndexForSlash(idx);
-                              setSlashTarget('ROW');
-                              setSlashQuery('');
-                              setIsSlashMenuOpen(true);
-                            }}
-                            className="px-2 py-0.5 bg-[#0a0d15] border border-purple-500/30 rounded text-[10px] text-purple-400 font-mono flex items-center justify-between cursor-pointer hover:border-purple-500/60 transition-colors w-fit"
-                          >
-                            <span>type / for formula</span>
-                            {row.formula && row.formula !== 'LxWxH' && (
-                              <span className="ml-2 font-bold text-blue-400">[{row.formula}]</span>
+
+                          {/* Trigger Pill matching Screenshot 1 */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {row.formula && row.formula !== 'LxWxH' ? (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-500/15 border border-blue-500/30 text-[10px] font-mono text-blue-300">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleOpenSlashMenuForPill(idx, e.currentTarget)}
+                                  className="font-bold text-cyan-300 hover:text-cyan-200 cursor-pointer flex items-center gap-1"
+                                  title="Click to change formula"
+                                >
+                                  <Sparkles className="w-2.5 h-2.5 text-cyan-400" />
+                                  <span>{dimConfig.formulaName || row.formula}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const rows = [...measurementRows];
+                                    rows[idx].formula = 'LxWxH';
+                                    setMeasurementRows(rows);
+                                  }}
+                                  title="Reset formula to standard L×W×H"
+                                  className="text-slate-400 hover:text-rose-300 ml-0.5 transition-colors cursor-pointer"
+                                >
+                                  <RotateCcw className="w-2.5 h-2.5" />
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => handleOpenSlashMenuForPill(idx, e.currentTarget)}
+                                className="px-2 py-0.5 bg-[#0a0d15] border border-purple-500/40 rounded text-[10px] text-purple-400 font-mono flex items-center gap-1 cursor-pointer hover:border-purple-500/80 hover:bg-purple-950/20 transition-all select-none"
+                              >
+                                <span>type / for formula</span>
+                              </button>
                             )}
                           </div>
                         </div>
@@ -1465,77 +2168,135 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
                       {/* NOS */}
                       <td className="py-2 px-1.5 align-top">
                         <input
-                          type="number"
-                          min="0"
-                          step="any"
+                          type="text"
                           value={row.nos}
                           onChange={(e) => {
                             const rows = [...measurementRows];
-                            rows[idx].nos = e.target.value === '' ? '' : parseFloat(e.target.value);
+                            rows[idx].nos = e.target.value;
                             setMeasurementRows(rows);
                           }}
-                          placeholder="N1"
-                          className="w-full px-2 py-1.5 bg-[#080b11] border border-[#1e2536] focus:border-cyan-400 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium"
+                          onBlur={() => {
+                            const evaluated = evaluateCellMath(row.nos);
+                            if (typeof row.nos === 'string' && row.nos.trim() && evaluated !== 0) {
+                              const rows = [...measurementRows];
+                              rows[idx].nos = evaluated;
+                              setMeasurementRows(rows);
+                            }
+                          }}
+                          placeholder={`N${idx + 1}`}
+                          className="w-full px-2 py-1.5 bg-[#080b11] border border-[#22d3ee]/60 focus:border-[#22d3ee] focus:ring-1 focus:ring-[#22d3ee]/50 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium placeholder:text-[#22d3ee]/40 transition-colors"
                         />
                       </td>
 
                       {/* LENGTH (M) */}
                       <td className="py-2 px-1.5 align-top">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={row.length}
-                          onChange={(e) => {
-                            const rows = [...measurementRows];
-                            rows[idx].length = e.target.value === '' ? '' : parseFloat(e.target.value);
-                            setMeasurementRows(rows);
-                          }}
-                          placeholder="L1"
-                          className="w-full px-2 py-1.5 bg-[#080b11] border border-[#1e2536] border-l-2 border-l-emerald-400 focus:border-emerald-400 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium"
-                        />
+                        {dimConfig.hasLength ? (
+                          <input
+                            type="text"
+                            value={row.length}
+                            onChange={(e) => {
+                              const rows = [...measurementRows];
+                              rows[idx].length = e.target.value;
+                              setMeasurementRows(rows);
+                            }}
+                            onBlur={() => {
+                              const evaluated = evaluateCellMath(row.length);
+                              if (typeof row.length === 'string' && row.length.trim() && evaluated !== 0) {
+                                const rows = [...measurementRows];
+                                rows[idx].length = evaluated;
+                                setMeasurementRows(rows);
+                              }
+                            }}
+                            placeholder={`${dimConfig.lengthLabel}${idx + 1}`}
+                            className="w-full px-2 py-1.5 bg-[#080b11] border border-[#34d399]/60 focus:border-[#34d399] focus:ring-1 focus:ring-[#34d399]/50 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium placeholder:text-[#34d399]/40 transition-colors"
+                          />
+                        ) : (
+                          <div
+                            title={`Length not used by active formula (${dimConfig.formulaName})`}
+                            className="w-full px-2 py-1.5 bg-[#06080d]/60 border border-slate-800/40 rounded-lg text-xs text-slate-600 text-center font-mono select-none cursor-not-allowed opacity-40"
+                          >
+                            —
+                          </div>
+                        )}
                       </td>
 
                       {/* BREADTH (M) */}
                       <td className="py-2 px-1.5 align-top">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={row.width}
-                          onChange={(e) => {
-                            const rows = [...measurementRows];
-                            rows[idx].width = e.target.value === '' ? '' : parseFloat(e.target.value);
-                            setMeasurementRows(rows);
-                          }}
-                          placeholder="B1"
-                          className="w-full px-2 py-1.5 bg-[#080b11] border border-[#1e2536] border-l-2 border-l-amber-400 focus:border-amber-400 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium"
-                        />
+                        {dimConfig.hasBreadth ? (
+                          <input
+                            type="text"
+                            value={row.width}
+                            onChange={(e) => {
+                              const rows = [...measurementRows];
+                              rows[idx].width = e.target.value;
+                              setMeasurementRows(rows);
+                            }}
+                            onBlur={() => {
+                              const evaluated = evaluateCellMath(row.width);
+                              if (typeof row.width === 'string' && row.width.trim() && evaluated !== 0) {
+                                const rows = [...measurementRows];
+                                rows[idx].width = evaluated;
+                                setMeasurementRows(rows);
+                              }
+                            }}
+                            placeholder={`${dimConfig.breadthLabel}${idx + 1}`}
+                            className="w-full px-2 py-1.5 bg-[#080b11] border border-[#fbbf24]/60 focus:border-[#fbbf24] focus:ring-1 focus:ring-[#fbbf24]/50 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium placeholder:text-[#fbbf24]/40 transition-colors"
+                          />
+                        ) : (
+                          <div
+                            title={`Breadth not used by active formula (${dimConfig.formulaName})`}
+                            className="w-full px-2 py-1.5 bg-[#06080d]/60 border border-slate-800/40 rounded-lg text-xs text-slate-600 text-center font-mono select-none cursor-not-allowed opacity-40"
+                          >
+                            —
+                          </div>
+                        )}
                       </td>
 
                       {/* H/DEPTH (M) */}
                       <td className="py-2 px-1.5 align-top">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={row.heightDepth}
-                          onChange={(e) => {
-                            const rows = [...measurementRows];
-                            rows[idx].heightDepth = e.target.value === '' ? '' : parseFloat(e.target.value);
-                            setMeasurementRows(rows);
-                          }}
-                          placeholder="H1"
-                          className="w-full px-2 py-1.5 bg-[#080b11] border border-[#1e2536] border-l-2 border-l-purple-400 focus:border-purple-400 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium"
-                        />
+                        {dimConfig.hasHeight ? (
+                          <input
+                            type="text"
+                            value={row.heightDepth}
+                            onChange={(e) => {
+                              const rows = [...measurementRows];
+                              rows[idx].heightDepth = e.target.value;
+                              setMeasurementRows(rows);
+                            }}
+                            onBlur={() => {
+                              const evaluated = evaluateCellMath(row.heightDepth);
+                              if (typeof row.heightDepth === 'string' && row.heightDepth.trim() && evaluated !== 0) {
+                                const rows = [...measurementRows];
+                                rows[idx].heightDepth = evaluated;
+                                setMeasurementRows(rows);
+                              }
+                            }}
+                            placeholder={`${dimConfig.heightLabel}${idx + 1}`}
+                            className="w-full px-2 py-1.5 bg-[#080b11] border border-[#a78bfa]/60 focus:border-[#a78bfa] focus:ring-1 focus:ring-[#a78bfa]/50 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium placeholder:text-[#a78bfa]/40 transition-colors"
+                          />
+                        ) : (
+                          <div
+                            title={`Height/Depth not used by active formula (${dimConfig.formulaName})`}
+                            className="w-full px-2 py-1.5 bg-[#06080d]/60 border border-slate-800/40 rounded-lg text-xs text-slate-600 text-center font-mono select-none cursor-not-allowed opacity-40"
+                          >
+                            —
+                          </div>
+                        )}
                       </td>
 
                       {/* QTY */}
                       <td className="py-2 px-1.5 align-top">
-                        <div className="w-full px-2 py-1.5 bg-[#080b11] border border-blue-500/60 rounded-lg text-xs text-blue-300 font-bold font-mono text-center">
-                          {typeof row.calculatedQuantity === 'number' && row.calculatedQuantity > 0
+                        <div
+                          className={cn(
+                            "w-full px-2 py-1.5 rounded-lg text-xs font-bold font-mono text-center shadow-inner",
+                            typeof row.calculatedQuantity === 'number' && row.calculatedQuantity < 0
+                              ? "bg-rose-950/30 border border-rose-500/60 text-rose-300"
+                              : "bg-[#080b11] border border-[#60a5fa]/60 text-blue-300"
+                          )}
+                        >
+                          {typeof row.calculatedQuantity === 'number' && row.calculatedQuantity !== 0
                             ? row.calculatedQuantity.toFixed(3)
-                            : 'Q1'}
+                            : (row.nos !== '' || row.length !== '' || row.width !== '' || row.heightDepth !== '' ? '0.000' : `Q${idx + 1}`)}
                         </div>
                       </td>
 
@@ -1560,7 +2321,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
                           type="button"
                           onClick={() => handleRemoveMeasurementRow(idx)}
                           title="Delete Row"
-                          className="text-red-500/80 hover:text-red-400 hover:bg-red-500/10 p-1 rounded transition-colors"
+                          className="text-red-500/80 hover:text-red-400 hover:bg-red-500/10 p-1 rounded transition-colors cursor-pointer"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -1571,6 +2332,366 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Floating Slash Formula Popup matching Reference Screenshot 2 */}
+          {isSlashMenuOpen && slashMenuCoords && (
+            <div
+              ref={slashMenuRef}
+              style={{
+                position: 'fixed',
+                left: `${slashMenuCoords.left}px`,
+                ...(slashMenuCoords.placeAbove
+                  ? { bottom: `${slashMenuCoords.bottom}px` }
+                  : { top: `${slashMenuCoords.top}px` }),
+                width: `${Math.min(430, slashMenuCoords.width || 430)}px`,
+                zIndex: 99999,
+              }}
+              className="max-h-72 overflow-y-auto bg-[#0d121e] border border-slate-700/90 rounded-xl shadow-2xl p-1.5 space-y-1.5 animate-in fade-in zoom-in-95 duration-100 select-none scrollbar-thin scrollbar-thumb-slate-700"
+            >
+              {Object.entries(groupedSlashFormulas).length === 0 ? (
+                <div className="p-3 text-center text-xs text-slate-400">
+                  No formulas matching "{slashQuery}"
+                </div>
+              ) : (
+                Object.entries(groupedSlashFormulas).map(([cat, formulas]) => (
+                  <div key={cat} className="space-y-0.5">
+                    <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 tracking-wider uppercase bg-[#141a27] rounded">
+                      {cat}
+                    </div>
+                    {formulas.map((f) => {
+                      const isHighlighted =
+                        filteredSlashFormulas[highlightedFormulaIndex]?.command === f.command;
+                      return (
+                        <div
+                          key={f.command}
+                          onMouseEnter={() => {
+                            const globalIdx = filteredSlashFormulas.findIndex(
+                              (item) => item.command === f.command
+                            );
+                            if (globalIdx !== -1) setHighlightedFormulaIndex(globalIdx);
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSelectSlashFormula(f);
+                          }}
+                          className={cn(
+                            "px-2.5 py-1.5 rounded-lg cursor-pointer flex items-center justify-between text-xs transition-colors group",
+                            isHighlighted ? "bg-[#1a233a] text-white" : "hover:bg-[#151c2e] text-slate-300"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-purple-400 group-hover:text-purple-300">
+                              {f.command}
+                            </span>
+                            <span className="text-slate-200 group-hover:text-white font-medium text-[11px]">
+                              {f.name.replace(/^[^\s]+\s+/, '')}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))
+              )}
+
+              {/* Bottom Action matching Screenshot 2 */}
+              <div
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsSlashMenuOpen(false);
+                  setIsManageFormulasModalOpen(true);
+                }}
+                className="pt-1.5 border-t border-slate-800 px-2 py-1 text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1.5 cursor-pointer font-medium"
+              >
+                <Settings className="w-3.5 h-3.5 text-blue-400" />
+                <span>Manage / add custom formulas...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Column Header Dropdown Menu */}
+          {activeColumnDropdown && (
+            <div
+              ref={columnDropdownRef}
+              className="absolute bg-[#0f1422] border border-slate-700 rounded-xl shadow-2xl p-2 z-[90] text-xs space-y-1 w-64 animate-in fade-in"
+              style={{
+                top: '55px',
+                left:
+                  activeColumnDropdown === 'NOS'
+                    ? '320px'
+                    : activeColumnDropdown === 'LENGTH'
+                    ? '410px'
+                    : activeColumnDropdown === 'BREADTH'
+                    ? '520px'
+                    : activeColumnDropdown === 'H_DEPTH'
+                    ? '630px'
+                    : '720px',
+              }}
+            >
+              {activeColumnDropdown === 'QTY' && (
+                <>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">Apply Formula to All Rows</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMeasurementRows((prev) => prev.map((r) => ({ ...r, formula: '/area' })));
+                      setActiveColumnDropdown(null);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-center justify-between"
+                  >
+                    <span>Area (L × B)</span>
+                    <span className="text-purple-400 font-mono text-[10px]">/area</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMeasurementRows((prev) => prev.map((r) => ({ ...r, formula: 'LxWxH' })));
+                      setActiveColumnDropdown(null);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-center justify-between"
+                  >
+                    <span>Volume (L × B × H)</span>
+                    <span className="text-purple-400 font-mono text-[10px]">/vol</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMeasurementRows((prev) => prev.map((r) => ({ ...r, formula: '/circarea' })));
+                      setActiveColumnDropdown(null);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-center justify-between"
+                  >
+                    <span>Circle Area (π/4 × D²)</span>
+                    <span className="text-purple-400 font-mono text-[10px]">/circarea</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMeasurementRows((prev) => prev.map((r) => ({ ...r, formula: '/cylarea' })));
+                      setActiveColumnDropdown(null);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-center justify-between"
+                  >
+                    <span>Cylinder Surface (π × D × H)</span>
+                    <span className="text-purple-400 font-mono text-[10px]">/cylarea</span>
+                  </button>
+                  <div className="border-t border-slate-800 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveColumnDropdown(null);
+                        setIsManageFormulasModalOpen(true);
+                      }}
+                      className="w-full text-left px-2.5 py-1 text-blue-400 hover:text-blue-300 flex items-center gap-1.5"
+                    >
+                      <Settings className="w-3 h-3" />
+                      <span>Manage Formulas...</span>
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {activeColumnDropdown === 'NOS' && (
+                <>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">Nos Column Tools</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMeasurementRows((prev) => prev.map((r) => ({ ...r, nos: 1 })));
+                      setActiveColumnDropdown(null);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white"
+                  >
+                    Set all rows Nos = 1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMeasurementRows((prev) => prev.map((r) => ({ ...r, nos: 2 })));
+                      setActiveColumnDropdown(null);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white"
+                  >
+                    Set all rows Nos = 2
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMeasurementRows((prev) => prev.map((r) => ({ ...r, nos: '' })));
+                      setActiveColumnDropdown(null);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-rose-400 hover:text-rose-300"
+                  >
+                    Clear all Nos values
+                  </button>
+                </>
+              )}
+
+              {(activeColumnDropdown === 'LENGTH' || activeColumnDropdown === 'BREADTH' || activeColumnDropdown === 'H_DEPTH') && (
+                <>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">Quick Unit Converter</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const col = activeColumnDropdown === 'LENGTH' ? 'length' : activeColumnDropdown === 'BREADTH' ? 'width' : 'heightDepth';
+                      setMeasurementRows((prev) =>
+                        prev.map((r) => {
+                          const val = evaluateCellMath(r[col]);
+                          return val > 0 ? { ...r, [col]: Number((val * 0.3048).toFixed(3)) } : r;
+                        })
+                      );
+                      setActiveColumnDropdown(null);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-center justify-between"
+                  >
+                    <span>Convert Feet → Meters</span>
+                    <span className="font-mono text-[10px] text-slate-400">× 0.3048</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const col = activeColumnDropdown === 'LENGTH' ? 'length' : activeColumnDropdown === 'BREADTH' ? 'width' : 'heightDepth';
+                      setMeasurementRows((prev) =>
+                        prev.map((r) => {
+                          const val = evaluateCellMath(r[col]);
+                          return val > 0 ? { ...r, [col]: Number((val / 39.37).toFixed(3)) } : r;
+                        })
+                      );
+                      setActiveColumnDropdown(null);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-center justify-between"
+                  >
+                    <span>Convert Inches → Meters</span>
+                    <span className="font-mono text-[10px] text-slate-400">÷ 39.37</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const col = activeColumnDropdown === 'LENGTH' ? 'length' : activeColumnDropdown === 'BREADTH' ? 'width' : 'heightDepth';
+                      setMeasurementRows((prev) =>
+                        prev.map((r) => {
+                          const val = evaluateCellMath(r[col]);
+                          return val > 0 ? { ...r, [col]: Number((val / 1000).toFixed(3)) } : r;
+                        })
+                      );
+                      setActiveColumnDropdown(null);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-center justify-between"
+                  >
+                    <span>Convert mm → Meters</span>
+                    <span className="font-mono text-[10px] text-slate-400">÷ 1000</span>
+                  </button>
+                  <div className="border-t border-slate-800 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const col = activeColumnDropdown === 'LENGTH' ? 'length' : activeColumnDropdown === 'BREADTH' ? 'width' : 'heightDepth';
+                        setMeasurementRows((prev) => prev.map((r) => ({ ...r, [col]: '' })));
+                        setActiveColumnDropdown(null);
+                      }}
+                      className="w-full text-left px-2.5 py-1 text-rose-400 hover:text-rose-300"
+                    >
+                      Clear column values
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Right-Click Row Context Menu */}
+          {rowContextMenu && (
+            <div
+              ref={contextMenuRef}
+              style={{
+                position: 'fixed',
+                top: `${rowContextMenu.y}px`,
+                left: `${rowContextMenu.x}px`,
+                zIndex: 99999,
+              }}
+              className="bg-[#0f1422] border border-slate-700 rounded-xl shadow-2xl p-1.5 text-xs space-y-0.5 w-48 animate-in fade-in zoom-in-95 duration-75 select-none"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  const newRow: MeasurementRowItem = {
+                    id: `row-${Date.now()}`,
+                    description: '',
+                    nos: 1,
+                    length: '',
+                    width: '',
+                    heightDepth: '',
+                    formula: 'LxWxH',
+                    remarks: '',
+                  };
+                  const updated = [...measurementRows];
+                  updated.splice(rowContextMenu.rowIndex, 0, newRow);
+                  setMeasurementRows(updated);
+                  setRowContextMenu(null);
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2"
+              >
+                <Plus className="w-3.5 h-3.5 text-blue-400" />
+                <span>Insert Row Above</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const newRow: MeasurementRowItem = {
+                    id: `row-${Date.now()}`,
+                    description: '',
+                    nos: 1,
+                    length: '',
+                    width: '',
+                    heightDepth: '',
+                    formula: 'LxWxH',
+                    remarks: '',
+                  };
+                  const updated = [...measurementRows];
+                  updated.splice(rowContextMenu.rowIndex + 1, 0, newRow);
+                  setMeasurementRows(updated);
+                  setRowContextMenu(null);
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2"
+              >
+                <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Insert Row Below</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const source = measurementRows[rowContextMenu.rowIndex];
+                  if (source) {
+                    const cloned: MeasurementRowItem = {
+                      ...source,
+                      id: `row-clone-${Date.now()}`,
+                      description: `${source.description} (Copy)`,
+                    };
+                    const updated = [...measurementRows];
+                    updated.splice(rowContextMenu.rowIndex + 1, 0, cloned);
+                    setMeasurementRows(updated);
+                  }
+                  setRowContextMenu(null);
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2"
+              >
+                <Copy className="w-3.5 h-3.5 text-amber-400" />
+                <span>Duplicate Row</span>
+              </button>
+              <div className="border-t border-slate-800 my-1" />
+              <button
+                type="button"
+                onClick={() => {
+                  handleRemoveMeasurementRow(rowContextMenu.rowIndex);
+                  setRowContextMenu(null);
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-rose-950/40 text-rose-400 hover:text-rose-300 flex items-center gap-2"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Row</span>
+              </button>
+            </div>
+          )}
 
           {/* GROUP TOTAL row right-aligned */}
           <div className="flex justify-end items-center px-4 py-1.5 text-xs font-bold text-slate-400">
@@ -1701,243 +2822,28 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
       </div>
 
       {/* ======================================================================
-          DYNAMIC SOR SELECTION MODAL (Zero Hardcoding)
+          SUB-POPUP 2: "Pick SOR for Measurement Book" matching reference screenshot
          ====================================================================== */}
-      {isSorModalOpen && (
-        <Modal
-          isOpen={isSorModalOpen}
-          onClose={() => setIsSorModalOpen(false)}
-          title={
-            <div className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-emerald-400" />
-              <span>Select Schedule of Rates (SOR)</span>
-            </div>
-          }
-          maxWidth="2xl"
-        >
-          <div className="space-y-3.5">
-            <p className="text-xs text-slate-400">
-              Choose an active Schedule of Rates from the database. All clauses, subclauses, categories, and rates will update dynamically:
-            </p>
-
-            {/* Search filter */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                value={sorSearchTerm}
-                onChange={(e) => setSorSearchTerm(e.target.value)}
-                placeholder="Search by schedule name, authority (CPWD, State PWD), version..."
-                className="w-full pl-9 pr-3 py-2 bg-[#080b11] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            {/* SOR List */}
-            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-              {isSchedulesLoading ? (
-                <div className="p-8 text-center text-xs text-slate-500">
-                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-slate-400" />
-                  Loading uploaded SOR schedules...
-                </div>
-              ) : filteredScheduleList.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-500">
-                  No imported SOR schedules found in database matching "{sorSearchTerm}".
-                </div>
-              ) : (
-                filteredScheduleList.map((sor) => {
-                  const isSelected = sor._id === selectedScheduleId;
-                  return (
-                    <div
-                      key={sor._id}
-                      onClick={() => handleSwitchSor(sor)}
-                      className={cn(
-                        'p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between',
-                        isSelected
-                          ? 'bg-emerald-950/30 border-emerald-500/60 shadow-lg shadow-emerald-950/50'
-                          : 'bg-[#0a0d15] hover:bg-[#111724] border-slate-800 hover:border-slate-700'
-                      )}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-white tracking-wide">
-                            {sor.sorName}
-                          </span>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                            {sor.authority} {sor.version}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-400 flex items-center gap-3">
-                          <span>Department: <strong className="text-slate-300">{sor.department || 'Civil'}</strong></span>
-                          <span>•</span>
-                          <span>Category: <strong className="text-slate-300">{sor.category || 'Standard'}</strong></span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 shrink-0">
-                        <div className="text-right font-mono">
-                          <span className="text-xs font-bold text-emerald-400">
-                            {sor.itemCount ? sor.itemCount.toLocaleString() : 0}
-                          </span>
-                          <span className="text-[10px] text-slate-500 block uppercase">items</span>
-                        </div>
-                        {isSelected && (
-                          <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-emerald-400">
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-slate-800">
-              <Button variant="outline" size="sm" onClick={() => setIsSorModalOpen(false)}>
-                Close
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      <PickSorMeasurementBookModal
+        isOpen={isSorModalOpen}
+        onClose={() => setIsSorModalOpen(false)}
+        schedules={allSchedules}
+        selectedScheduleId={selectedScheduleId}
+        onSelectSchedule={(sor) => handleSwitchSor(sor)}
+      />
 
       {/* ======================================================================
-          DYNAMIC KEYWORDS MULTI-SELECTOR MODAL
+          SUB-POPUP 1: "Pick SOR Clause by Keyword" matching reference screenshot
          ====================================================================== */}
-      {isKeywordsModalOpen && (
-        <Modal
-          isOpen={isKeywordsModalOpen}
-          onClose={() => setIsKeywordsModalOpen(false)}
-          title={
-            <div className="flex items-center gap-2">
-              <Tag className="w-5 h-5 text-blue-400" />
-              <span>Select Construction Keywords</span>
-            </div>
-          }
-          maxWidth="2xl"
-        >
-          <div className="space-y-3.5">
-            <p className="text-xs text-slate-400">
-              Select keywords derived dynamically from the database for <strong>{activeSchedule?.sorName}</strong> to filter matching clauses and auto-complete headings:
-            </p>
-
-            {/* Keyword Search */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                value={keywordSearchTerm}
-                onChange={(e) => setKeywordSearchTerm(e.target.value)}
-                placeholder="Search keywords (e.g. concrete, excavation, shuttering, beam)..."
-                className="w-full pl-9 pr-3 py-2 bg-[#080b11] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            {/* Selected Chips */}
-            {selectedKeywords.length > 0 && (
-              <div className="p-2.5 bg-[#090c13] border border-blue-500/30 rounded-xl space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Selected Keywords ({selectedKeywords.length}):</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedKeywords([]);
-                      setKeywordsText('');
-                    }}
-                    className="text-rose-400 hover:text-rose-300 font-medium cursor-pointer"
-                  >
-                    Clear All
-                  </button>
-                </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {selectedKeywords.map((kw) => (
-                    <span
-                      key={kw}
-                      className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-md bg-blue-600 text-white font-medium"
-                    >
-                      <span>{kw}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveKeyword(kw)}
-                        className="hover:text-blue-200 cursor-pointer ml-0.5"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Available Keywords Grid */}
-            <div className="max-h-72 overflow-y-auto p-1 pr-2">
-              {isKeywordsLoading ? (
-                <div className="p-8 text-center text-xs text-slate-500">
-                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-slate-400" />
-                  Loading keywords from database...
-                </div>
-              ) : availableKeywords.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-500">
-                  No keywords found matching "{keywordSearchTerm}".
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {availableKeywords.map((k) => {
-                    const isSelected = selectedKeywords.includes(k.label);
-                    return (
-                      <button
-                        key={k.label}
-                        type="button"
-                        onClick={() => handleToggleKeyword(k.label)}
-                        className={cn(
-                          'px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer border',
-                          isSelected
-                            ? 'bg-blue-600 text-white border-blue-400 shadow-sm'
-                            : 'bg-[#10141f] hover:bg-[#161c2b] text-slate-300 hover:text-white border-slate-800 hover:border-slate-700'
-                        )}
-                      >
-                        <span>{k.label}</span>
-                        {k.count > 1 && (
-                          <span
-                            className={cn(
-                              'text-[10px] px-1.5 py-0.2 rounded-full font-mono',
-                              isSelected ? 'bg-blue-700 text-blue-100' : 'bg-slate-800 text-slate-400'
-                            )}
-                          >
-                            {k.count}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-between items-center pt-2 border-t border-slate-800">
-              <span className="text-xs text-slate-500">
-                {selectedKeywords.length} selected
-              </span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setIsKeywordsModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setIsKeywordsModalOpen(false);
-                    if (selectedKeywords.length > 0) {
-                      setKeywordsText(selectedKeywords.join(', '));
-                    }
-                  }}
-                >
-                  Apply Keywords
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
+      <PickSorClauseByKeywordModal
+        isOpen={isKeywordsModalOpen}
+        onClose={() => setIsKeywordsModalOpen(false)}
+        initialSearchQuery={keywordClauseSearch || keywordsText || itemHeading || ''}
+        onSelectClause={(card) => handleSelectKeywordCard(card)}
+        databaseCards={databaseKeywordCards}
+        activeSorId={activeSchedule?._id}
+        activeSorName={activeSchedule?.sorName || ''}
+      />
 
       {/* ======================================================================
           DYNAMIC SOR CLAUSE SELECTOR MODAL
@@ -2211,6 +3117,171 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
         </Modal>
       )}
 
+      {/* Manage Formulas Modal */}
+      {isManageFormulasModalOpen && (
+        <Modal
+          isOpen={isManageFormulasModalOpen}
+          onClose={() => setIsManageFormulasModalOpen(false)}
+          title={
+            <div className="flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-purple-400" />
+              <span>Civil Formulas & Custom Expression Manager</span>
+            </div>
+          }
+          maxWidth="4xl"
+        >
+          <div className="space-y-4 text-xs text-slate-300">
+            {/* Quick explanation banner */}
+            <div className="p-3 bg-[#0d1322] border border-blue-500/30 rounded-xl flex items-center justify-between gap-3">
+              <div>
+                <div className="text-white font-bold text-sm">Interactive Quantity Formulas</div>
+                <p className="text-slate-400 text-xs">
+                  Formulas automate quantity calculations from your dimensions. Type <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-purple-400 font-mono text-[11px]">/</kbd> in any row to invoke.
+                </p>
+              </div>
+              <a
+                href="/planning/quantity-master"
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-1 shrink-0"
+              >
+                <span>Quantity Master</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            {/* List of Available Formulas by Category */}
+            <div className="space-y-2">
+              <div className="font-bold text-slate-200 uppercase tracking-wider text-[11px]">
+                Standard Civil Formulas ({allSlashFormulas.length})
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+                {allSlashFormulas.map((f) => (
+                  <div
+                    key={f.command}
+                    className="p-2.5 rounded-lg bg-[#0b0f19] border border-slate-800 hover:border-slate-700 space-y-1 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-purple-400 text-xs">{f.command}</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 uppercase">
+                        {f.category}
+                      </span>
+                    </div>
+                    <div className="text-white font-medium text-xs">{f.name}</div>
+                    <div className="text-slate-400 font-mono text-[11px]">{f.expressionDesc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* + Add Custom Formula */}
+            <div className="p-3.5 bg-[#090d16] border border-slate-800 rounded-xl space-y-3">
+              <div className="font-bold text-emerald-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <Plus className="w-4 h-4" />
+                <span>Add Custom Formula</span>
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  const name = (form.elements.namedItem('formulaName') as HTMLInputElement).value.trim();
+                  let code = (form.elements.namedItem('formulaCode') as HTMLInputElement).value.trim();
+                  const expr = (form.elements.namedItem('formulaExpr') as HTMLInputElement).value.trim();
+                  const cat = (form.elements.namedItem('formulaCategory') as HTMLSelectElement).value as any;
+
+                  if (!name || !expr) {
+                    alert('Please provide formula name and mathematical expression');
+                    return;
+                  }
+                  if (!code.startsWith('/')) {
+                    code = `/${code}`;
+                  }
+
+                  const exprUpper = expr.toUpperCase();
+                  const cols: ('NOS' | 'L' | 'B' | 'H')[] = ['NOS'];
+                  if (/\b(L|LEN|LENGTH|DIA|RADIUS|R|BASE)\b/.test(exprUpper)) cols.push('L');
+                  if (/\b(B|W|WIDTH|BREADTH)\b/.test(exprUpper)) cols.push('B');
+                  if (/\b(H|D|DEPTH|HEIGHT|THICK)\b/.test(exprUpper)) cols.push('H');
+                  if (cols.length === 1) cols.push('L', 'B', 'H');
+
+                  const newFormula: SlashFormulaDefinition = {
+                    command: code.toLowerCase(),
+                    name: `${name} = ${expr}`,
+                    code: code.toLowerCase(),
+                    category: cat || 'CUSTOM',
+                    expressionDesc: expr,
+                    highlightCols: cols,
+                    calculate: ({ nos, l, w, h }) => {
+                      const substituted = expr
+                        .replace(/\bL\b/gi, String(l))
+                        .replace(/\bB\b|\bW\b/gi, String(w))
+                        .replace(/\bH\b|\bD\b/gi, String(h))
+                        .replace(/\bN\b|\bNOS\b/gi, String(nos));
+                      const res = evaluateCellMath(substituted);
+                      return res !== 0 ? res : nos * l * w;
+                    },
+                  };
+
+                  const updated = [...customFormulasList, newFormula];
+                  setCustomFormulasList(updated);
+                  try {
+                    localStorage.setItem('budgetpilot_custom_formulas', JSON.stringify(updated));
+                  } catch {
+                    // ignore
+                  }
+                  form.reset();
+                  setImportedFormulaNotice(`Added custom formula "${name}" (${code})!`);
+                  setTimeout(() => setImportedFormulaNotice(null), 3000);
+                }}
+                className="grid grid-cols-1 sm:grid-cols-4 gap-2.5"
+              >
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Formula Name</label>
+                  <input
+                    name="formulaName"
+                    required
+                    placeholder="e.g. Tile Skirting"
+                    className="w-full px-2.5 py-1.5 bg-[#0e1422] border border-slate-700 rounded-lg text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Slash Command</label>
+                  <input
+                    name="formulaCode"
+                    required
+                    placeholder="/skirting"
+                    className="w-full px-2.5 py-1.5 bg-[#0e1422] border border-slate-700 rounded-lg text-xs text-purple-400 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Expression (L, B, H, N)</label>
+                  <input
+                    name="formulaExpr"
+                    required
+                    placeholder="2 * (L + B) * H"
+                    className="w-full px-2.5 py-1.5 bg-[#0e1422] border border-slate-700 rounded-lg text-xs text-emerald-400 font-mono"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    className="w-full px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                  >
+                    + Save Formula
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button size="sm" onClick={() => setIsManageFormulasModalOpen(false)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* Cell Formula Help Modal */}
       {isCellFormulaHelpOpen && (
         <Modal
@@ -2220,23 +3291,43 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
           maxWidth="lg"
         >
           <div className="space-y-3.5 text-xs text-slate-300">
-            <div className="p-3 rounded-lg bg-[#0b0e16] border border-slate-800 space-y-1.5">
-              <div className="font-bold text-white text-sm">Standard Formulas</div>
+            <div className="p-3 rounded-lg bg-[#0b0e16] border border-slate-800 space-y-2">
+              <div className="font-bold text-white text-sm">Interactive Civil Formulas</div>
               <p className="text-slate-400">
-                The spreadsheet table automatically computes quantities based on your input dimensions:
+                Type <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-purple-400 font-mono">/</kbd> in the Sub-item description or click <strong className="text-purple-300">type / for formula</strong>:
               </p>
-              <ul className="list-disc pl-5 space-y-1 font-mono text-[11px] text-emerald-400">
-                <li>Volume: Nos × Length × Breadth × Height/Depth</li>
-                <li>Area: Nos × Length × Breadth</li>
-                <li>Length / Linear: Nos × Length</li>
-                <li>Count: Nos</li>
+              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                <div className="p-2 bg-[#121724] rounded border border-slate-800">
+                  <span className="text-purple-400 font-bold">/area</span>: L × B
+                </div>
+                <div className="p-2 bg-[#121724] rounded border border-slate-800">
+                  <span className="text-purple-400 font-bold">/circarea</span>: π/4 × D²
+                </div>
+                <div className="p-2 bg-[#121724] rounded border border-slate-800">
+                  <span className="text-purple-400 font-bold">/cylarea</span>: π × D × H
+                </div>
+                <div className="p-2 bg-[#121724] rounded border border-slate-800">
+                  <span className="text-purple-400 font-bold">/vol</span>: L × B × H
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-[#0b0e16] border border-slate-800 space-y-1.5">
+              <div className="font-bold text-emerald-400 text-sm">Math in Any Dimension Cell</div>
+              <p className="text-slate-400">
+                You can type arithmetic expressions directly into Length, Breadth, Height or Nos cells like in Excel:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 font-mono text-[11px] text-emerald-300">
+                <li><code>10.5 + 2.5</code> → auto-evaluates to 13.000</li>
+                <li><code>=15 * 2</code> → auto-evaluates to 30.000</li>
+                <li><code>100 / 4</code> → auto-evaluates to 25.000</li>
               </ul>
             </div>
 
             <div className="p-3 rounded-lg bg-[#0b0e16] border border-slate-800 space-y-1.5">
-              <div className="font-bold text-blue-400 text-sm">Slash (/) Commands</div>
+              <div className="font-bold text-blue-400 text-sm">Column Header Dropdowns & Right-Click</div>
               <p className="text-slate-400">
-                Type <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono border border-slate-700">/</kbd> in the Item Heading or any Sub-item row to search and import formulas directly from Quantity Master.
+                Click any column header with <span className="text-cyan-400">▾</span> to convert units (Feet → Meters, Inches → Meters) or apply formulas. Right-click any row for quick copy/insert/delete!
               </p>
             </div>
 

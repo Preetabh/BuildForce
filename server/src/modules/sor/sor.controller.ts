@@ -497,5 +497,91 @@ export class SorController {
       next(error);
     }
   }
+
+  /**
+   * Duplicate an SOR Master Schedule with all items
+   */
+  public static async duplicateSorMaster(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { masterId } = req.params;
+      const { newName } = req.body;
+      const result = await SorService.duplicateSorMaster(companyId, masterId, newName);
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Archive an SOR Master Schedule
+   */
+  public static async archiveSorMaster(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { masterId } = req.params;
+      const result = await SorService.archiveSorMaster(companyId, masterId);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Record recently opened SOR for authenticated user
+   */
+  public static async recordRecentSor(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const userId = req.user!.userId;
+      const { sorId } = req.params;
+      const result = await SorService.recordRecentSor(companyId, userId, sorId);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get recently opened SORs for authenticated user
+   */
+  public static async getRecentSors(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const userId = req.user!.userId;
+      const result = await SorService.getRecentSors(companyId, userId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get dynamic master options for organization
+   */
+  public static async getMasterOptions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { type } = req.query;
+      const result = await SorService.getMasterOptions(companyId, type as string);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Create dynamic master option for organization
+   */
+  public static async createMasterOption(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const result = await SorService.createMasterOption(companyId, req.body);
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+
 
