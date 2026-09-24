@@ -65,28 +65,65 @@ export class CalculationEngine {
 
     const normalizedFormula = rawFormula.toUpperCase();
 
+    // Deduction detection (/deduct, /door, /window, or explicitly negative)
+    const isDeduction =
+      normalizedFormula.includes('DEDUCT') ||
+      normalizedFormula.includes('/DOOR') ||
+      normalizedFormula.includes('/WINDOW') ||
+      normalizedFormula.startsWith('-');
+
     if (
-      normalizedFormula.includes('LXWXD') ||
-      normalizedFormula === 'LXWXD' ||
-      normalizedFormula === 'LXWXH' ||
-      normalizedFormula === 'LXWXHXNOS' ||
-      normalizedFormula === 'VOLUME' ||
-      expectedDimension === 'VOLUME'
+      !isDeduction &&
+      (normalizedFormula.includes('LXWXD') ||
+        normalizedFormula === 'LXWXD' ||
+        normalizedFormula === 'LXWXH' ||
+        normalizedFormula === 'LXBXH' ||
+        normalizedFormula === 'LXBXD' ||
+        normalizedFormula.includes('LXBXH') ||
+        normalizedFormula.includes('LXBXD') ||
+        normalizedFormula === 'LXWXHXNOS' ||
+        normalizedFormula === 'VOLUME' ||
+        normalizedFormula === '/VOL' ||
+        expectedDimension === 'VOLUME')
     ) {
       // 3D Volume (Earthwork, Concrete, Masonry) -> Evaluates to m³ (cum)
       const hOrD = height > 0 ? height : (thickness > 0 ? thickness : 1);
       qty = nos * (length || 0) * (width || 0) * hOrD;
       expr = `${nos > 1 ? nos + ' × ' : ''}${length}m × ${width}m × ${hOrD}m`;
+    } else if (normalizedFormula.includes('/CIRCAREA') || normalizedFormula.includes('CIRCAREA')) {
+      // Circular Area (pi/4 * d^2)
+      const d = length > 0 ? length : (width > 0 ? width : height);
+      qty = nos * (Math.PI / 4) * d * d;
+      expr = `${nos > 1 ? nos + ' × ' : ''}π/4 × ${d}²`;
+    } else if (normalizedFormula.includes('/CYLVOL') || normalizedFormula.includes('CYLVOL')) {
+      // Cylinder Volume (pi/4 * d^2 * h)
+      const d = length > 0 ? length : width;
+      qty = nos * (Math.PI / 4) * d * d * (height || 1);
+      expr = `${nos > 1 ? nos + ' × ' : ''}π/4 × ${d}² × ${height || 1}m`;
+    } else if (normalizedFormula.includes('/PERIM') || normalizedFormula.includes('PERIMETER')) {
+      // Perimeter: 2 * (L + B)
+      qty = nos * 2 * ((length || 0) + (width || 0));
+      expr = `${nos > 1 ? nos + ' × ' : ''}2 × (${length || 0} + ${width || 0})m`;
+    } else if (normalizedFormula.includes('/CIRCPERIM')) {
+      // Circumference: pi * d
+      const d = length > 0 ? length : (width > 0 ? width : height);
+      qty = nos * Math.PI * d;
+      expr = `${nos > 1 ? nos + ' × ' : ''}π × ${d}m`;
     } else if (
       normalizedFormula.includes('LXW') ||
+      normalizedFormula.includes('LXB') ||
       normalizedFormula.includes('LXH') ||
+      normalizedFormula.includes('AREA') ||
       normalizedFormula === 'AREA' ||
-      expectedDimension === 'AREA'
+      normalizedFormula === '/AREA' ||
+      expectedDimension === 'AREA' ||
+      isDeduction
     ) {
-      // 2D Area (Plaster, Flooring, Painting, Formwork) -> Evaluates to m² (sqm)
+      // 2D Area (Plaster, Flooring, Painting, Formwork, Deductions) -> Evaluates to m² (sqm)
       const dim2 = width > 0 ? width : (height > 0 ? height : 1);
-      qty = nos * (length || 0) * dim2;
-      expr = `${nos > 1 ? nos + ' × ' : ''}${length}m × ${dim2}m`;
+      const sign = isDeduction ? -1 : 1;
+      qty = sign * Math.abs(nos * (length || 0) * dim2);
+      expr = `${isDeduction ? '(-) ' : ''}${nos > 1 ? nos + ' × ' : ''}${length}m × ${dim2}m`;
     } else if (
       normalizedFormula === 'WEIGHT' ||
       normalizedFormula.includes('WEIGHT') ||

@@ -92,10 +92,27 @@ export class MeasurementService {
     let mainExpression = '';
     let canonicalUnit = '';
 
+    const rawUnit = input.unit || 'cum';
+    const actualDim = UnitDimensionEngine.getPhysicalDimension(rawUnit);
+    let defaultFormula = input.formula;
+    if (!defaultFormula || (defaultFormula === 'LxWxH' && actualDim !== 'VOLUME')) {
+      if (actualDim === 'AREA') defaultFormula = 'LxW';
+      else if (actualDim === 'LENGTH') defaultFormula = 'L';
+      else if (actualDim === 'COUNT') defaultFormula = 'Nos';
+      else if (actualDim === 'WEIGHT') defaultFormula = 'Weight';
+      else defaultFormula = 'LxWxH';
+    }
+
     if (input.entries && input.entries.length > 0) {
       for (const row of input.entries) {
+        let rowFormula = row.formula || defaultFormula;
+        if (actualDim === 'AREA' && (rowFormula === 'LxWxH' || rowFormula === 'LXWXH')) {
+          rowFormula = 'LxW';
+        } else if (actualDim === 'LENGTH' && (rowFormula === 'LxWxH' || rowFormula === 'LXWXH')) {
+          rowFormula = 'L';
+        }
         const rowCalc = CalculationEngine.calculateQuantity(
-          row.formula || input.formula || 'LxWxH',
+          rowFormula,
           {
             nos: row.nos !== undefined ? row.nos : 1,
             length: row.length,
@@ -115,7 +132,7 @@ export class MeasurementService {
       mainExpression = `${input.entries.length} items = ${totalQty} ${canonicalUnit}`;
     } else {
       const calcResult = CalculationEngine.calculateQuantity(
-        input.formula || 'LxWxH',
+        defaultFormula,
         {
           nos: input.nos,
           length: input.length,
@@ -436,8 +453,28 @@ export class MeasurementService {
       unitWeight: input.unitWeight,
     };
 
-    const formula = input.formula || targetSorItem?.measurementFormula || 'LxWxH';
     const rawUnit = input.unit || boqItem.unit || targetSorItem?.unit || 'cum';
+    const actualDim = UnitDimensionEngine.getPhysicalDimension(rawUnit);
+
+    let formula = input.formula || targetSorItem?.measurementFormula;
+    const firstRowFormula = input.entries?.[0]?.formula;
+
+    // Resilient fallback: If no formula provided or if formula is default 'LxWxH' but the item is NOT a volume
+    if (!formula || (formula.toUpperCase() === 'LXWXH' && actualDim !== 'VOLUME')) {
+      if (firstRowFormula && UnitDimensionEngine.getExpectedDimensionForFormula(firstRowFormula) === actualDim) {
+        formula = firstRowFormula;
+      } else if (actualDim === 'AREA') {
+        formula = 'LxW';
+      } else if (actualDim === 'LENGTH') {
+        formula = 'L';
+      } else if (actualDim === 'COUNT') {
+        formula = 'Nos';
+      } else if (actualDim === 'WEIGHT') {
+        formula = 'Weight';
+      } else {
+        formula = 'LxWxH';
+      }
+    }
 
     // Strict Dimensional Validation
     const dimValidation = UnitDimensionEngine.validateDimensionalCompatibility(formula, rawUnit, boqItem.itemCode);
@@ -453,7 +490,12 @@ export class MeasurementService {
 
     if (input.entries && input.entries.length > 0) {
       for (const row of input.entries) {
-        const rowFormula = row.formula || formula;
+        let rowFormula = row.formula || formula;
+        if (actualDim === 'AREA' && (rowFormula.toUpperCase() === 'LXWXH' || rowFormula.toUpperCase() === 'LXWXD')) {
+          rowFormula = 'LxW';
+        } else if (actualDim === 'LENGTH' && (rowFormula.toUpperCase() === 'LXWXH' || rowFormula.toUpperCase() === 'LXW')) {
+          rowFormula = 'L';
+        }
         const rowDims: MeasurementDimensions = {
           nos: row.nos !== undefined ? row.nos : 1,
           length: row.length || 0,
@@ -634,8 +676,27 @@ export class MeasurementService {
       unitWeight: input.unitWeight !== undefined ? input.unitWeight : existingEntry.unitWeight,
     };
 
-    const formula = input.formula || existingEntry.formula || 'LxWxH';
     const rawUnit = input.unit || existingEntry.unit || 'cum';
+    const actualDim = UnitDimensionEngine.getPhysicalDimension(rawUnit);
+
+    let formula = input.formula || existingEntry.formula;
+    const firstRowFormula = input.entries?.[0]?.formula;
+
+    if (!formula || (formula.toUpperCase() === 'LXWXH' && actualDim !== 'VOLUME')) {
+      if (firstRowFormula && UnitDimensionEngine.getExpectedDimensionForFormula(firstRowFormula) === actualDim) {
+        formula = firstRowFormula;
+      } else if (actualDim === 'AREA') {
+        formula = 'LxW';
+      } else if (actualDim === 'LENGTH') {
+        formula = 'L';
+      } else if (actualDim === 'COUNT') {
+        formula = 'Nos';
+      } else if (actualDim === 'WEIGHT') {
+        formula = 'Weight';
+      } else {
+        formula = 'LxWxH';
+      }
+    }
 
     // Strict Dimensional Validation
     const dimValidation = UnitDimensionEngine.validateDimensionalCompatibility(formula, rawUnit, measurement.sourceItemCode);

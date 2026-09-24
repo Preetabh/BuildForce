@@ -55,4 +55,14 @@ export class AuditService {
       .limit(50)
       .lean();
   }
+
+  public static async getRecentLogs(companyId: string, limit = 10) {
+    return AuditLog.find({
+      companyId: new Types.ObjectId(companyId),
+    })
+      .sort({ timestamp: -1 })
+      .populate('userId', 'name email role')
+      .limit(limit)
+      .lean();
+  }
 }

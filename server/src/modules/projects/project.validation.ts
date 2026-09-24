@@ -109,6 +109,10 @@ export const projectQuerySchema = z.object({
     .string()
     .optional()
     .transform((val) => (val === 'true' ? true : val === 'false' ? false : undefined)),
+  includeSubProjects: z
+    .string()
+    .optional()
+    .transform((val) => val === 'true'),
   sort: z.string().optional().default('createdAt'),
   order: z.enum(['asc', 'desc']).optional().default('desc'),
   page: z.coerce.number().int().min(1).optional().default(1),

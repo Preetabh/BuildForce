@@ -146,7 +146,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
       length: '',
       width: '',
       heightDepth: '',
-      formula: 'LxWxH',
+      formula: 'LxW',
       remarks: '',
     },
   ]);
@@ -599,6 +599,11 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
       setSorClauseInput(
         initialBoqItem.itemCode ? `${initialBoqItem.itemCode} - ${initialBoqItem.description}` : initialBoqItem.description || ''
       );
+      const boqUnit = (initialBoqItem.unit || 'sqm').toLowerCase();
+      const isBoqArea = boqUnit.includes('sqm') || boqUnit.includes('m2') || boqUnit.includes('m²') || boqUnit.includes('sq.m');
+      const isBoqLinear = boqUnit === 'm' || boqUnit.includes('rmt');
+      const defaultForm = isBoqArea ? 'LxW' : (isBoqLinear ? 'L' : 'LxWxH');
+
       setUnit(initialBoqItem.unit || 'sqm');
       setRate(initialBoqItem.rate || 0);
       setWorkCategory(initialBoqItem.chapter || '');
@@ -611,7 +616,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
           length: '',
           width: '',
           heightDepth: '',
-          formula: 'LxWxH',
+          formula: defaultForm,
           remarks: '',
         },
       ]);
@@ -675,7 +680,16 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
     setItemHeading(item.descriptionEnglish || clauseTitle);
     setSorClauseInput(clauseTitle);
     setSubClause(''); // reset subclause when parent clause changes
-    if (item.unit) setUnit(item.unit);
+    if (item.unit) {
+      setUnit(item.unit);
+      const cleanU = item.unit.toLowerCase();
+      const isUArea = cleanU.includes('sqm') || cleanU.includes('m2') || cleanU.includes('m²') || cleanU.includes('sq.m');
+      const isULinear = cleanU === 'm' || cleanU.includes('rmt');
+      const targetFormula = isUArea ? 'LxW' : (isULinear ? 'L' : 'LxWxH');
+      setMeasurementRows((prev) =>
+        prev.map((r) => (!r.isSubheading && (r.formula === 'LxWxH' || r.formula === 'LxW' || !r.formula) ? { ...r, formula: targetFormula } : r))
+      );
+    }
     if (item.rate !== undefined) setRate(item.rate);
     if (item.workCategory || item.chapter) setWorkCategory(item.workCategory || item.chapter || '');
 
@@ -698,7 +712,16 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
   // SELECT SUBCLAUSE
   const handleSelectSubclause = (sub: SubclauseItem) => {
     setSubClause(`${sub.itemCode} - ${sub.description}`);
-    if (sub.unit) setUnit(sub.unit);
+    if (sub.unit) {
+      setUnit(sub.unit);
+      const cleanU = sub.unit.toLowerCase();
+      const isUArea = cleanU.includes('sqm') || cleanU.includes('m2') || cleanU.includes('m²') || cleanU.includes('sq.m');
+      const isULinear = cleanU === 'm' || cleanU.includes('rmt');
+      const targetFormula = isUArea ? 'LxW' : (isULinear ? 'L' : 'LxWxH');
+      setMeasurementRows((prev) =>
+        prev.map((r) => (!r.isSubheading && (r.formula === 'LxWxH' || r.formula === 'LxW' || !r.formula) ? { ...r, formula: targetFormula } : r))
+      );
+    }
     if (sub.rate !== undefined) setRate(sub.rate);
     if (selectedSorItem) {
       setItemHeading(`${selectedSorItem.itemCode} ${selectedSorItem.descriptionEnglish} - ${sub.description}`);
@@ -1032,7 +1055,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
     const formulaKey = rawKey.toLowerCase();
 
     // Default cuboid L x W x H
-    if (!formulaKey || formulaKey === 'lxwxh' || formulaKey === 'volume' || formulaKey === 'default') {
+    if (!formulaKey || formulaKey === 'lxwxh' || formulaKey === 'lxbxh' || formulaKey === 'volume' || formulaKey === 'default') {
       return {
         hasLength: true,
         hasBreadth: true,
@@ -1041,6 +1064,45 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
         breadthLabel: 'B',
         heightLabel: 'H',
         formulaName: 'L×B×H',
+      };
+    }
+
+    // 2D Area LxW or LxB or /area
+    if (
+      formulaKey === 'lxw' ||
+      formulaKey === 'lxb' ||
+      formulaKey === '/area' ||
+      formulaKey === 'area' ||
+      formulaKey === 'area = lxb' ||
+      formulaKey === 'area = lxw'
+    ) {
+      return {
+        hasLength: true,
+        hasBreadth: true,
+        hasHeight: false,
+        lengthLabel: 'L',
+        breadthLabel: 'B',
+        heightLabel: 'H',
+        formulaName: 'Area = L×B',
+      };
+    }
+
+    // Linear Running Length
+    if (
+      formulaKey === 'l' ||
+      formulaKey === '/length' ||
+      formulaKey === 'length' ||
+      formulaKey === 'linear' ||
+      formulaKey === 'running'
+    ) {
+      return {
+        hasLength: true,
+        hasBreadth: false,
+        hasHeight: false,
+        lengthLabel: 'L',
+        breadthLabel: 'B',
+        heightLabel: 'H',
+        formulaName: 'Running Length = L',
       };
     }
 
@@ -1249,6 +1311,20 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
       return Number(val.toFixed(3));
     }
 
+    // Area formula LxW or LxB or /area
+    if (
+      formulaKey === 'lxw' ||
+      formulaKey === 'lxb' ||
+      formulaKey === '/area' ||
+      formulaKey === 'area' ||
+      formulaKey === 'area = lxb' ||
+      formulaKey === 'area = lxw'
+    ) {
+      const dimL = l > 0 ? l : 0;
+      const dimW = w > 0 ? w : (h > 0 ? h : 0);
+      return Number((nos * dimL * dimW).toFixed(3));
+    }
+
     // Default cuboid dimension calculation (L x W x H)
     if (l > 0 && w > 0 && h > 0) {
       return Number((nos * l * w * h).toFixed(3));
@@ -1296,6 +1372,11 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
     ],
     queryFn: async () => {
       if (totalCalculatedQuantity <= 0) return null;
+      const cleanU = (unit || '').toLowerCase();
+      const isArea = cleanU.includes('sqm') || cleanU.includes('m2') || cleanU.includes('m²') || cleanU.includes('sq.m');
+      const isLinear = cleanU === 'm' || cleanU.includes('rmt');
+      const defaultForm = isArea ? 'LxW' : (isLinear ? 'L' : 'LxWxH');
+
       const res = await api.post(`/projects/${projectId}/measurements/preview`, {
         sorId: selectedScheduleId || undefined,
         sorItemId: selectedSorItem?._id,
@@ -1305,6 +1386,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
         rate: activeRateNum,
         formulaId: selectedFormulaId || undefined,
         formulaCode: activeFormulaDoc?.code || undefined,
+        formula: defaultForm,
         entries: calculatedRows
           .filter((r) => !r.isSubheading)
           .map((r) => ({
@@ -1313,7 +1395,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
             length: typeof r.length === 'number' ? r.length : 0,
             width: typeof r.width === 'number' ? r.width : 0,
             heightDepth: typeof r.heightDepth === 'number' ? r.heightDepth : 0,
-            formula: r.formula,
+            formula: r.formula && (r.formula !== 'LxWxH' || !isArea) ? r.formula : defaultForm,
             remarks: r.remarks,
           })),
       });
@@ -1324,6 +1406,11 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
 
   // Add a new measurement sub-row
   const handleAddMeasurementRow = () => {
+    const cleanU = (unit || '').toLowerCase();
+    const isArea = cleanU.includes('sqm') || cleanU.includes('m2') || cleanU.includes('m²') || cleanU.includes('sq.m') || cleanU.includes('square');
+    const isLinear = cleanU === 'm' || cleanU.includes('metre') || cleanU.includes('meter') || cleanU.includes('rmt');
+    const defaultRowFormula = isArea ? 'LxW' : (isLinear ? 'L' : 'LxWxH');
+
     setMeasurementRows((prev) => [
       ...prev,
       {
@@ -1333,7 +1420,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
         length: '',
         width: '',
         heightDepth: '',
-        formula: 'LxWxH',
+        formula: defaultRowFormula,
         remarks: '',
       },
     ]);
@@ -1455,6 +1542,50 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
         throw new Error('Total calculated quantity must be greater than zero. Please enter dimensions.');
       }
 
+      const cleanUnit = (unit || '').toLowerCase();
+      const isArea =
+        cleanUnit.includes('sqm') ||
+        cleanUnit.includes('m2') ||
+        cleanUnit.includes('m²') ||
+        cleanUnit.includes('sq.m') ||
+        cleanUnit.includes('square') ||
+        cleanUnit.includes('sqft');
+      const isLinear =
+        cleanUnit === 'm' ||
+        cleanUnit.includes('metre') ||
+        cleanUnit.includes('meter') ||
+        cleanUnit.includes('rmt');
+      const isCount =
+        cleanUnit.includes('no') ||
+        cleanUnit.includes('each') ||
+        cleanUnit.includes('set') ||
+        cleanUnit.includes('bag');
+      const isWeight =
+        cleanUnit.includes('kg') ||
+        cleanUnit.includes('ton') ||
+        cleanUnit.includes('quintal');
+
+      // Determine primary formula for the measurement item
+      const firstValidRow = calculatedRows.find((r) => !r.isSubheading && r.formula);
+      let primaryFormula = 'LxWxH';
+      if (firstValidRow?.formula && (firstValidRow.formula !== 'LxWxH' || !isArea)) {
+        primaryFormula = firstValidRow.formula;
+      } else if (activeFormulaDoc?.code) {
+        primaryFormula = activeFormulaDoc.code;
+      } else if (isArea) {
+        primaryFormula = 'LxW';
+      } else if (isLinear) {
+        primaryFormula = 'L';
+      } else if (isCount) {
+        primaryFormula = 'Nos';
+      } else if (isWeight) {
+        primaryFormula = 'Weight';
+      } else {
+        primaryFormula = 'LxWxH';
+      }
+
+      const defaultRowFormula = isArea ? 'LxW' : (isLinear ? 'L' : (isCount ? 'Nos' : (isWeight ? 'Weight' : 'LxWxH')));
+
       const payload = {
         sorId: selectedScheduleId || undefined,
         sorItemId: selectedSorItem?._id,
@@ -1468,7 +1599,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
         formulaCode: activeFormulaDoc?.code || undefined,
         unit,
         rate: activeRateNum,
-        formula: 'LxWxH',
+        formula: primaryFormula,
         nos: 1,
         entries: calculatedRows
           .filter((r) => !r.isSubheading)
@@ -1478,6 +1609,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
             const lVal = dim.hasLength ? (typeof r.length === 'number' ? r.length : evaluateCellMath(r.length)) : 0;
             const wVal = dim.hasBreadth ? (typeof r.width === 'number' ? r.width : evaluateCellMath(r.width)) : 0;
             const hVal = dim.hasHeight ? (typeof r.heightDepth === 'number' ? r.heightDepth : evaluateCellMath(r.heightDepth)) : 0;
+            const rowFormula = (r.formula && (r.formula !== 'LxWxH' || !isArea)) ? r.formula : defaultRowFormula;
             return {
               description: r.description.trim() || activeTitle,
               nos: nosVal !== 0 ? nosVal : 1,
@@ -1487,7 +1619,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
               height: hVal,
               heightDepth: hVal,
               remarks: r.remarks.trim(),
-              formula: r.formula || 'LxWxH',
+              formula: rowFormula,
             };
           }),
       };

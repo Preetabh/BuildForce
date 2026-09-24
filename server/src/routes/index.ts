@@ -40,7 +40,18 @@ router.use('/projects/:projectId/measurements', measurementRoutes);
 router.use('/projects/:projectId/resources', resourcesRoutes);
 router.use('/projects/:projectId/billing', billingRoutes);
 
-// Audit Trail Route
+// Audit Trail Routes
+router.get('/audit/recent', authenticate, async (req, res, next) => {
+  try {
+    const companyId = req.user!.companyId;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const logs = await AuditService.getRecentLogs(companyId, limit);
+    res.status(200).json({ success: true, data: logs });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/audit/:entity/:entityId', authenticate, async (req, res, next) => {
   try {
     const { entity, entityId } = req.params;

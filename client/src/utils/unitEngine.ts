@@ -87,9 +87,17 @@ export class UnitDimensionEngine {
     if (
       form === 'LXWXH' ||
       form === 'LXWXD' ||
+      form === 'LXBXH' ||
+      form === 'LXBXD' ||
+      form === '/VOL' ||
+      form === '/CYLVOL' ||
+      form === '/SPHEREVOL' ||
+      form === '/CONE' ||
       form.includes('LXWXD') ||
       form.includes('LXWXH') ||
-      form === 'VOLUME' ||
+      form.includes('LXBXH') ||
+      form.includes('LXBXD') ||
+      form.includes('VOLUME') ||
       form === '3D'
     ) {
       return 'VOLUME';
@@ -97,10 +105,22 @@ export class UnitDimensionEngine {
 
     if (
       form === 'LXW' ||
+      form === 'LXB' ||
       form === 'LXH' ||
+      form === '/AREA' ||
+      form === '/CIRCAREA' ||
+      form === '/CYLAREA' ||
+      form === '/CYLTOTAL' ||
+      form === '/SPHEREAREA' ||
+      form === '/TRIAREA' ||
+      form === '/DOOR' ||
+      form === '/WINDOW' ||
+      form === '/DEDUCT' ||
+      form.includes('DEDUCT') ||
       form.includes('LXW') ||
+      form.includes('LXB') ||
       form.includes('LXH') ||
-      form === 'AREA' ||
+      form.includes('AREA') ||
       form === '2D'
     ) {
       return 'AREA';
@@ -110,7 +130,11 @@ export class UnitDimensionEngine {
       form === 'LENGTH' ||
       form === 'RUNNING' ||
       form === 'LINEAR' ||
-      form === 'L'
+      form === 'L' ||
+      form === '/PERIM' ||
+      form === '/CIRCPERIM' ||
+      form === '/LENGTH' ||
+      form.includes('PERIM')
     ) {
       return 'LENGTH';
     }
@@ -129,7 +153,8 @@ export class UnitDimensionEngine {
       form === 'COUNT' ||
       form === 'NOSXQTY' ||
       form === 'NUMBERS' ||
-      form === 'NOS'
+      form === 'NOS' ||
+      form.includes('NOS')
     ) {
       return 'COUNT';
     }
@@ -190,6 +215,24 @@ export class UnitDimensionEngine {
         actualDimension: actualDim,
         canonicalUnit: canonical,
       };
+    }
+
+    // Deduction formulas (e.g. /deduct, /door, /window) are valid for both AREA and VOLUME works
+    const formUpper = (formula || '').trim().toUpperCase();
+    if (
+      formUpper === '/DEDUCT' ||
+      formUpper.includes('DEDUCT') ||
+      formUpper === '/DOOR' ||
+      formUpper === '/WINDOW'
+    ) {
+      if (actualDim === 'AREA' || actualDim === 'VOLUME') {
+        return {
+          isValid: true,
+          expectedDimension: actualDim,
+          actualDimension: actualDim,
+          canonicalUnit: canonical,
+        };
+      }
     }
 
     if (expectedDim === actualDim) {

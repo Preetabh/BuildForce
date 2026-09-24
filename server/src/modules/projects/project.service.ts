@@ -24,6 +24,13 @@ export class ProjectService {
       filter.isArchived = query.isArchived;
     }
 
+    if (!query.includeSubProjects) {
+      filter.$and = [
+        { $or: [{ parentId: null }, { parentId: { $exists: false } }] },
+        { code: { $not: /-SP\d+/i } },
+      ];
+    }
+
     if (query.search && query.search.trim() !== '') {
       const searchRegex = new RegExp(query.search.trim(), 'i');
       filter.$or = [
@@ -72,6 +79,8 @@ export class ProjectService {
         $match: {
           companyId: compObjectId,
           deletedAt: null,
+          $or: [{ parentId: null }, { parentId: { $exists: false } }],
+          code: { $not: /-SP\d+/i },
         },
       },
       {

@@ -24,7 +24,7 @@ export const AppLayout: React.FC = () => {
   const deletedCount = Array.isArray(recycleBinData) ? recycleBinData.length : 0;
 
   return (
-    <div className="min-h-screen bg-erp-bg flex relative">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 flex relative">
       {/* Sidebar Navigation */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -33,7 +33,7 @@ export const AppLayout: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
+      <div className="flex-1 flex flex-col min-w-0 md:pl-64">
         <main className="flex-1 pb-16">
           <Outlet context={{ setSidebarOpen, deletedCount }} />
         </main>
