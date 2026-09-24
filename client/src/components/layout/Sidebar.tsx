@@ -195,8 +195,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, deletedCount 
               <Flame className="w-4.5 h-4.5 text-pink-200 fill-pink-300" />
             </div>
             <div>
-              <h1 className="font-bold text-xs tracking-tight text-white flex items-center gap-1.5">
-                <span>Civil Limitless</span>
+              <h1 className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5">
+                <span>BudgetPilot</span>
               </h1>
               <p className="text-[9.5px] font-medium tracking-wide text-purple-400/90 uppercase">
                 BY CIVIL GURUJI

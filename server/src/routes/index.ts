@@ -16,7 +16,7 @@ const router = Router();
 router.get('/health', (req, res) => {
   res.status(200).json({
     status: 'online',
-    system: 'BuildForce 360 Construction ERP Backend',
+    system: 'BudgetPilot Construction ERP Backend',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });

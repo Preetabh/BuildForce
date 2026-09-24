@@ -57,7 +57,7 @@ export const Login: React.FC = () => {
             <HardHat className="w-8 h-8 text-amber-300" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-erp-text tracking-tight">
-            BuildForce 360 ERP
+            BudgetPilot
           </h1>
           <p className="text-sm text-erp-text-muted mt-1">
             Construction Project Management & Estimation Platform

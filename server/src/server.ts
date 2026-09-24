@@ -30,7 +30,7 @@ const startServer = async () => {
     // 4. Listen on PORT
     const server = app.listen(env.PORT, () => {
       logger.info(`=======================================================`);
-      logger.info(`🏗️BuildForce 360 Construction ERP Backend Running`);
+      logger.info(`🏗️BudgetPilot Construction ERP Backend Running`);
       logger.info(`📡 Port: http://localhost:${env.PORT}`);
       logger.info(`🔗 API Endpoint: http://localhost:${env.PORT}/api`);
       logger.info(`💾 Database: ${env.MONGODB_URI}`);

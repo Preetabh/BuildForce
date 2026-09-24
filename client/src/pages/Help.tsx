@@ -42,7 +42,7 @@ export const Help: React.FC = () => {
             Help & Documentation
           </h1>
           <p className="text-sm text-erp-text-muted mt-1">
-            BuildForce 360 Construction ERP user guides and architectural reference.
+            BudgetPilot Construction ERP user guides and architectural reference.
           </p>
         </div>
 

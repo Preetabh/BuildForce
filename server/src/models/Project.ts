@@ -13,6 +13,7 @@ export interface IProject extends Document {
   preparedBy?: string;
   parentId?: Types.ObjectId | null;
   measurementUnit?: string;
+  buildupArea?: number;
   defaultQcLevel?: string;
   description?: string;
   projectType: ProjectType;
@@ -88,6 +89,11 @@ const projectSchema = new Schema<IProject>(
       trim: true,
       default: 'Metres (m)',
       maxlength: 50,
+    },
+    buildupArea: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     defaultQcLevel: {
       type: String,

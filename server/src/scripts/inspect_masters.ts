@@ -3,8 +3,10 @@ import { SorMaster, SorItem } from '../models/SorMaster';
 import { SorImport } from '../models/SorImport';
 import { Company } from '../models/Company';
 
+import { env } from '../config/env';
+
 async function main() {
-  await mongoose.connect('mongodb://127.0.0.1:27017/civil_guruji_erp');
+  await mongoose.connect(env.MONGODB_URI);
 
   const companies = await Company.find({});
   console.log('Companies:', companies.map(c => ({ id: c._id.toString(), name: c.name })));

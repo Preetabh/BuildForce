@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -31,7 +31,12 @@ import {
   Settings2,
   Copy,
   ChevronRight,
+  ChevronDown,
+  Download,
+  Upload,
   Calculator,
+  FolderTree,
+  ArrowRight,
 } from 'lucide-react';
 import api from '../services/api';
 import {
@@ -64,6 +69,7 @@ interface OutletContextType {
 
 type WorkspaceTab =
   | 'overview'
+  | 'subprojects'
   | 'boq'
   | 'measurements'
   | 'materials'
@@ -78,7 +84,22 @@ export const ProjectWorkspace: React.FC = () => {
   const { setSidebarOpen } = useOutletContext<OutletContextType>();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>('overview');
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('measurements');
+
+  // Sub-Projects State & Query
+  const [isAddSubProjectModalOpen, setIsAddSubProjectModalOpen] = useState(false);
+  const [subProjectForm, setSubProjectForm] = useState({
+    name: '',
+    code: '',
+    projectType: '',
+    clientName: '',
+    location: '',
+    department: '',
+    buildupArea: '',
+    description: '',
+    measurementUnit: 'Metres (m)',
+    contractValue: '',
+  });
 
   // Modals
   const [isAddBoqModalOpen, setIsAddBoqModalOpen] = useState(false);
@@ -116,6 +137,16 @@ export const ProjectWorkspace: React.FC = () => {
   const [reversalModalMeasurement, setReversalModalMeasurement] = useState<Measurement | null>(null);
   const [reversalReason, setReversalReason] = useState('');
 
+  // Measurement Book Filters & Expansion (Matching Screenshot)
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [measurementSearch, setMeasurementSearch] = useState('');
+  const [measurementSort, setMeasurementSort] = useState('default');
+  const [selectedWorkCategory, setSelectedWorkCategory] = useState('all');
+  const [selectedStage, setSelectedStage] = useState('all');
+  const [stageGroupsEnabled, setStageGroupsEnabled] = useState(true);
+  const [selectedMeasurementIds, setSelectedMeasurementIds] = useState<Record<string, boolean>>({});
+
   // 1. Fetch Project Details
   const { data: project, isLoading: isProjectLoading } = useQuery<Project>({
     queryKey: ['project', projectId],
@@ -125,6 +156,79 @@ export const ProjectWorkspace: React.FC = () => {
     },
     enabled: !!projectId,
   });
+
+  // 1b. Fetch Sub-Projects
+  const { data: subProjects = [], refetch: refetchSubProjects } = useQuery<Project[]>({
+    queryKey: ['subProjects', projectId],
+    queryFn: async () => {
+      const res = await api.get(`/projects/${projectId}/sub-projects`);
+      return res.data?.data || [];
+    },
+    enabled: !!projectId,
+  });
+
+  // Create Sub-Project Mutation
+  const createSubProjectMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      return api.post(`/projects/${projectId}/sub-projects`, payload);
+    },
+    onSuccess: () => {
+      refetchSubProjects();
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      setIsAddSubProjectModalOpen(false);
+      setSubProjectForm({
+        name: '',
+        code: '',
+        projectType: '',
+        clientName: '',
+        location: '',
+        department: '',
+        buildupArea: '',
+        description: '',
+        measurementUnit: project?.measurementUnit || 'Metres (m)',
+        contractValue: '',
+      });
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Failed to create sub-project');
+    },
+  });
+
+  const openCreateSubProjectModal = () => {
+    setSubProjectForm({
+      name: '',
+      code: '',
+      projectType: '',
+      clientName: project?.clientName || '',
+      location: project?.location || '',
+      department: project?.department || '',
+      buildupArea: '',
+      description: '',
+      measurementUnit: project?.measurementUnit || 'Metres (m)',
+      contractValue: '',
+    });
+    setIsAddSubProjectModalOpen(true);
+  };
+
+  const handleCreateSubProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subProjectForm.name.trim()) {
+      alert('Please provide a Sub-Project name');
+      return;
+    }
+    createSubProjectMutation.mutate({
+      name: subProjectForm.name.trim(),
+      code: subProjectForm.code.trim() || undefined,
+      projectType: subProjectForm.projectType.trim() || project?.projectType || 'Residential Building',
+      clientName: subProjectForm.clientName.trim(),
+      location: subProjectForm.location.trim(),
+      department: subProjectForm.department.trim(),
+      buildupArea: Number(subProjectForm.buildupArea) || 0,
+      description: subProjectForm.description.trim(),
+      measurementUnit: subProjectForm.measurementUnit || project?.measurementUnit || 'Metres (m)',
+      contractValue: Number(subProjectForm.contractValue) || 0,
+    });
+  };
 
   // 2. Fetch BOQ Items
   const { data: boqData, refetch: refetchBoq } = useQuery<{ boq: Boq; items: BoqItem[] }>({
@@ -143,7 +247,7 @@ export const ProjectWorkspace: React.FC = () => {
       const res = await api.get(`/projects/${projectId}/measurements`);
       return res.data?.data || [];
     },
-    enabled: !!projectId && activeTab === 'measurements',
+    enabled: !!projectId,
   });
 
   // 3b. Fetch Measurement Dashboard Summary
@@ -208,6 +312,7 @@ export const ProjectWorkspace: React.FC = () => {
 
   // Central refetch all connected data
   const refetchAllData = () => {
+    refetchSubProjects();
     refetchBoq();
     refetchMeasurements();
     refetchMeasurementSummary();
@@ -345,28 +450,55 @@ export const ProjectWorkspace: React.FC = () => {
     },
   });
 
-  if (isProjectLoading || !project) {
-    return (
-      <div className="min-h-screen bg-erp-bg">
-        <Header breadcrumbs={[{ label: 'Home', path: '/' }, { label: 'Project Workspace' }]} onToggleSidebar={() => setSidebarOpen(true)} />
-        <div className="p-8 text-center text-sm text-erp-text-muted">Loading Project Workspace...</div>
-      </div>
-    );
-  }
+  const isSubProject = Boolean(project?.parentId);
+  const parentProject =
+    project?.parentId && typeof project.parentId === 'object'
+      ? (project.parentId as { _id: string; name: string; code: string; projectType?: string; status?: string })
+      : null;
 
-  const boqItems = boqData?.items || [];
+  const safeSubProjects = Array.isArray(subProjects) ? subProjects : [];
+  const safeMeasurements = Array.isArray(measurements) ? measurements : [];
+  const safeBoqItems = Array.isArray(boqData?.items) ? boqData.items : [];
   const boq = boqData?.boq;
 
-  const tabs = [
-    { key: 'overview' as const, label: 'Overview', icon: Info },
-    { key: 'boq' as const, label: 'BOQ / Abstract', icon: FileSpreadsheet },
-    { key: 'measurements' as const, label: 'Measurements', icon: Ruler },
-    { key: 'materials' as const, label: 'Bill of Materials', icon: Package },
-    { key: 'manpower' as const, label: 'Bill of Manpower', icon: Users2 },
-    { key: 'machinery' as const, label: 'Bill of Machinery', icon: Truck },
-    { key: 'cost_control' as const, label: 'Cost Control', icon: LineChart },
-    { key: 'billing' as const, label: 'Running Bills', icon: Receipt },
-  ];
+  // Tabs configured strictly according to project level:
+  // Master Project: Sub-Projects is primary hub (NO direct BOQ at root)
+  // Sub-Project: Measurements is primary hub, with BOQ, BOM, Manpower, Machinery auto-calculated
+  const tabs = useMemo(() => {
+    return isSubProject
+      ? [
+          { key: 'measurements' as const, label: 'Measurements', icon: Ruler },
+          { key: 'boq' as const, label: 'BOQ / Abstract', icon: FileSpreadsheet },
+          { key: 'materials' as const, label: 'Bill of Materials', icon: Package },
+          { key: 'manpower' as const, label: 'Bill of Manpower', icon: Users2 },
+          { key: 'machinery' as const, label: 'Bill of Machinery', icon: Truck },
+        ]
+      : [
+          {
+            key: 'subprojects' as const,
+            label: `Sub-Projects (${safeSubProjects.length})`,
+            icon: FolderTree,
+          },
+          { key: 'overview' as const, label: 'Overview & Rollup', icon: Info },
+        ];
+  }, [isSubProject, safeSubProjects.length]);
+
+  // Auto-synchronize tab based on Master Project vs Sub-Project
+  useEffect(() => {
+    if (project) {
+      if (project.parentId) {
+        // Sub-project: primary tab is measurements
+        if (!['measurements', 'boq', 'materials', 'manpower', 'machinery'].includes(activeTab)) {
+          setActiveTab('measurements');
+        }
+      } else {
+        // Master project: primary tab is subprojects (NO direct BOQ at root)
+        if (!['subprojects', 'overview'].includes(activeTab)) {
+          setActiveTab('subprojects');
+        }
+      }
+    }
+  }, [project?._id, Boolean(project?.parentId)]);
 
   // Handlers
   const handleCreateCustomBoqItem = (e: React.FormEvent) => {
@@ -397,16 +529,211 @@ export const ProjectWorkspace: React.FC = () => {
     });
   };
 
+  // Export Measurements to Excel / CSV
+  const handleExportMeasurementsExcel = () => {
+    if (safeMeasurements.length === 0) {
+      alert('No measurement records available to export.');
+      return;
+    }
+    const headers = ['#', 'SOR Item Code', 'Description', 'Formula', 'Nos', 'Length (m)', 'Width (m)', 'Height (m)', 'Total Qty', 'Unit', 'Rate (INR)', 'Amount (INR)', 'Status', 'Date'];
+    const rows: string[] = [headers.join(',')];
 
+    safeMeasurements.forEach((m, idx) => {
+      const entries = Array.isArray(m.entries) ? m.entries : [];
+      const entry = entries[0] || {};
+      const item = m.boqItemId as any;
+      const rate = m.unitRate ?? item?.rate ?? 0;
+      const qty = typeof m.totalQuantity === 'number' ? m.totalQuantity : 0;
+      const amt = typeof m.amount === 'number' ? m.amount : (qty * rate);
+      const unit = entry.unit || item?.unit || 'cum';
+
+      rows.push([
+        idx + 1,
+        `"${m.sourceItemCode || item?.itemCode || ''}"`,
+        `"${(entry.description || item?.description || '').replace(/"/g, '""')}"`,
+        `"${entry.formula || 'LxWxH'}"`,
+        entry.nos || 1,
+        entry.length || 0,
+        entry.width || entry.breadth || 0,
+        entry.heightDepth || entry.height || entry.depth || 0,
+        qty,
+        `"${unit}"`,
+        rate,
+        amt,
+        `"${m.status || 'Approved'}"`,
+        `"${formatDate(m.measurementDate)}"`,
+      ].join(','));
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(rows.join('\n'));
+    const link = document.createElement('a');
+    link.setAttribute('href', csvContent);
+    link.setAttribute('download', `${project?.name || 'Project'}-Measurements-${formatDate(new Date())}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Filtered & Sorted Measurements for Sub-Project
+  const filteredMeasurements = useMemo(() => {
+    let list = [...safeMeasurements];
+
+    if (measurementSearch.trim()) {
+      const q = measurementSearch.toLowerCase();
+      list = list.filter((m: Measurement) => {
+        const item = m.boqItemId as any;
+        const code = (m.sourceItemCode || item?.itemCode || '').toLowerCase();
+        const desc = (m.entries?.[0]?.description || item?.description || '').toLowerCase();
+        const rem = (m.remarks || m.entries?.[0]?.remarks || '').toLowerCase();
+        return code.includes(q) || desc.includes(q) || rem.includes(q);
+      });
+    }
+
+    if (selectedWorkCategory !== 'all') {
+      list = list.filter((m: Measurement) => {
+        const item = m.boqItemId as any;
+        const cat = (m as any).category || item?.workCategory || item?.chapter || '';
+        return cat === selectedWorkCategory;
+      });
+    }
+
+    if (selectedStage !== 'all') {
+      list = list.filter((m: Measurement) => {
+        const item = m.boqItemId as any;
+        const st = (m as any).stage || item?.stage || '';
+        return st === selectedStage;
+      });
+    }
+
+    if (measurementSort === 'itemCode') {
+      list.sort((a, b) => (a.sourceItemCode || '').localeCompare(b.sourceItemCode || ''));
+    } else if (measurementSort === 'amountDesc') {
+      list.sort((a, b) => (b.amount || 0) - (a.amount || 0));
+    } else if (measurementSort === 'amountAsc') {
+      list.sort((a, b) => (a.amount || 0) - (b.amount || 0));
+    } else if (measurementSort === 'dateDesc') {
+      list.sort((a, b) => new Date(b.measurementDate).getTime() - new Date(a.measurementDate).getTime());
+    }
+
+    return list;
+  }, [safeMeasurements, measurementSearch, selectedWorkCategory, selectedStage, measurementSort]);
+
+  // Grouped Measurements by Category or Stage
+  const groupedMeasurements = useMemo((): Record<string, Measurement[]> => {
+    if (!stageGroupsEnabled) {
+      return { 'ALL MEASUREMENTS': filteredMeasurements };
+    }
+
+    const groups: Record<string, Measurement[]> = {};
+    filteredMeasurements.forEach((m: Measurement) => {
+      const item = m.boqItemId as any;
+      const groupKey = ((m as any).stage || (m as any).category || item?.stage || item?.workCategory || 'UNCATEGORIZED').toUpperCase();
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(m);
+    });
+
+    return groups;
+  }, [filteredMeasurements, stageGroupsEnabled]);
+
+  // Grand Total for Filtered Measurements
+  const measurementGrandTotal = useMemo(() => {
+    return filteredMeasurements.reduce((sum: number, m: Measurement) => {
+      const item = m.boqItemId as any;
+      const rate = m.unitRate ?? item?.rate ?? 0;
+      const qty = typeof m.totalQuantity === 'number' ? m.totalQuantity : 0;
+      const amt = typeof m.amount === 'number' ? m.amount : (qty * rate);
+      return sum + (m.isReversed ? 0 : amt);
+    }, 0);
+  }, [filteredMeasurements]);
+
+  const availableWorkCategories = useMemo(() => {
+    const cats = new Set<string>();
+    safeMeasurements.forEach((m: Measurement) => {
+      const item = m.boqItemId as any;
+      const cat = (m as any).category || item?.workCategory || item?.chapter;
+      if (cat) cats.add(cat);
+    });
+    return Array.from(cats);
+  }, [safeMeasurements]);
+
+  const availableStages = useMemo(() => {
+    const stages = new Set<string>();
+    safeMeasurements.forEach((m: Measurement) => {
+      const item = m.boqItemId as any;
+      const st = (m as any).stage || item?.stage;
+      if (st) stages.add(st);
+    });
+    return Array.from(stages);
+  }, [safeMeasurements]);
+
+  if (isProjectLoading) {
+    return (
+      <div className="min-h-screen bg-[#080a0f] text-slate-300">
+        <Header breadcrumbs={[{ label: 'Dashboard', path: '/' }, { label: 'Project Workspace' }]} onToggleSidebar={() => setSidebarOpen(true)} />
+        <div className="p-16 text-center text-sm text-slate-400 font-medium">Loading Project Workspace...</div>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-[#080a0f] text-slate-300">
+        <Header breadcrumbs={[{ label: 'Dashboard', path: '/' }, { label: 'Project Workspace' }]} onToggleSidebar={() => setSidebarOpen(true)} />
+        <div className="max-w-md mx-auto mt-20 p-8 glass-panel rounded-2xl border border-slate-800 text-center space-y-4 shadow-2xl">
+          <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto" />
+          <h2 className="text-lg font-bold text-white">Project Not Found</h2>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            This project could not be found or may have been moved to the recycle bin.
+          </p>
+          <Button onClick={() => navigate('/')} size="sm">
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
       <Header
-        breadcrumbs={[{ label: 'Dashboard', path: '/' }, { label: 'Project', path: '/' }, { label: project.name }]}
+        breadcrumbs={
+          parentProject
+            ? [
+                { label: 'Dashboard', path: '/' },
+                { label: parentProject.name, path: `/projects/${parentProject._id}` },
+                { label: project.name, path: `/projects/${project._id}` },
+                { label: activeTab === 'measurements' ? 'Measurements' : (activeTab === 'boq' ? 'BOQ' : activeTab) },
+              ]
+            : [
+                { label: 'Dashboard', path: '/' },
+                { label: project.name },
+              ]
+        }
         onToggleSidebar={() => setSidebarOpen(true)}
       />
 
       <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+        {/* Sub-Project Parent Association Banner */}
+        {parentProject && (
+          <div className="flex items-center justify-between p-3 px-4 rounded-xl bg-gradient-to-r from-blue-900/30 to-indigo-900/20 border border-blue-500/40 text-xs shadow-lg">
+            <div className="flex items-center gap-2.5">
+              <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold uppercase text-[10px] tracking-wider border border-blue-500/30">
+                Sub-Project / Package
+              </span>
+              <span className="text-slate-300">
+                Child of Master Project: <strong className="text-white font-semibold">{parentProject.name}</strong> ({parentProject.code})
+              </span>
+            </div>
+            <button
+              onClick={() => navigate(`/projects/${parentProject._id}`)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/30 font-medium transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Master Project</span>
+            </button>
+          </div>
+        )}
+
         {/* Project Profile Banner */}
         <div className="glass-panel rounded-2xl p-6 border border-erp-border relative overflow-hidden shadow-2xl">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -440,16 +767,53 @@ export const ProjectWorkspace: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-6 border-t lg:border-t-0 lg:border-l border-erp-border pt-4 lg:pt-0 lg:pl-6">
-              <div>
-                <span className="text-[11px] text-erp-text-subtle uppercase block font-mono">Contract Value</span>
-                <span className="text-xl font-bold text-erp-text">
-                  {formatCurrency(project.contractValue || project.estimatedValue, project.currency)}
-                </span>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              <div className="flex items-center gap-6 border-t lg:border-t-0 lg:border-l border-erp-border pt-4 lg:pt-0 lg:pl-6">
+                <div>
+                  <span className="text-[11px] text-erp-text-subtle uppercase block font-mono">Contract Value</span>
+                  <span className="text-xl font-bold text-erp-text">
+                    {formatCurrency(project.contractValue || project.estimatedValue, project.currency)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[11px] text-erp-text-subtle uppercase block font-mono">Overall Progress</span>
+                  <span className="text-xl font-bold text-blue-400">{project.progress}%</span>
+                </div>
               </div>
-              <div>
-                <span className="text-[11px] text-erp-text-subtle uppercase block font-mono">Overall Progress</span>
-                <span className="text-xl font-bold text-blue-400">{project.progress}%</span>
+
+              {/* Action Buttons from Screenshot 1 */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => alert('Exporting Project Excel workbook...')}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Export Excel</span>
+                </button>
+                {!isSubProject ? (
+                  <button
+                    type="button"
+                    onClick={() => openCreateSubProjectModal()}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add Sub-Project</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingMeasurement(null);
+                      setInitialBoqItemForMeasurement(null);
+                      setIsSmartMeasurementModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ New Item</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -478,63 +842,301 @@ export const ProjectWorkspace: React.FC = () => {
             TAB 1: OVERVIEW
            ====================================================================== */}
         {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 glass-panel rounded-xl p-6 border border-erp-border space-y-4">
-              <h3 className="text-base font-semibold text-erp-text">Project Scope & Engineering Summary</h3>
-              <p className="text-sm text-erp-text-muted leading-relaxed whitespace-pre-wrap">
-                {project.description || 'No specific scope narrative documented.'}
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-erp-border/60 text-xs">
-                <div>
-                  <span className="text-erp-text-subtle block">Project Type</span>
-                  <span className="text-sm font-medium text-erp-text">{project.projectType}</span>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 glass-panel rounded-xl p-6 border border-erp-border space-y-4">
+                <h3 className="text-base font-semibold text-erp-text">Project Scope & Engineering Summary</h3>
+                <p className="text-sm text-erp-text-muted leading-relaxed whitespace-pre-wrap">
+                  {project.description || 'No specific scope narrative documented.'}
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-erp-border/60 text-xs">
+                  <div>
+                    <span className="text-erp-text-subtle block">Project Type</span>
+                    <span className="text-sm font-medium text-erp-text">{project.projectType}</span>
+                  </div>
+                  <div>
+                    <span className="text-erp-text-subtle block">Estimated Value</span>
+                    <span className="text-sm font-medium text-erp-text">{formatCurrency(project.estimatedValue, project.currency)}</span>
+                  </div>
+                  <div>
+                    <span className="text-erp-text-subtle block">Contract Value</span>
+                    <span className="text-sm font-medium text-erp-text">{formatCurrency(project.contractValue, project.currency)}</span>
+                  </div>
+                  <div>
+                    <span className="text-erp-text-subtle block">Phases</span>
+                    <span className="text-sm font-medium text-erp-text">{project.phases}</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-erp-text-subtle block">Estimated Value</span>
-                  <span className="text-sm font-medium text-erp-text">{formatCurrency(project.estimatedValue, project.currency)}</span>
-                </div>
-                <div>
-                  <span className="text-erp-text-subtle block">Contract Value</span>
-                  <span className="text-sm font-medium text-erp-text">{formatCurrency(project.contractValue, project.currency)}</span>
-                </div>
-                <div>
-                  <span className="text-erp-text-subtle block">Phases</span>
-                  <span className="text-sm font-medium text-erp-text">{project.phases}</span>
+              </div>
+
+              <div className="glass-panel rounded-xl p-6 border border-erp-border space-y-4">
+                <h3 className="text-base font-semibold text-erp-text">Module Readiness</h3>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-erp-border">
+                    <span className="text-erp-text">BOQ Items</span>
+                    <span className="font-bold text-blue-400">{safeBoqItems.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-erp-border">
+                    <span className="text-erp-text">Approved Measurements</span>
+                    <span className="font-bold text-emerald-400">{measurements.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-erp-border">
+                    <span className="text-erp-text">Sub-Projects Configured</span>
+                    <span className="font-bold text-indigo-400">{subProjects.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-erp-border">
+                    <span className="text-erp-text">Running Bills</span>
+                    <span className="font-bold text-purple-400">{runningBills.length}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="glass-panel rounded-xl p-6 border border-erp-border space-y-4">
-              <h3 className="text-base font-semibold text-erp-text">Module Readiness</h3>
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-erp-border">
-                  <span className="text-erp-text">BOQ Items</span>
-                  <span className="font-bold text-blue-400">{boqItems.length}</span>
+            {/* Sub-Projects & Quantity Master Summary Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Sub-Projects Snapshot Card */}
+              <div className="glass-panel rounded-xl p-6 border border-erp-border space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-erp-text flex items-center gap-2">
+                    <FolderTree className="w-4 h-4 text-blue-400" />
+                    Sub-Projects & Packages ({subProjects.length})
+                  </h3>
+                  <button
+                    onClick={() => setActiveTab('subprojects')}
+                    className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <span>Manage</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
                 </div>
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-erp-border">
-                  <span className="text-erp-text">Approved Measurements</span>
-                  <span className="font-bold text-emerald-400">{measurements.length}</span>
+                {subProjects.length === 0 ? (
+                  <div className="p-6 rounded-xl bg-slate-900/60 border border-erp-border text-center space-y-2">
+                    <p className="text-xs text-slate-400">No sub-projects partitioned yet under this project.</p>
+                    <button
+                      onClick={() => openCreateSubProjectModal()}
+                      className="px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/30 text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Create Sub-Project</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                    {subProjects.slice(0, 4).map((sp) => (
+                      <div
+                        key={sp._id}
+                        onClick={() => navigate(`/projects/${sp._id}`)}
+                        className="p-3 rounded-lg bg-slate-900/70 border border-erp-border hover:border-blue-500/40 flex items-center justify-between gap-3 text-xs cursor-pointer transition-all"
+                      >
+                        <div>
+                          <div className="font-semibold text-white flex items-center gap-2">
+                            <span className="font-mono text-[11px] text-blue-400">{sp.code}</span>
+                            <span>{sp.name}</span>
+                          </div>
+                          <span className="text-[11px] text-slate-400">
+                            Budget: {formatCurrency(sp.contractValue || sp.estimatedValue, sp.currency)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-semibold text-emerald-400">{sp.progress || 0}%</span>
+                          <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Automated Resource Engine Breakdown Card */}
+              <div className="glass-panel rounded-xl p-6 border border-erp-border space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-erp-text flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-400" />
+                    Quantity Master Automated Breakdown
+                  </h3>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                    Measurement-Driven
+                  </span>
                 </div>
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-erp-border">
-                  <span className="text-erp-text">Running Bills</span>
-                  <span className="font-bold text-purple-400">{runningBills.length}</span>
+                <div className="grid grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 rounded-lg bg-slate-900 border border-erp-border text-center">
+                    <span className="text-slate-400 block text-[10px] uppercase">Materials (BOM)</span>
+                    <span className="text-sm font-bold text-blue-400 block mt-1">{bomItems.length} items</span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      ₹{bomItems.reduce((s, m) => s + (m.executedAmount || m.amount || 0), 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-900 border border-erp-border text-center">
+                    <span className="text-slate-400 block text-[10px] uppercase">Manpower</span>
+                    <span className="text-sm font-bold text-purple-400 block mt-1">{manpowerItems.length} trades</span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      ₹{manpowerItems.reduce((s, m) => s + (m.executedAmount || m.amount || 0), 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-900 border border-erp-border text-center">
+                    <span className="text-slate-400 block text-[10px] uppercase">Machinery</span>
+                    <span className="text-sm font-bold text-amber-400 block mt-1">{machineryItems.length} units</span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      ₹{machineryItems.reduce((s, m) => s + (m.executedAmount || m.amount || 0), 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
                 </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Materials, manpower mandays, and machinery hours are continuously recalculated via live engineering formulas from Quantity Master as measurements are entered.
+                </p>
               </div>
             </div>
           </div>
         )}
 
         {/* ======================================================================
+            TAB: SUB-PROJECTS
+           ====================================================================== */}
+        {activeTab === 'subprojects' && (
+          <div className="space-y-5">
+            {/* Master Project Architecture Alert */}
+            <div className="p-3.5 px-4 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-between gap-4 text-xs text-blue-300 shadow-sm">
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+                <span>
+                  <strong>Master Project Architecture:</strong> Direct BOQ and measurements are disabled at the Master Project level. All civil measurements, detailed BOQs, and resource breakdowns are managed inside individual <strong>Sub-Projects</strong> below.
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-erp-text flex items-center gap-2">
+                  <FolderTree className="w-5 h-5 text-blue-400" />
+                  Sub-Projects & Work Packages
+                </h3>
+                <p className="text-xs text-erp-text-muted">
+                  Deconstruct this master project into discrete towers, phases, or civil packages with autonomous BOQs and measurements.
+                </p>
+              </div>
+              <Button
+                onClick={() => openCreateSubProjectModal()}
+                leftIcon={<Plus className="w-4 h-4" />}
+                size="sm"
+              >
+                Create Sub-Project
+              </Button>
+            </div>
+
+            {subProjects.length === 0 ? (
+              <div className="glass-panel rounded-2xl p-12 text-center border border-erp-border space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto shadow-glow">
+                  <FolderTree className="w-8 h-8" />
+                </div>
+                <div className="max-w-md mx-auto space-y-1">
+                  <h4 className="text-base font-bold text-white">No Sub-Projects Configured Yet</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Break down "{project.name}" into sub-projects (e.g. Tower A, Foundation & Sub-structure, Podium, Finishing Works). Each sub-project has its own autonomous measurements, BOQ, and resource analysis.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => openCreateSubProjectModal()}
+                  leftIcon={<Plus className="w-4 h-4" />}
+                  size="sm"
+                >
+                  Create First Sub-Project
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {subProjects.map((sp) => {
+                  return (
+                    <div
+                      key={sp._id}
+                      className="glass-panel rounded-xl p-5 border border-erp-border hover:border-blue-500/40 transition-all duration-200 flex flex-col justify-between space-y-4 group shadow-lg hover:shadow-blue-500/10"
+                    >
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-blue-400 border border-slate-700">
+                            {sp.code}
+                          </span>
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full capitalize bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                            {sp.status}
+                          </span>
+                        </div>
+                        <div>
+                          <h4 className="text-base font-bold text-white group-hover:text-blue-400 transition-colors">
+                            {sp.name}
+                          </h4>
+                          {sp.description && (
+                            <p className="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">
+                              {sp.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 pt-3 border-t border-erp-border/60 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Budget / Value</span>
+                          <span className="font-bold text-white">
+                            {formatCurrency(sp.contractValue || sp.estimatedValue, sp.currency)}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-400">Execution Progress</span>
+                            <span className="font-semibold text-blue-400">{sp.progress || 0}%</span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
+                              style={{ width: `${Math.min(100, Math.max(0, sp.progress || 0))}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => navigate(`/projects/${sp._id}`)}
+                          className="w-full mt-2 py-2 px-3 rounded-lg bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                        >
+                          <span>Open Sub-Project Workspace</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ======================================================================
             TAB 2: BOQ / ABSTRACT
            ====================================================================== */}
-        {activeTab === 'boq' && (
+        {activeTab === 'boq' && !isSubProject && (
+          <div className="glass-panel p-8 rounded-2xl border border-erp-border text-center space-y-4 max-w-xl mx-auto my-12 shadow-xl">
+            <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto">
+              <FolderTree className="w-7 h-7" />
+            </div>
+            <h3 className="text-lg font-bold text-white">Direct BOQ is Disabled at Master Project Level</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              In this architecture, BOQs and measurements cannot be created directly at the root project level. All work breakdown, measurement books, and BOQ schedules belong inside individual <strong>Sub-Projects</strong>.
+            </p>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <Button onClick={() => setActiveTab('subprojects')} size="sm" leftIcon={<FolderTree className="w-4 h-4" />}>
+                Go to Sub-Projects
+              </Button>
+              <Button onClick={() => openCreateSubProjectModal()} variant="outline" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+                + Add Sub-Project
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'boq' && isSubProject && (
           <div className="space-y-4">
             {/* BOQ Header Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-lg font-bold text-erp-text">Bill of Quantities (BOQ) & Abstract</h3>
                 <p className="text-xs text-erp-text-muted">
-                  Schedule items with immutable SOR rate snapshots and automated measurement-driven quantity amounts.
+                  Abstracted schedule of quantities auto-derived directly from detailed Measurement Book entries.
                 </p>
               </div>
 
@@ -548,15 +1150,7 @@ export const ProjectWorkspace: React.FC = () => {
                   }}
                   leftIcon={<Plus className="w-4 h-4" />}
                 >
-                  Add Measurement / Item
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsAddBoqModalOpen(true)}
-                  leftIcon={<Settings2 className="w-4 h-4 text-blue-400" />}
-                >
-                  Add Custom Item
+                  + Record Measurement
                 </Button>
               </div>
             </div>
@@ -564,8 +1158,8 @@ export const ProjectWorkspace: React.FC = () => {
             {/* BOQ Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="glass-panel p-4 rounded-xl border border-erp-border">
-                <span className="text-xs text-erp-text-subtle uppercase block">Total BOQ Items</span>
-                <span className="text-2xl font-bold text-erp-text">{boqItems.length}</span>
+                <span className="text-xs text-erp-text-subtle uppercase block">Total Abstract Items</span>
+                <span className="text-2xl font-bold text-erp-text">{safeBoqItems.length}</span>
               </div>
               <div className="glass-panel p-4 rounded-xl border border-erp-border">
                 <span className="text-xs text-erp-text-subtle uppercase block">Total BOQ Value</span>
@@ -584,7 +1178,7 @@ export const ProjectWorkspace: React.FC = () => {
               <div className="flex items-center gap-2.5 text-xs text-blue-300">
                 <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
                 <span>
-                  <strong>Measurement-Driven BOQ:</strong> Item quantities and amounts are derived directly from detailed measurements. Recording or editing measurements instantly cascades updates to BOQ, BOM, Manpower, and Machinery.
+                  <strong>Measurement-Driven BOQ:</strong> Quantities and amounts are derived directly from approved Measurement Book entries. Recording measurements instantly updates this abstract, along with BOM, Manpower, and Machinery.
                 </span>
               </div>
             </div>
@@ -608,14 +1202,14 @@ export const ProjectWorkspace: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-erp-border/60">
-                    {boqItems.length === 0 ? (
+                    {safeBoqItems.length === 0 ? (
                       <tr>
                         <td colSpan={10} className="py-12 text-center text-erp-text-muted">
-                          No BOQ items yet. Click "Add Measurement / Item" above to search DSR/SOR and enter dimensions.
+                          No abstract items generated yet. Click "+ Record Measurement" above to enter dimensions and auto-generate this BOQ.
                         </td>
                       </tr>
                     ) : (
-                      boqItems.map((item, idx) => (
+                      safeBoqItems.map((item: BoqItem, idx: number) => (
                         <tr key={item._id} className="hover:bg-slate-850/50 transition-colors">
                           <td className="py-3 px-3 text-center text-erp-text-subtle font-mono">{idx + 1}</td>
                           <td className="py-3 px-3 font-mono font-bold text-blue-400">
@@ -712,221 +1306,386 @@ export const ProjectWorkspace: React.FC = () => {
         )}
 
         {/* ======================================================================
-            TAB 3: MEASUREMENTS (MB)
+            TAB 3: MEASUREMENTS (MB) - Exact UI Matching Screenshot
            ====================================================================== */}
         {activeTab === 'measurements' && (
-          <div className="space-y-5">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-bold text-erp-text">Measurement Book (MB)</h3>
-                <p className="text-xs text-erp-text-muted">
-                  Single source of truth: Record dimensions to automatically compute BOQ, BOM, Manpower, and Machinery.
-                </p>
+          <div className="space-y-4">
+            {/* Top Title & Actions Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl font-bold text-white tracking-tight">Measurement Book</h3>
+                <button
+                  type="button"
+                  title="Single source of truth for all project quantities & resource calculations"
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                {/* Active SOR Schedule Pill */}
+                <div className="px-3 py-1.5 rounded-lg bg-[#121620] border border-slate-750 text-xs font-medium text-slate-300">
+                  CPWD SOR 2023 (4060 items)
+                </div>
+
+                {/* Browse Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsSorSelectModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-[#181c28] hover:bg-[#222838] border border-slate-750 text-xs font-medium text-slate-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Search className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Browse</span>
+                </button>
+
+                {/* BOM Rate List Dropdown */}
+                <select
+                  aria-label="BOM Rate List"
+                  className="px-3 py-1.5 rounded-lg bg-[#121620] border border-slate-750 text-xs text-slate-300 focus:outline-none cursor-pointer"
+                >
+                  <option>-- BOM Rate List --</option>
+                  <option>CPWD Standard Norms</option>
+                  <option>Market Rates 2026</option>
+                  <option>Delhi DSR Schedule</option>
+                </select>
+
+                {/* Export Button */}
+                <button
+                  type="button"
+                  onClick={handleExportMeasurementsExcel}
+                  className="px-3 py-1.5 rounded-lg bg-[#181c28] hover:bg-[#222838] border border-slate-750 text-xs font-medium text-slate-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Export</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                </button>
+
+                {/* Import Button */}
+                <button
+                  type="button"
                   onClick={() => {
                     setEditingMeasurement(null);
                     setInitialBoqItemForMeasurement(null);
                     setIsSmartMeasurementModalOpen(true);
                   }}
-                  leftIcon={<Plus className="w-4 h-4" />}
+                  className="px-3 py-1.5 rounded-lg bg-[#181c28] hover:bg-[#222838] border border-slate-750 text-xs font-medium text-slate-300 flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  Record New Measurement
-                </Button>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Import</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                </button>
+
+                {/* Primary Action Button: + New Item */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingMeasurement(null);
+                    setInitialBoqItemForMeasurement(null);
+                    setIsSmartMeasurementModalOpen(true);
+                  }}
+                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-xs font-semibold text-white flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ New Item</span>
+                </button>
               </div>
             </div>
 
-            {/* Dashboard Summary Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <div className="glass-panel p-3.5 rounded-xl border border-erp-border">
-                <span className="text-[10px] text-erp-text-subtle uppercase block font-semibold">Total Measurements</span>
-                <span className="text-xl font-bold text-erp-text mt-0.5 block">
-                  {measurementSummary?.totalMeasurements ?? measurements.length}
-                </span>
-                <span className="text-[10px] text-slate-400 mt-1 block">Active Entries</span>
+            {/* Section Header */}
+            <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
+                <span className="w-3.5 h-3.5 rounded bg-blue-600/30 border border-blue-500 flex items-center justify-center text-[9px] text-blue-400 font-bold">▦</span>
+                <span>MEASUREMENT BOOK</span>
               </div>
-              <div className="glass-panel p-3.5 rounded-xl border border-erp-border">
-                <span className="text-[10px] text-erp-text-subtle uppercase block font-semibold">Total BOQ Executed</span>
-                <span className="text-xl font-bold text-blue-400 mt-0.5 block">
-                  {formatCurrency(measurementSummary?.totalBoqAmount ?? 0, 'INR')}
-                </span>
-                <span className="text-[10px] text-blue-300/70 mt-1 block">Value of Work</span>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                {filteredMeasurements.length} ITEMS
+              </span>
+            </div>
+
+            {/* Filter & Sort Toolbar (Exact match from screenshot) */}
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3 bg-[#0d1017] rounded-xl border border-slate-800 text-xs">
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={measurementSearch}
+                  onChange={(e) => setMeasurementSearch(e.target.value)}
+                  placeholder="Search description / SOR / remarks ->"
+                  className="w-full pl-8 pr-3 py-1.5 bg-[#080a0f] border border-slate-750 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                />
               </div>
-              <div className="glass-panel p-3.5 rounded-xl border border-erp-border">
-                <span className="text-[10px] text-erp-text-subtle uppercase block font-semibold">Material Cost</span>
-                <span className="text-xl font-bold text-emerald-400 mt-0.5 block">
-                  {formatCurrency(measurementSummary?.totalMaterialCost ?? 0, 'INR')}
-                </span>
-                <span className="text-[10px] text-emerald-300/70 mt-1 block">BOM Consumption</span>
-              </div>
-              <div className="glass-panel p-3.5 rounded-xl border border-erp-border">
-                <span className="text-[10px] text-erp-text-subtle uppercase block font-semibold">Labour Cost</span>
-                <span className="text-xl font-bold text-amber-400 mt-0.5 block">
-                  {formatCurrency(measurementSummary?.totalManpowerCost ?? 0, 'INR')}
-                </span>
-                <span className="text-[10px] text-amber-300/70 mt-1 block">Manpower Wages</span>
-              </div>
-              <div className="glass-panel p-3.5 rounded-xl border border-erp-border">
-                <span className="text-[10px] text-erp-text-subtle uppercase block font-semibold">Machinery Cost</span>
-                <span className="text-xl font-bold text-purple-400 mt-0.5 block">
-                  {formatCurrency(measurementSummary?.totalMachineryCost ?? 0, 'INR')}
-                </span>
-                <span className="text-[10px] text-purple-300/70 mt-1 block">Plant & Equipment</span>
-              </div>
-              <div className="glass-panel p-3.5 rounded-xl border border-erp-border bg-gradient-to-br from-blue-950/20 to-slate-900/60">
-                <span className="text-[10px] text-erp-text-subtle uppercase block font-semibold">Total Direct Cost</span>
-                <span className="text-xl font-bold text-cyan-400 mt-0.5 block">
-                  {formatCurrency(measurementSummary?.totalProjectCost ?? 0, 'INR')}
-                </span>
-                <span className="text-[10px] text-cyan-300/70 mt-1 block">Direct Execution</span>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  aria-label="Sort order"
+                  value={measurementSort}
+                  onChange={(e) => setMeasurementSort(e.target.value)}
+                  className="px-2.5 py-1.5 bg-[#080a0f] border border-slate-750 rounded-lg text-xs text-slate-300 focus:outline-none cursor-pointer"
+                >
+                  <option value="default">Sort: Default order (manual)</option>
+                  <option value="itemCode">Sort: Item Code (A-Z)</option>
+                  <option value="amountDesc">Sort: Amount (High to Low)</option>
+                  <option value="amountAsc">Sort: Amount (Low to High)</option>
+                  <option value="dateDesc">Sort: Date (Newest)</option>
+                </select>
+
+                <select
+                  aria-label="Work category filter"
+                  value={selectedWorkCategory}
+                  onChange={(e) => setSelectedWorkCategory(e.target.value)}
+                  className="px-2.5 py-1.5 bg-[#080a0f] border border-slate-750 rounded-lg text-xs text-slate-300 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Work: All work categories</option>
+                  {availableWorkCategories.map((cat: string) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+
+                <select
+                  aria-label="Stage filter"
+                  value={selectedStage}
+                  onChange={(e) => setSelectedStage(e.target.value)}
+                  className="px-2.5 py-1.5 bg-[#080a0f] border border-slate-750 rounded-lg text-xs text-slate-300 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Stage: All stages</option>
+                  {availableStages.map((st: string) => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+
+                <label className="flex items-center gap-1.5 text-slate-300 px-2 py-1 select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={stageGroupsEnabled}
+                    onChange={(e) => setStageGroupsEnabled(e.target.checked)}
+                    className="rounded bg-slate-800 border-slate-750 text-blue-600 focus:ring-0 cursor-pointer"
+                  />
+                  <span>Stage groups</span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMeasurementSearch('');
+                    setMeasurementSort('default');
+                    setSelectedWorkCategory('all');
+                    setSelectedStage('all');
+                    setStageGroupsEnabled(true);
+                  }}
+                  className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 px-1 transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset</span>
+                </button>
               </div>
             </div>
 
-            {/* Single Source of Truth Banner */}
-            <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2.5 text-xs text-blue-300">
-                <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>
-                  <strong>Measurement is Single Source of Truth:</strong> Adding, editing, duplicating, or reversing an entry updates the Measurement Book, BOQ item quantity, Bill of Materials, Bill of Manpower, and Bill of Machinery simultaneously.
-                </span>
-              </div>
-            </div>
+            {/* Group Accordions & Items List */}
+            <div className="rounded-xl border border-slate-800 bg-[#080a0f] overflow-hidden">
+              {filteredMeasurements.length === 0 ? (
+                <div className="py-16 text-center text-slate-400 space-y-3">
+                  <Ruler className="w-8 h-8 text-slate-600 mx-auto" />
+                  <p className="text-sm font-medium">No measurement items recorded yet.</p>
+                  <p className="text-xs text-slate-500">Click "+ New Item" above to record dimensions and calculate quantities.</p>
+                </div>
+              ) : (
+                Object.entries(groupedMeasurements).map(([groupName, groupItems]: [string, Measurement[]]) => {
+                  const isCollapsed = Boolean(collapsedGroups[groupName]);
+                  const groupTotal = groupItems.reduce((acc: number, m: Measurement) => {
+                    const item = m.boqItemId as any;
+                    const r = m.unitRate ?? item?.rate ?? 0;
+                    const q = typeof m.totalQuantity === 'number' ? m.totalQuantity : 0;
+                    return acc + (m.isReversed ? 0 : (typeof m.amount === 'number' ? m.amount : q * r));
+                  }, 0);
 
-            {/* Measurement List */}
-            <div className="glass-panel rounded-xl border border-erp-border overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900/90 text-erp-text-muted border-b border-erp-border">
-                    <tr>
-                      <th className="py-3 px-3 w-24">Date</th>
-                      <th className="py-3 px-3 w-28">Item Code</th>
-                      <th className="py-3 px-4">Description / Location</th>
-                      <th className="py-3 px-2 text-center">Formula</th>
-                      <th className="py-3 px-2 text-center">Nos</th>
-                      <th className="py-3 px-2 text-center">L (m)</th>
-                      <th className="py-3 px-2 text-center">W / B (m)</th>
-                      <th className="py-3 px-2 text-center">H / D (m)</th>
-                      <th className="py-3 px-3 text-right font-semibold">Entry Qty</th>
-                      <th className="py-3 px-3 text-right font-semibold">Cumulative</th>
-                      <th className="py-3 px-3 text-right font-semibold">Item Amount (₹)</th>
-                      <th className="py-3 px-2 text-center">Status</th>
-                      <th className="py-3 px-3 text-center w-28">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-erp-border/60">
-                    {measurements.length === 0 ? (
-                      <tr>
-                        <td colSpan={13} className="py-12 text-center text-erp-text-muted">
-                          No measurement entries recorded yet. Click "Record New Measurement" above to get started.
-                        </td>
-                      </tr>
-                    ) : (
-                      measurements.map((m) => {
-                        const entry = m.entries[0] || {};
-                        const item = m.boqItemId;
-                        const itemRate = m.unitRate ?? (typeof item === 'object' ? item?.rate : 0) ?? 0;
-                        const itemAmount = m.amount ?? (m.totalQuantity * itemRate);
+                  return (
+                    <div key={groupName} className="border-b border-slate-800/80 last:border-b-0">
+                      {/* Accordion Group Header matching Screenshot */}
+                      <div
+                        onClick={() => setCollapsedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }))}
+                        className="px-4 py-2.5 bg-[#0d1017] hover:bg-[#121622] flex items-center justify-between text-xs font-bold text-slate-300 cursor-pointer transition-colors border-y border-slate-800/60"
+                      >
+                        <div className="flex items-center gap-2">
+                          <ChevronDown className={cn('w-4 h-4 text-slate-400 transition-transform', isCollapsed && '-rotate-90')} />
+                          <span className="uppercase tracking-wider">{groupName}</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono font-normal">
+                            {groupItems.length} {groupItems.length === 1 ? 'ITEM' : 'ITEMS'}
+                          </span>
+                        </div>
+                        <span className="font-mono font-bold text-white text-sm">
+                          {formatCurrency(groupTotal, 'INR')}
+                        </span>
+                      </div>
 
-                        return (
-                          <tr key={m._id} className={cn('hover:bg-slate-850/50 transition-colors', m.isReversed && 'opacity-60 bg-red-950/10')}>
-                            <td className="py-3 px-3 font-mono text-erp-text-muted">{formatDate(m.measurementDate)}</td>
-                            <td className="py-3 px-3 font-mono font-bold text-blue-400">
-                              {m.sourceItemCode || (typeof item === 'object' ? item?.itemCode : 'BOQ Item')}
-                            </td>
-                            <td className="py-3 px-4 text-erp-text max-w-xs">
-                              <p className={cn('font-medium', m.isReversed && 'line-through text-slate-400')}>{entry.description}</p>
-                              {entry.location && (
-                                <p className="text-[10px] text-slate-400 mt-0.5">
-                                  {entry.location} {entry.levelFloor ? `• ${entry.levelFloor}` : ''}
-                                </p>
-                              )}
-                              {m.isReversed && m.reversalReason && (
-                                <p className="text-[10px] text-red-400 mt-0.5">
-                                  <strong>Reversal Note:</strong> {m.reversalReason}
-                                </p>
-                              )}
-                            </td>
-                            <td className="py-3 px-2 text-center font-mono text-slate-400">{entry.formula || 'LxWxH'}</td>
-                            <td className="py-3 px-2 text-center font-mono">{entry.nos || 1}</td>
-                            <td className="py-3 px-2 text-center font-mono">{entry.length || '-'}</td>
-                            <td className="py-3 px-2 text-center font-mono">{entry.width || entry.breadth || '-'}</td>
-                            <td className="py-3 px-2 text-center font-mono">{entry.heightDepth || entry.height || entry.depth || '-'}</td>
-                            <td className="py-3 px-3 text-right font-bold text-emerald-400">
-                              {m.totalQuantity} {entry.unit}
-                            </td>
-                            <td className="py-3 px-3 text-right font-mono text-slate-300">
-                              {m.cumulativeQuantity ? `${m.cumulativeQuantity} ${entry.unit}` : `${m.totalQuantity} ${entry.unit}`}
-                            </td>
-                            <td className="py-3 px-3 text-right font-bold text-blue-400">
-                              {formatCurrency(itemAmount, 'INR')}
-                            </td>
-                            <td className="py-3 px-2 text-center">
-                              {m.isReversed ? (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-red-500/20 text-red-300 border border-red-500/30" title={m.reversalReason || 'Reversed'}>
-                                  Reversed
-                                </span>
-                              ) : (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                  {m.status || 'Approved'}
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                {!m.isReversed && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setEditingMeasurement(m);
-                                        setInitialBoqItemForMeasurement(null);
-                                        setIsSmartMeasurementModalOpen(true);
-                                      }}
-                                      className="p-1 rounded text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
-                                      title="Edit measurement & recalculate all downstream resources"
-                                    >
-                                      <Edit2 className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => duplicateMeasurementMutation.mutate(m._id)}
-                                      disabled={duplicateMeasurementMutation.isPending}
-                                      className="p-1 rounded text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
-                                      title="Duplicate measurement entry"
-                                    >
-                                      <Copy className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (m.status === 'Approved') {
-                                          setReversalModalMeasurement(m);
-                                          setReversalReason('');
-                                        } else {
-                                          if (confirm('Are you sure you want to delete this measurement? All derived resources will be adjusted.')) {
-                                            deleteMeasurementMutation.mutate(m._id);
+                      {/* Items in this group */}
+                      {!isCollapsed && (
+                        <div className="divide-y divide-slate-800/60">
+                          {groupItems.map((m: Measurement, idx: number) => {
+                            const entries = Array.isArray(m?.entries) ? m.entries : [];
+                            const entry = entries[0] || {};
+                            const item = m?.boqItemId as any;
+                            const itemRate = m?.unitRate ?? item?.rate ?? 0;
+                            const totalQty = typeof m?.totalQuantity === 'number' ? m.totalQuantity : 0;
+                            const itemAmount = typeof m?.amount === 'number' ? m.amount : (totalQty * itemRate);
+                            const displayUnit = entry.unit || item?.unit || 'cum';
+                            const isExpanded = Boolean(expandedRows[m._id]);
+                            const isSelected = Boolean(selectedMeasurementIds[m._id]);
+
+                            return (
+                              <div key={m._id} className={cn('transition-colors', m.isReversed ? 'opacity-60 bg-red-950/10' : 'hover:bg-slate-900/40')}>
+                                {/* Main Item Row matching screenshot */}
+                                <div className="p-3 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                  {/* Left: Checkbox, Index, Dot, Pill, Description */}
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={(e) => setSelectedMeasurementIds((prev) => ({ ...prev, [m._id]: e.target.checked }))}
+                                      className="rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-0 cursor-pointer"
+                                    />
+                                    <span className="text-slate-400 font-mono text-[11px] w-4 text-center">{idx + 1}</span>
+                                    <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                                    <span className="font-bold text-slate-300 shrink-0">
+                                      SOR {m.sourceItemCode || item?.itemCode || '14.78'}
+                                    </span>
+                                    <span className="font-semibold text-white truncate max-w-sm sm:max-w-md md:max-w-lg" title={entry.description || item?.description}>
+                                      {entry.description || item?.description || 'Cleaning of under ground sump...'}
+                                    </span>
+                                  </div>
+
+                                  {/* Right: Quantity, Unit, Rate, Amount, Actions */}
+                                  <div className="flex items-center gap-5 shrink-0 font-mono">
+                                    <div className="text-right">
+                                      <span className="font-bold text-white text-xs">{totalQty.toFixed(2)}</span>
+                                    </div>
+                                    <div className="w-10 text-left text-slate-400">
+                                      {displayUnit}
+                                    </div>
+                                    <div className="text-right text-slate-300 w-16">
+                                      ₹{itemRate.toFixed(2)}
+                                    </div>
+                                    <div className="text-right font-bold text-blue-400 text-sm min-w-[90px]">
+                                      {formatCurrency(itemAmount, 'INR')}
+                                    </div>
+
+                                    {/* Action Icons */}
+                                    <div className="flex items-center gap-1.5 pl-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedRows((prev) => ({ ...prev, [m._id]: !prev[m._id] }))}
+                                        className="w-6 h-6 rounded-full bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 flex items-center justify-center transition-colors cursor-pointer"
+                                        title={isExpanded ? 'Collapse dimensions' : 'Expand dimensions breakdown'}
+                                      >
+                                        <Plus className={cn('w-3.5 h-3.5 transition-transform', isExpanded && 'rotate-45 text-amber-400')} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingMeasurement(m);
+                                          setInitialBoqItemForMeasurement(null);
+                                          setIsSmartMeasurementModalOpen(true);
+                                        }}
+                                        className="p-1 rounded text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors cursor-pointer"
+                                        title="Edit measurement"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => duplicateMeasurementMutation.mutate(m._id)}
+                                        disabled={duplicateMeasurementMutation.isPending}
+                                        className="p-1 rounded text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                                        title="Duplicate entry"
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (m.status === 'Approved') {
+                                            setReversalModalMeasurement(m);
+                                            setReversalReason('');
+                                          } else {
+                                            if (confirm('Delete this measurement entry? Derived BOQ and resources will be updated.')) {
+                                              deleteMeasurementMutation.mutate(m._id);
+                                            }
                                           }
-                                        }
-                                      }}
-                                      className="p-1 rounded text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                      title={m.status === 'Approved' ? 'Audit-compliant reversal' : 'Delete measurement'}
-                                    >
-                                      {m.status === 'Approved' ? <RotateCcw className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
-                                    </button>
-                                  </>
+                                        }}
+                                        className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                        title="Delete / Reverse entry"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Detailed Dimensions Spreadsheet Sub-Table */}
+                                {isExpanded && (
+                                  <div className="bg-[#06080d] p-3 px-6 border-t border-slate-800/80 animate-in fade-in slide-in-from-top-1">
+                                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                      <Ruler className="w-3 h-3 text-blue-400" />
+                                      <span>DIMENSION ENTRIES ({entries.length})</span>
+                                    </div>
+                                    <div className="overflow-x-auto rounded-lg border border-slate-800">
+                                      <table className="w-full text-left text-xs font-mono">
+                                        <thead className="bg-[#0d1017] text-slate-400 text-[10px] uppercase">
+                                          <tr>
+                                            <th className="py-2 px-3 w-8 text-center">#</th>
+                                            <th className="py-2 px-3">Description / Sub-item</th>
+                                            <th className="py-2 px-2 text-center">Formula</th>
+                                            <th className="py-2 px-2 text-right">Nos</th>
+                                            <th className="py-2 px-2 text-right">Length (m)</th>
+                                            <th className="py-2 px-2 text-right">Width (m)</th>
+                                            <th className="py-2 px-2 text-right">Height/Depth (m)</th>
+                                            <th className="py-2 px-3 text-right text-emerald-400">Total Qty ({displayUnit})</th>
+                                            <th className="py-2 px-3">Remarks</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800/60 bg-[#080a0f]">
+                                          {entries.map((ent: any, eIdx: number) => {
+                                            const nos = ent.nos ?? 1;
+                                            const l = ent.length || 0;
+                                            const w = ent.width || ent.breadth || 0;
+                                            const h = ent.heightDepth || ent.height || ent.depth || 0;
+                                            const rowQty = typeof ent.calculatedQuantity === 'number' ? ent.calculatedQuantity : (l * (w || 1) * (h || 1) * nos);
+
+                                            return (
+                                              <tr key={ent._id || eIdx} className="hover:bg-slate-850/30">
+                                                <td className="py-2 px-3 text-center text-slate-500 text-[11px]">{eIdx + 1}</td>
+                                                <td className="py-2 px-3 font-sans text-slate-200">{ent.description || 'Measured Sub-item'}</td>
+                                                <td className="py-2 px-2 text-center text-slate-400">{ent.formula || 'LxWxH'}</td>
+                                                <td className="py-2 px-2 text-right text-slate-300">{nos}</td>
+                                                <td className="py-2 px-2 text-right text-slate-300">{l ? l.toFixed(2) : '-'}</td>
+                                                <td className="py-2 px-2 text-right text-slate-300">{w ? w.toFixed(2) : '-'}</td>
+                                                <td className="py-2 px-2 text-right text-slate-300">{h ? h.toFixed(2) : '-'}</td>
+                                                <td className="py-2 px-3 text-right font-bold text-emerald-400">{rowQty.toFixed(2)}</td>
+                                                <td className="py-2 px-3 font-sans text-slate-400">{ent.remarks || '-'}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
                                 )}
                               </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+
+              {/* Grand Total Footer Bar */}
+              <div className="p-3.5 px-5 bg-[#080a0f] border-t border-slate-800 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-300">
+                <span>GRAND TOTAL ({filteredMeasurements.length} {filteredMeasurements.length === 1 ? 'ITEM' : 'ITEMS'})</span>
+                <span className="text-base font-bold text-white font-mono">
+                  {formatCurrency(measurementGrandTotal, 'INR')}
+                </span>
               </div>
             </div>
           </div>
@@ -2109,6 +2868,154 @@ export const ProjectWorkspace: React.FC = () => {
             </div>
           </form>
         )}
+      </Modal>
+
+      {/* 9. Modal: Create Sub-Project (Exact UI from Screenshot 1) */}
+      <Modal
+        isOpen={isAddSubProjectModalOpen}
+        onClose={() => setIsAddSubProjectModalOpen(false)}
+        title={`New Sub-Project for ${project?.name || 'Project'}`}
+        maxWidth="2xl"
+      >
+        <form onSubmit={handleCreateSubProject} className="space-y-4 pt-1">
+          {/* Row 1: Name * & Type */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={subProjectForm.name}
+                onChange={(e) => setSubProjectForm({ ...subProjectForm, name: e.target.value })}
+                placeholder=""
+                className="w-full px-3 py-2 bg-[#12141a] border border-slate-700/70 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Type
+              </label>
+              <input
+                type="text"
+                value={subProjectForm.projectType}
+                onChange={(e) => setSubProjectForm({ ...subProjectForm, projectType: e.target.value })}
+                placeholder="e.g. Villa, Road, Canal"
+                className="w-full px-3 py-2 bg-[#12141a] border border-slate-700/70 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Sub-projects group by this type (Villa, Road, Drain Line...)
+              </p>
+            </div>
+          </div>
+
+          {/* Row 2: Client / Owner, Location, Department */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Client / Owner
+              </label>
+              <input
+                type="text"
+                value={subProjectForm.clientName}
+                onChange={(e) => setSubProjectForm({ ...subProjectForm, clientName: e.target.value })}
+                className="w-full px-3 py-2 bg-[#12141a] border border-slate-700/70 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Location
+              </label>
+              <input
+                type="text"
+                value={subProjectForm.location}
+                onChange={(e) => setSubProjectForm({ ...subProjectForm, location: e.target.value })}
+                className="w-full px-3 py-2 bg-[#12141a] border border-slate-700/70 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Department
+              </label>
+              <input
+                type="text"
+                value={subProjectForm.department}
+                onChange={(e) => setSubProjectForm({ ...subProjectForm, department: e.target.value })}
+                className="w-full px-3 py-2 bg-[#12141a] border border-slate-700/70 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Row 3: Buildup Area (SQM) & Description / Notes */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Buildup Area (SQM)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={subProjectForm.buildupArea}
+                onChange={(e) => setSubProjectForm({ ...subProjectForm, buildupArea: e.target.value })}
+                placeholder="e.g. 500"
+                className="w-full px-3 py-2 bg-[#12141a] border border-slate-700/70 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 transition-colors font-mono"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Used for Avg Rate / Area (per sqm & per sqft)
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Description / Notes
+              </label>
+              <textarea
+                rows={3}
+                value={subProjectForm.description}
+                onChange={(e) => setSubProjectForm({ ...subProjectForm, description: e.target.value })}
+                placeholder=""
+                className="w-full px-3 py-2 bg-[#12141a] border border-slate-700/70 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 resize-none transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Row 4: Measurement Unit */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Measurement Unit
+            </label>
+            <div className="w-full md:w-1/2">
+              <input
+                type="text"
+                readOnly
+                value={subProjectForm.measurementUnit || project?.measurementUnit || 'Metres (m)'}
+                className="w-full px-3 py-2 bg-[#0e1015] border border-slate-800 rounded-lg text-sm text-slate-300 cursor-not-allowed font-medium"
+              />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Inherited from {project?.name || 'parent'} — a sub-project always works in its parent's unit.
+            </p>
+          </div>
+
+          {/* Footer: Cancel & Save buttons */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsAddSubProjectModalOpen(false)}
+              className="px-5 py-2 rounded-lg bg-[#222634] hover:bg-[#2c3142] text-slate-300 hover:text-white text-sm font-medium transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={createSubProjectMutation.isPending}
+              className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-sm font-semibold transition-all shadow-md hover:shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
+            >
+              {createSubProjectMutation.isPending ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

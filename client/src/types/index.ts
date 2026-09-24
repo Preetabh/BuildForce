@@ -33,8 +33,16 @@ export interface Project {
   location?: string;
   department?: string;
   preparedBy?: string;
-  parentId?: string | null;
+  parentId?: string | {
+    _id: string;
+    name: string;
+    code: string;
+    projectType?: string;
+    status?: string;
+  } | null;
+  subProjectsCount?: number;
   measurementUnit?: string;
+  buildupArea?: number;
   defaultQcLevel?: string;
   description?: string;
   projectType: ProjectType | string;
@@ -140,6 +148,10 @@ export interface ScheduleHierarchyItem {
   sorName: string;
   version: string;
   category?: string;
+  country?: string;
+  state?: string;
+  owningBody?: string;
+  type?: string;
   effectiveFrom?: string;
   itemCount: number;
   rateAnalysisCount: number;

@@ -108,6 +108,11 @@ export interface IBoqItem extends Document {
   rate: number;
   amount: number;
   sorReference?: ISorSnapshot;
+  formulaId?: Types.ObjectId | null;
+  formulaCode?: string;
+  workCategory?: string;
+  stage?: string;
+  subClause?: string;
   chapter?: string;
   subChapter?: string;
   remarks?: string;
@@ -214,6 +219,11 @@ const boqItemSchema = new Schema<IBoqItem>(
       version: String,
       snapshotRate: Number,
     },
+    formulaId: { type: Schema.Types.ObjectId, ref: 'Formula', default: null },
+    formulaCode: { type: String, default: '' },
+    workCategory: { type: String, default: '' },
+    stage: { type: String, default: '' },
+    subClause: { type: String, default: '' },
     chapter: { type: String, default: '' },
     subChapter: { type: String, default: '' },
     remarks: { type: String, default: '' },

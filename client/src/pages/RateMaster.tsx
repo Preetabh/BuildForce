@@ -1162,7 +1162,7 @@ export const RateMaster: React.FC = () => {
             <div className="flex items-center gap-2">
               <Bot className="w-5 h-5" />
               <div>
-                <h4 className="text-xs font-bold">BuildForce Rate Assistant</h4>
+                <h4 className="text-xs font-bold">BudgetPilot Rate Assistant</h4>
                 <p className="text-[10px] text-pink-100">Live SOR Lookup & Analysis</p>
               </div>
             </div>

@@ -319,6 +319,71 @@ export class SorController {
   }
 
   /**
+   * Get dynamic keywords aggregated from active SOR and master catalogs
+   */
+  public static async getDynamicKeywords(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { sorId, workCategory, search, limit } = req.query;
+
+      const result = await SorService.getDynamicKeywords(companyId, {
+        sorId: sorId as string,
+        workCategory: workCategory as string,
+        search: search as string,
+        limit: limit ? Number(limit) : undefined,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get subclauses for parentItemCode
+   */
+  public static async getSubclauses(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { sorId, parentItemCode } = req.query;
+
+      const result = await SorService.getSubclauses(companyId, {
+        sorId: sorId as string,
+        parentItemCode: (parentItemCode as string) || '',
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get distinct categories for active SOR
+   */
+  public static async getSorCategories(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { sorId } = req.query;
+
+      const result = await SorService.getSorCategories(companyId, sorId as string);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Export SOR schedule items as clean Excel spreadsheet
    */
   public static async exportSor(req: Request, res: Response, next: NextFunction): Promise<void> {

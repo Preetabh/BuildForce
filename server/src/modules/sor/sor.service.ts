@@ -5,6 +5,7 @@ import { execFile } from 'child_process';
 import { Types } from 'mongoose';
 import { SorMaster, SorItem } from '../../models/SorMaster';
 import { SorRateAnalysis } from '../../models/SorRateAnalysis';
+import { Formula } from '../../models/Formula';
 import { SorImport, ISorImport, IBatchLog, IExtractedRow } from '../../models/SorImport';
 import { SorStagedItem, ISorStagedItem, StagedItemStatus } from '../../models/SorStagedItem';
 import { AppError } from '../../middleware/error.middleware';
@@ -2167,14 +2168,57 @@ export class SorService {
 
         const documentName = s.sourceDocument || attachedImport?.fileName || `${s.authority} ${s.scheduleType || 'DSR'} ${s.version}`;
 
+        const nameLower = (s.sorName || '').toLowerCase();
+        const authLower = (s.authority || '').toLowerCase();
+        let state = (s as any).state || '';
+        if (!state) {
+          if (nameLower.includes('chhattisgarh') || nameLower.includes('cgpwd') || authLower.includes('cgpwd') || authLower.includes('cg pwd')) {
+            state = 'Chhattisgarh';
+          } else if (nameLower.includes('maharashtra') || authLower.includes('mh') || authLower.includes('maharashtra')) {
+            state = 'Maharashtra';
+          } else if (nameLower.includes('delhi')) {
+            state = 'Delhi';
+          } else if (authLower.includes('central') || authLower.includes('cpwd') || nameLower.includes('cpwd')) {
+            state = 'All India';
+          } else {
+            state = 'All India';
+          }
+        }
+
+        let owningBody = (s as any).owningBody || '';
+        if (!owningBody) {
+          if (nameLower.includes('cgpwd') || authLower.includes('cgpwd') || state === 'Chhattisgarh') {
+            owningBody = 'CG PWD';
+          } else if (nameLower.includes('maharashtra') || authLower.includes('mh pwd') || state === 'Maharashtra') {
+            owningBody = 'MH PWD';
+          } else if (nameLower.includes('cpwd') || authLower.includes('cpwd')) {
+            owningBody = 'CPWD';
+          } else {
+            owningBody = s.authority || 'PWD';
+          }
+        }
+
+        let type = 'Govt';
+        if (nameLower.includes('private') || (s as any).scheduleType === 'Private') {
+          type = 'Private';
+        } else if (state !== 'All India' && state !== 'Central Govt') {
+          type = 'State Govt';
+        } else {
+          type = 'Central Govt';
+        }
+
         return {
           _id: s._id.toString(),
           authority: s.authority || 'CPWD',
           department: s.department || 'Civil',
-          scheduleType: s.scheduleType || 'DSR',
+          scheduleType: s.scheduleType || type,
           sorName: s.sorName,
           version: s.version || '2023.1',
           category: s.category || 'Civil Works',
+          country: (s as any).country || 'India',
+          state,
+          owningBody,
+          type,
           effectiveFrom: s.effectiveFrom,
           itemCount,
           rateAnalysisCount,
@@ -2215,5 +2259,199 @@ export class SorService {
     } catch (e) {
       logger.error('[SorService] Error cleaning up orphaned imports:', e);
     }
+  }
+
+  /**
+   * Dynamically extract and aggregate construction keywords based on active SOR,
+   * work category, chapters, and available master data.
+   */
+  public static async getDynamicKeywords(
+    companyId: string,
+    params: {
+      sorId?: string;
+      workCategory?: string;
+      search?: string;
+      limit?: number;
+    } = {}
+  ) {
+    const { sorId, workCategory, search, limit = 100 } = params;
+    const filter: Record<string, unknown> = { status: 'ACTIVE' };
+
+    if (sorId && Types.ObjectId.isValid(sorId)) {
+      filter.sorId = new Types.ObjectId(sorId);
+    }
+    if (workCategory && workCategory.trim()) {
+      filter.$or = [
+        { workCategory: new RegExp(workCategory.trim(), 'i') },
+        { chapter: new RegExp(workCategory.trim(), 'i') },
+      ];
+    }
+
+    // 1. Fetch distinct workCategories & chapters from database
+    const [rawCategories, rawChapters] = await Promise.all([
+      SorItem.distinct('workCategory', filter),
+      SorItem.distinct('chapter', filter),
+    ]);
+
+    // 2. Fetch sample items to extract contextual civil keywords
+    const sampleItems = await SorItem.find(filter)
+      .select('itemCode descriptionEnglish chapter workCategory unit rate')
+      .limit(300)
+      .lean();
+
+    const keywordMap = new Map<string, { label: string; count: number; category: string }>();
+
+    const addKeyword = (word: string, category: string = 'General') => {
+      if (!word) return;
+      const clean = word.trim();
+      if (clean.length < 3 || clean.length > 40) return;
+      if (/^[\d\s.,\-()]+$/.test(clean)) return;
+
+      const key = clean.toLowerCase();
+      const existing = keywordMap.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        const formatted = clean
+          .split(' ')
+          .map((w) => (w.length > 0 ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : ''))
+          .join(' ');
+        keywordMap.set(key, { label: formatted, count: 1, category });
+      }
+    };
+
+    // Add categories & chapters
+    for (const cat of rawCategories) {
+      if (cat && typeof cat === 'string') {
+        addKeyword(cat, 'Work Category');
+      }
+    }
+    for (const chap of rawChapters) {
+      if (chap && typeof chap === 'string') {
+        addKeyword(chap, 'Chapter');
+      }
+    }
+
+    // Civil engineering keywords
+    const civilDomainTerms = [
+      'Excavation', 'Earth Work', 'PCC', 'RCC', 'Concrete', 'Footing', 'Column', 'Beam',
+      'Slab', 'Lintel', 'Brick Work', 'Brick Masonry', 'Block Work', 'Plastering',
+      'Pointing', 'Flooring', 'Tiling', 'Painting', 'White Washing', 'Distempering',
+      'Waterproofing', 'Reinforcement', 'TMT Bar', 'Centering', 'Shuttering', 'Formwork',
+      'Backfilling', 'Surface Dressing', 'Disposal', 'Drainage', 'Pipe', 'Grouting',
+      'Sump', 'Over Head Tank', 'Water Tank', 'Cleaning', 'Dismantling', 'Demolition',
+      'Structural Steel', 'Aluminium Work', 'Doors', 'Windows', 'Roofing', 'Curing',
+      'Expansion Joint', 'Parapet', 'Chajja', 'Staircase', 'Rubble', 'Masonry',
+      'Granite', 'Marble', 'Kota Stone', 'Vitrified Tile', 'Kerb Stone', 'Paver Block'
+    ];
+
+    for (const item of sampleItems) {
+      const descLower = (item.descriptionEnglish || '').toLowerCase();
+      for (const term of civilDomainTerms) {
+        if (descLower.includes(term.toLowerCase())) {
+          addKeyword(term, item.workCategory || item.chapter || 'Civil Works');
+        }
+      }
+    }
+
+    // Quantity Master formulas
+    try {
+      const qmFormulas = await Formula.find({ status: 'ACTIVE' })
+        .select('name category code tags')
+        .limit(100)
+        .lean();
+      for (const f of qmFormulas) {
+        if (f.name) addKeyword(f.name, f.category || 'Formula');
+        if (f.category) addKeyword(f.category, 'Formula Category');
+        if (Array.isArray((f as any).tags)) {
+          for (const t of (f as any).tags) addKeyword(t, 'Formula Tag');
+        }
+      }
+    } catch {
+      // Model fallback if formula collection empty
+    }
+
+    let allKeywords = Array.from(keywordMap.values());
+
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      allKeywords = allKeywords.filter(
+        (k) => k.label.toLowerCase().includes(q) || k.category.toLowerCase().includes(q)
+      );
+    }
+
+    allKeywords.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+
+    return {
+      keywords: allKeywords.slice(0, limit),
+      categories: rawCategories.filter(Boolean),
+      chapters: rawChapters.filter(Boolean),
+    };
+  }
+
+  /**
+   * Get subclauses / sub-items for a given parent itemCode under an SOR
+   * e.g., parentItemCode '2.16' -> returns '2.16.1', '2.16.2', etc.
+   */
+  public static async getSubclauses(
+    companyId: string,
+    params: {
+      sorId?: string;
+      parentItemCode: string;
+    }
+  ) {
+    const { sorId, parentItemCode } = params;
+    if (!parentItemCode || !parentItemCode.trim()) {
+      return [];
+    }
+
+    const cleanCode = parentItemCode.trim();
+    // Escape regex dots
+    const escapedCode = cleanCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const filter: Record<string, unknown> = {
+      status: 'ACTIVE',
+      itemCode: new RegExp(`^${escapedCode}\\.`),
+    };
+
+    if (sorId && Types.ObjectId.isValid(sorId)) {
+      filter.sorId = new Types.ObjectId(sorId);
+    }
+
+    const subItems = await SorItem.find(filter)
+      .select('itemCode descriptionEnglish unit rate chapter workCategory measurementFormula')
+      .sort({ itemCode: 1 })
+      .limit(50)
+      .lean();
+
+    return subItems.map((item) => ({
+      _id: item._id.toString(),
+      itemCode: item.itemCode,
+      description: item.descriptionEnglish,
+      unit: item.unit || '',
+      rate: item.rate || 0,
+      workCategory: item.workCategory || item.chapter || '',
+      chapter: item.chapter || '',
+      measurementFormula: item.measurementFormula || '',
+    }));
+  }
+
+  /**
+   * Get distinct categories and chapters for a given SOR
+   */
+  public static async getSorCategories(companyId: string, sorId?: string) {
+    const filter: Record<string, unknown> = { status: 'ACTIVE' };
+    if (sorId && Types.ObjectId.isValid(sorId)) {
+      filter.sorId = new Types.ObjectId(sorId);
+    }
+
+    const [workCategories, chapters] = await Promise.all([
+      SorItem.distinct('workCategory', filter),
+      SorItem.distinct('chapter', filter),
+    ]);
+
+    return {
+      workCategories: workCategories.filter(Boolean).sort(),
+      chapters: chapters.filter(Boolean).sort(),
+    };
   }
 }

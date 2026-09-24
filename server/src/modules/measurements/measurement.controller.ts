@@ -31,6 +31,20 @@ export class MeasurementController {
     }
   }
 
+  public static async previewMeasurement(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { projectId } = req.params;
+      const preview = await MeasurementService.getMeasurementPreview(companyId, projectId, req.body);
+      res.status(200).json({
+        success: true,
+        data: preview,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public static async addMeasurement(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const companyId = req.user!.companyId;

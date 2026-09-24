@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { Measurement, IMeasurement, IMeasurementEntry, MeasurementFormula } from '../../models/Measurement';
 import { Boq, BoqItem, IBoqItem } from '../../models/Boq';
-import { SorItem } from '../../models/SorMaster';
+import { SorMaster, SorItem } from '../../models/SorMaster';
 import { Project } from '../../models/Project';
 import { BomItem } from '../../models/Bom';
 import { ManpowerItem } from '../../models/Manpower';
@@ -13,10 +13,16 @@ import { AppError } from '../../middleware/error.middleware';
 import { AuditService } from '../audit/audit.service';
 
 export interface CreateMeasurementEntryInput {
+  sorId?: string;
   sorItemId?: string;
   itemCode?: string;
   boqItemId?: string;
   description?: string;
+  category?: string;
+  stage?: string;
+  subClause?: string;
+  formulaId?: string;
+  formulaCode?: string;
   location?: string;
   levelFloor?: string;
   nos?: number;
@@ -34,6 +40,23 @@ export interface CreateMeasurementEntryInput {
   formula?: MeasurementFormula | string;
   remarks?: string;
   measurementDate?: string;
+  entries?: Array<{
+    description?: string;
+    location?: string;
+    levelFloor?: string;
+    nos?: number;
+    length?: number;
+    width?: number;
+    breadth?: number;
+    heightDepth?: number;
+    height?: number;
+    depth?: number;
+    thickness?: number;
+    weight?: number;
+    unitWeight?: number;
+    formula?: string;
+    remarks?: string;
+  }>;
 }
 
 export class MeasurementService {
@@ -54,6 +77,106 @@ export class MeasurementService {
       heightDepth,
     });
     return res.calculatedQuantity;
+  }
+
+  /**
+   * Calculate live preview of measurement impact (Quantity, Materials, Manpower, Machinery)
+   * before saving to database.
+   */
+  public static async getMeasurementPreview(
+    companyId: string,
+    projectId: string,
+    input: CreateMeasurementEntryInput
+  ) {
+    let totalQty = 0;
+    let mainExpression = '';
+    let canonicalUnit = '';
+
+    if (input.entries && input.entries.length > 0) {
+      for (const row of input.entries) {
+        const rowCalc = CalculationEngine.calculateQuantity(
+          row.formula || input.formula || 'LxWxH',
+          {
+            nos: row.nos !== undefined ? row.nos : 1,
+            length: row.length,
+            width: row.width || row.breadth,
+            heightDepth: row.heightDepth || row.height || row.depth,
+            thickness: row.thickness,
+            weight: row.weight,
+            unitWeight: row.unitWeight,
+          },
+          input.unit,
+          input.itemCode
+        );
+        totalQty += rowCalc.calculatedQuantity;
+        canonicalUnit = rowCalc.canonicalUnit;
+      }
+      totalQty = Number(totalQty.toFixed(3));
+      mainExpression = `${input.entries.length} items = ${totalQty} ${canonicalUnit}`;
+    } else {
+      const calcResult = CalculationEngine.calculateQuantity(
+        input.formula || 'LxWxH',
+        {
+          nos: input.nos,
+          length: input.length,
+          width: input.width || input.breadth,
+          heightDepth: input.heightDepth || input.height || input.depth,
+          thickness: input.thickness,
+          weight: input.weight,
+          unitWeight: input.unitWeight,
+        },
+        input.unit,
+        input.itemCode
+      );
+      totalQty = calcResult.calculatedQuantity;
+      mainExpression = calcResult.formulaExpression;
+      canonicalUnit = calcResult.canonicalUnit;
+    }
+
+    let dummyBoqItem: any = {
+      itemCode: input.itemCode || 'CUSTOM-ITEM',
+      description: input.description || 'Measured Item',
+      unit: input.unit || canonicalUnit || 'cum',
+      rate: input.rate || 0,
+      formulaId: input.formulaId,
+      formulaCode: input.formulaCode,
+    };
+
+    if (input.boqItemId && Types.ObjectId.isValid(input.boqItemId)) {
+      const b = await BoqItem.findById(input.boqItemId).lean();
+      if (b) dummyBoqItem = { ...b, formulaId: input.formulaId || b.formulaId, formulaCode: input.formulaCode || b.formulaCode };
+    } else if (input.sorItemId && Types.ObjectId.isValid(input.sorItemId)) {
+      const s = await SorItem.findById(input.sorItemId).lean();
+      if (s) {
+        dummyBoqItem = {
+          itemCode: s.itemCode,
+          description: s.descriptionEnglish,
+          unit: s.unit,
+          rate: s.rate,
+          formulaId: input.formulaId,
+          formulaCode: input.formulaCode,
+          sorReference: { sorItemId: s._id, itemCode: s.itemCode },
+        };
+      }
+    }
+
+    const rateAnalysis = await RateAnalysisService.resolveAnalysisForBoqItem(companyId, dummyBoqItem);
+    const activeUnitRate = input.rate !== undefined && input.rate > 0 ? input.rate : (dummyBoqItem.rate || 0);
+    const impact = CalculationEngine.calculateImpactPreview(
+      totalQty,
+      activeUnitRate,
+      rateAnalysis
+    );
+
+    return {
+      calculatedQuantity: totalQty,
+      formulaExpression: mainExpression,
+      canonicalUnit: canonicalUnit,
+      unitRate: activeUnitRate,
+      totalAmount: impact.boqAmount,
+      rateAnalysis,
+      impact,
+    };
   }
 
   /**
@@ -202,9 +325,12 @@ export class MeasurementService {
               createdBy: new Types.ObjectId(userId),
             });
           }
-
           const nextItemNumber = (await BoqItem.countDocuments({ boqId: boq._id })) + 1;
           const sorMaster = targetSorItem.sorId as unknown as { _id: Types.ObjectId; sorName?: string; version?: string };
+          const activeSorId = (input.sorId && Types.ObjectId.isValid(input.sorId))
+            ? new Types.ObjectId(input.sorId)
+            : (sorMaster?._id || targetSorItem?.sorId);
+          const activeSorDoc = activeSorId ? await SorMaster.findById(activeSorId) : null;
 
           boqItem = await BoqItem.create({
             companyId: compObjectId,
@@ -220,11 +346,11 @@ export class MeasurementService {
             chapter: targetSorItem.chapter || '',
             subChapter: targetSorItem.subChapter || '',
             sorReference: {
-              sorId: sorMaster?._id || targetSorItem.sorId,
+              sorId: activeSorId || null,
               sorItemId: targetSorItem._id,
-              scheduleName: sorMaster?.sorName || 'Schedule of Rates',
-              version: sorMaster?.version || 'Latest',
-              snapshotRate: targetSorItem.rate,
+              scheduleName: activeSorDoc?.sorName || sorMaster?.sorName || 'Schedule of Rates',
+              version: activeSorDoc?.version || sorMaster?.version || 'Latest',
+              snapshotRate: input.rate !== undefined && input.rate > 0 ? input.rate : targetSorItem.rate,
             },
             isDerivedFromMeasurement: true,
             executedQuantity: 0,
@@ -237,8 +363,63 @@ export class MeasurementService {
       }
     }
 
+    if (!boqItem && (input.description || input.itemCode)) {
+      let boq = await Boq.findOne({
+        companyId: compObjectId,
+        projectId: projObjectId,
+        status: { $ne: 'Archived' },
+      });
+
+      if (!boq) {
+        boq = await Boq.create({
+          companyId: compObjectId,
+          projectId: projObjectId,
+          title: 'Main Project BOQ',
+          version: '1.0',
+          status: 'Draft',
+          createdBy: new Types.ObjectId(userId),
+        });
+      }
+
+      const nextItemNumber = (await BoqItem.countDocuments({ boqId: boq._id })) + 1;
+      const cleanPrefix = (input.itemCode || input.description?.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase()) || 'ITEM';
+      const autoCode = input.itemCode || `${cleanPrefix}-${nextItemNumber}`;
+
+      boqItem = await BoqItem.create({
+        companyId: compObjectId,
+        projectId: projObjectId,
+        boqId: boq._id,
+        itemNumber: nextItemNumber,
+        itemCode: autoCode,
+        description: input.description?.trim() || 'Custom Measured Item',
+        unit: input.unit || 'cum',
+        quantity: 0,
+        rate: input.rate !== undefined && input.rate >= 0 ? input.rate : 0,
+        amount: 0,
+        formulaId: input.formulaId && Types.ObjectId.isValid(input.formulaId) ? new Types.ObjectId(input.formulaId) : null,
+        formulaCode: input.formulaCode || '',
+        workCategory: input.category || '',
+        stage: input.stage || '',
+        subClause: input.subClause || '',
+        chapter: input.category || 'General Civil Works',
+        isDerivedFromMeasurement: true,
+        executedQuantity: 0,
+        balanceQuantity: 0,
+        progressPercent: 0,
+        rateAnalysisStatus: 'NOT_AVAILABLE',
+        allowExcessQuantity: true,
+      });
+    }
+
     if (!boqItem) {
       throw new AppError('Could not resolve or create target BOQ / SOR item for this measurement', 404);
+    }
+
+    // Update formulaId or formulaCode on boqItem if newly specified
+    if (input.formulaId && Types.ObjectId.isValid(input.formulaId) && (!boqItem.formulaId || boqItem.formulaId.toString() !== input.formulaId)) {
+      boqItem.formulaId = new Types.ObjectId(input.formulaId);
+      boqItem.formulaCode = input.formulaCode || '';
+      await boqItem.save();
     }
 
     // 2. Perform authoritative formula calculation
@@ -267,63 +448,117 @@ export class MeasurementService {
 
     const { calculatedQuantity, formulaExpression } = CalculationEngine.calculateQuantity(formula, dims, rawUnit, boqItem.itemCode);
 
-    if (calculatedQuantity <= 0) {
-      throw new AppError('Calculated measurement quantity must be greater than zero. Please verify input dimensions.', 400);
+    const processedEntries: IMeasurementEntry[] = [];
+    let grandCalculatedQuantity = 0;
+
+    if (input.entries && input.entries.length > 0) {
+      for (const row of input.entries) {
+        const rowFormula = row.formula || formula;
+        const rowDims: MeasurementDimensions = {
+          nos: row.nos !== undefined ? row.nos : 1,
+          length: row.length || 0,
+          width: row.width || 0,
+          breadth: row.breadth || row.width || 0,
+          height: row.height || 0,
+          depth: row.depth || 0,
+          heightDepth: row.heightDepth || row.height || row.depth || 0,
+          thickness: row.thickness || 0,
+          weight: row.weight || 0,
+          unitWeight: row.unitWeight || 0,
+        };
+        const rowCalc = CalculationEngine.calculateQuantity(rowFormula, rowDims, rawUnit, boqItem.itemCode);
+        grandCalculatedQuantity += rowCalc.calculatedQuantity;
+        processedEntries.push({
+          description: row.description?.trim() || input.description?.trim() || boqItem.description,
+          location: row.location?.trim() || input.location?.trim() || '',
+          levelFloor: row.levelFloor?.trim() || input.levelFloor?.trim() || '',
+          nos: row.nos !== undefined ? row.nos : 1,
+          length: row.length || 0,
+          width: row.width || 0,
+          breadth: row.breadth || row.width || 0,
+          height: row.height || 0,
+          depth: row.depth || 0,
+          heightDepth: row.heightDepth || row.height || row.depth || 0,
+          thickness: row.thickness || 0,
+          weight: row.weight || 0,
+          unitWeight: row.unitWeight || 0,
+          unit,
+          formula: rowFormula,
+          formulaExpression: rowCalc.formulaExpression,
+          calculatedQuantity: rowCalc.calculatedQuantity,
+          remarks: row.remarks || '',
+        });
+      }
+      grandCalculatedQuantity = Number(grandCalculatedQuantity.toFixed(3));
+    } else {
+      if (calculatedQuantity <= 0) {
+        throw new AppError('Calculated measurement quantity must be greater than zero. Please verify input dimensions.', 400);
+      }
+      grandCalculatedQuantity = calculatedQuantity;
+      processedEntries.push({
+        description: input.description?.trim() || boqItem.description,
+        location: input.location?.trim() || '',
+        levelFloor: input.levelFloor?.trim() || '',
+        nos: input.nos !== undefined && !isNaN(input.nos) ? input.nos : 1,
+        length: input.length || 0,
+        width: input.width || 0,
+        breadth: input.breadth || 0,
+        heightDepth: input.heightDepth || 0,
+        height: input.height || 0,
+        depth: input.depth || 0,
+        thickness: input.thickness || 0,
+        weight: input.weight || 0,
+        unitWeight: input.unitWeight || 0,
+        unit,
+        formula,
+        formulaExpression,
+        calculatedQuantity,
+        remarks: input.remarks || '',
+      });
+    }
+
+    if (grandCalculatedQuantity <= 0) {
+      throw new AppError('Total calculated measurement quantity must be greater than zero.', 400);
     }
 
     // BOQ Quantity Validation Rule: Do not allow exceeding planned BOQ quantity if allowExcessQuantity is false
     if (!boqItem.get('isDerivedFromMeasurement') && boqItem.quantity > 0 && !boqItem.allowExcessQuantity) {
       const remainingBalance = Math.max(0, Number((boqItem.quantity - (boqItem.executedQuantity || 0)).toFixed(3)));
-      if (calculatedQuantity > remainingBalance + 0.0001) {
+      if (grandCalculatedQuantity > remainingBalance + 0.0001) {
         throw new AppError(
-          `Measurement quantity (${calculatedQuantity} ${unit}) exceeds remaining BOQ balance (${remainingBalance} ${unit}). Planned BOQ quantity is ${boqItem.quantity} ${unit}. Excess quantity is not permitted for item '${boqItem.itemCode}'.`,
+          `Measurement quantity (${grandCalculatedQuantity} ${unit}) exceeds remaining BOQ balance (${remainingBalance} ${unit}). Planned BOQ quantity is ${boqItem.quantity} ${unit}. Excess quantity is not permitted for item '${boqItem.itemCode}'.`,
           400
         );
       }
     }
 
     const unitRate = input.rate !== undefined && input.rate > 0 ? input.rate : boqItem.rate;
-    const amount = CalculationEngine.calculateAmount(calculatedQuantity, unitRate);
+    const amount = CalculationEngine.calculateAmount(grandCalculatedQuantity, unitRate);
 
-    // 3. Create measurement entry
-    const entry: IMeasurementEntry = {
-      description: input.description?.trim() || boqItem.description,
-      location: input.location?.trim() || '',
-      levelFloor: input.levelFloor?.trim() || '',
-      nos: input.nos !== undefined && !isNaN(input.nos) ? input.nos : 1,
-      length: input.length || 0,
-      width: input.width || 0,
-      breadth: input.breadth || 0,
-      heightDepth: input.heightDepth || 0,
-      height: input.height || 0,
-      depth: input.depth || 0,
-      thickness: input.thickness || 0,
-      weight: input.weight || 0,
-      unitWeight: input.unitWeight || 0,
-      unit,
-      formula,
-      formulaExpression,
-      calculatedQuantity,
-      remarks: input.remarks || '',
-    };
+    const resolvedSorId = (input.sorId && Types.ObjectId.isValid(input.sorId))
+      ? new Types.ObjectId(input.sorId)
+      : (boqItem.sorReference?.sorId || targetSorItem?.sorId?._id || targetSorItem?.sorId || null);
+    const resolvedSorDoc = resolvedSorId ? await SorMaster.findById(resolvedSorId) : null;
 
     const measurement = await Measurement.create({
       companyId: compObjectId,
       projectId: projObjectId,
       boqId: boqItem.boqId,
       boqItemId: boqItem._id,
-      sorId: boqItem.sorReference?.sorId || targetSorItem?.sorId?._id || null,
-      sorItemId: boqItem.sorReference?.sorItemId || targetSorItem?._id || null,
-      scheduleName: boqItem.sorReference?.scheduleName || '',
-      scheduleVersion: boqItem.sorReference?.version || '',
+      sorId: resolvedSorId,
+      sorItemId: (input.sorItemId && Types.ObjectId.isValid(input.sorItemId))
+        ? new Types.ObjectId(input.sorItemId)
+        : (boqItem.sorReference?.sorItemId || targetSorItem?._id || null),
+      scheduleName: resolvedSorDoc?.sorName || boqItem.sorReference?.scheduleName || '',
+      scheduleVersion: resolvedSorDoc?.version || boqItem.sorReference?.version || '',
       sourceItemCode: boqItem.itemCode,
       unitRate,
       amount,
       measurementDate: input.measurementDate ? new Date(input.measurementDate) : new Date(),
       status: 'Approved',
-      entries: [entry],
-      totalQuantity: calculatedQuantity,
-      currentQuantity: calculatedQuantity,
+      entries: processedEntries,
+      totalQuantity: grandCalculatedQuantity,
+      currentQuantity: grandCalculatedQuantity,
       isReversed: false,
       createdBy: new Types.ObjectId(userId),
       approvedBy: new Types.ObjectId(userId),

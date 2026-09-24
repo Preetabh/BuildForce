@@ -15,6 +15,7 @@ export const createProjectSchema = z
     preparedBy: z.string().max(150).optional().default(''),
     parentId: z.string().nullable().optional().default(null),
     measurementUnit: z.string().max(50).optional().default('Metres (m)'),
+    buildupArea: z.number().min(0).optional().default(0),
     defaultQcLevel: z.string().max(100).optional().default('Standard — recommended site checks'),
     description: z.string().max(2000).optional().default(''),
     projectType: z.string().optional().default('Residential Building'),
@@ -59,6 +60,9 @@ export const updateProjectSchema = z
       .optional(),
     clientName: z.string().max(200).optional(),
     location: z.string().max(250).optional(),
+    department: z.string().max(150).optional(),
+    measurementUnit: z.string().max(50).optional(),
+    buildupArea: z.number().min(0).optional(),
     description: z.string().max(2000).optional(),
     projectType: z
       .enum(['Residential', 'Commercial', 'Infrastructure', 'Industrial', 'Institutional', 'Other'])

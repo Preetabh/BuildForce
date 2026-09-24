@@ -60,6 +60,36 @@ export class ProjectController {
     }
   }
 
+  public static async getSubProjects(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companyId = req.user!.companyId;
+      const { id } = req.params;
+      const subProjects = await ProjectService.getSubProjects(companyId, id);
+      res.status(200).json({
+        success: true,
+        data: subProjects,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async createSubProject(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { companyId, userId } = req.user!;
+      const { id } = req.params;
+      const ip = req.ip || req.socket.remoteAddress;
+      const subProject = await ProjectService.createSubProject(companyId, userId, id, req.body, ip);
+      res.status(201).json({
+        success: true,
+        message: 'Sub-project created successfully',
+        data: subProject,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public static async updateProject(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { companyId, userId } = req.user!;

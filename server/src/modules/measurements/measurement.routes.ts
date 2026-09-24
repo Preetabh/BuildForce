@@ -9,6 +9,7 @@ router.use(authenticate);
 
 router.get('/summary', requirePermission('measurement.view'), MeasurementController.getMeasurementSummary);
 router.get('/', requirePermission('measurement.view'), MeasurementController.getMeasurements);
+router.post('/preview', requirePermission('measurement.view'), MeasurementController.previewMeasurement);
 router.post('/', requirePermission('measurement.create'), MeasurementController.addMeasurement);
 router.put('/:id', requirePermission('measurement.edit'), MeasurementController.updateMeasurement);
 router.post('/:id/duplicate', requirePermission('measurement.create'), MeasurementController.duplicateMeasurement);

@@ -23,6 +23,8 @@ router.post('/', validateBody(createProjectSchema), ProjectController.createProj
 
 // Single project item operations
 router.get('/:id', ProjectController.getProjectById);
+router.get('/:id/sub-projects', ProjectController.getSubProjects);
+router.post('/:id/sub-projects', validateBody(createProjectSchema), ProjectController.createSubProject);
 router.patch('/:id', validateBody(updateProjectSchema), ProjectController.updateProject);
 router.delete('/:id', ProjectController.softDeleteProject);
 

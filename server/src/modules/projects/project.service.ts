@@ -143,13 +143,94 @@ export class ProjectService {
       deletedAt: null,
     })
       .populate('createdBy', 'name email')
+      .populate('parentId', 'name code projectType status')
       .lean();
 
     if (!project) {
       throw new AppError('Project not found or may have been deleted', 404);
     }
 
-    return project;
+    const subProjectsCount = await Project.countDocuments({
+      companyId: new Types.ObjectId(companyId),
+      parentId: project._id,
+      deletedAt: null,
+    });
+
+    return {
+      ...project,
+      subProjectsCount,
+    };
+  }
+
+  public static async getSubProjects(companyId: string, parentId: string) {
+    if (!Types.ObjectId.isValid(parentId)) {
+      throw new AppError('Invalid parent project ID format', 400);
+    }
+
+    const compObjectId = new Types.ObjectId(companyId);
+    const parentObjectId = new Types.ObjectId(parentId);
+
+    const subProjects = await Project.find({
+      companyId: compObjectId,
+      parentId: parentObjectId,
+      deletedAt: null,
+    })
+      .sort({ createdAt: -1 })
+      .populate('createdBy', 'name email')
+      .lean();
+
+    return subProjects;
+  }
+
+  public static async createSubProject(
+    companyId: string,
+    userId: string,
+    parentId: string,
+    input: CreateProjectInput,
+    ipAddress?: string
+  ) {
+    if (!Types.ObjectId.isValid(parentId)) {
+      throw new AppError('Invalid parent project ID format', 400);
+    }
+
+    const compObjectId = new Types.ObjectId(companyId);
+    const parentObjectId = new Types.ObjectId(parentId);
+
+    const parentProject = await Project.findOne({
+      _id: parentObjectId,
+      companyId: compObjectId,
+      deletedAt: null,
+    });
+
+    if (!parentProject) {
+      throw new AppError('Parent project not found', 404);
+    }
+
+    // Auto-generate code prefixed with parent code if not explicitly provided
+    let normalizedCode = input.code ? input.code.trim().toUpperCase() : '';
+    if (!normalizedCode) {
+      const existingCount = await Project.countDocuments({
+        companyId: compObjectId,
+        parentId: parentObjectId,
+      });
+      normalizedCode = `${parentProject.code}-SP${String(existingCount + 1).padStart(2, '0')}`;
+    }
+
+    const subProject = await this.createProject(
+      companyId,
+      userId,
+      {
+        ...input,
+        code: normalizedCode,
+        parentId: parentObjectId.toString(),
+        clientName: input.clientName || parentProject.clientName || '',
+        location: input.location || parentProject.location || '',
+        projectType: input.projectType || parentProject.projectType || 'Residential Building',
+      },
+      ipAddress
+    );
+
+    return subProject;
   }
 
   public static async createProject(

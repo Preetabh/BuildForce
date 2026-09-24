@@ -3,22 +3,28 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Search,
   Sparkles,
-  AlertTriangle,
   Layers,
   Ruler,
-  Package,
-  Users2,
-  Truck,
   CheckCircle2,
-  ChevronRight,
-  ArrowRight,
-  ArrowLeft,
   X,
   FileSpreadsheet,
   Info,
-  Scale,
   Calculator,
   RefreshCw,
+  Plus,
+  Trash2,
+  ExternalLink,
+  Code2,
+  GripVertical,
+  Settings,
+  Maximize2,
+  FileText,
+  HelpCircle,
+  ChevronDown,
+  Tag,
+  Check,
+  Building2,
+  BookOpen,
 } from 'lucide-react';
 import api from '../../services/api';
 import {
@@ -26,14 +32,11 @@ import {
   ScheduleHierarchyItem,
   Measurement,
   BoqItem,
-  MeasurementFormula,
-  RateAnalysisComponent,
 } from '../../types';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { formatCurrency } from '../../utils/formatters';
 import { cn } from '../../utils/cn';
-import { UnitDimensionEngine } from '../../utils/unitEngine';
 
 interface SmartMeasurementModalProps {
   isOpen: boolean;
@@ -44,26 +47,34 @@ interface SmartMeasurementModalProps {
   initialBoqItem?: BoqItem | null;
 }
 
-const QUICK_KEYWORDS = [
-  'RCC footing',
-  'PCC',
-  'Brick masonry',
-  'Earthwork excavation',
-  'Plaster',
-  'Flooring',
-  'Reinforcement',
-  'Concrete',
-];
+interface MeasurementRowItem {
+  id: string;
+  isSubheading?: boolean;
+  description: string;
+  nos: number | '';
+  length: number | '';
+  width: number | '';
+  heightDepth: number | '';
+  formula: string;
+  remarks: string;
+}
 
-const REBAR_DIAMETERS = [
-  { dia: 8, weightPerMeter: 0.395 },
-  { dia: 10, weightPerMeter: 0.617 },
-  { dia: 12, weightPerMeter: 0.888 },
-  { dia: 16, weightPerMeter: 1.58 },
-  { dia: 20, weightPerMeter: 2.47 },
-  { dia: 25, weightPerMeter: 3.85 },
-  { dia: 32, weightPerMeter: 6.31 },
-];
+interface SubclauseItem {
+  _id: string;
+  itemCode: string;
+  description: string;
+  unit: string;
+  rate: number;
+  workCategory: string;
+  chapter: string;
+  measurementFormula?: string;
+}
+
+interface DynamicKeyword {
+  label: string;
+  count: number;
+  category: string;
+}
 
 export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
   isOpen,
@@ -73,331 +84,708 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
   editingMeasurement,
   initialBoqItem,
 }) => {
-  // Step State (1: Schedule -> 2: Search -> 3: Selected Item -> 4: Measurement -> 5: Impact Preview)
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  // Input Heading tab: 'KEYWORDS' | 'ITEM_HEADING'
+  const [activeInputTab, setActiveInputTab] = useState<'KEYWORDS' | 'ITEM_HEADING'>('KEYWORDS');
+  const [itemHeading, setItemHeading] = useState<string>('');
+  const [keywordsText, setKeywordsText] = useState<string>('');
+  const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
 
-  // Form states
+  // SOR & Clause
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedSorItem, setSelectedSorItem] = useState<SorItem | null>(null);
+  const [sorClauseInput, setSorClauseInput] = useState<string>('');
+  const [subClause, setSubClause] = useState<string>('');
+  const [workCategory, setWorkCategory] = useState<string>('');
+  const [stage, setStage] = useState<string>('');
 
-  // Measurement dimensions
-  const [mbDescription, setMbDescription] = useState<string>('');
-  const [mbLocation, setMbLocation] = useState<string>('');
-  const [mbLevel, setMbLevel] = useState<string>('');
-  const [mbFormula, setMbFormula] = useState<MeasurementFormula | string>('LxWxH');
-  const [mbNos, setMbNos] = useState<number | ''>(1);
-  const [mbLength, setMbLength] = useState<number | ''>('');
-  const [mbWidth, setMbWidth] = useState<number | ''>('');
-  const [mbDepth, setMbDepth] = useState<number | ''>('');
-  const [mbHeight, setMbHeight] = useState<number | ''>('');
-  const [mbThickness, setMbThickness] = useState<number | ''>('');
-  const [mbWeight, setMbWeight] = useState<number | ''>('');
-  const [mbUnitWeight, setMbUnitWeight] = useState<number | ''>('');
-  const [mbSelectedRebarDia, setMbSelectedRebarDia] = useState<number | ''>('');
-  const [mbCustomRate, setMbCustomRate] = useState<number | ''>('');
-  const [mbRemarks, setMbRemarks] = useState<string>('');
+  // Estimation
+  const [selectedFormulaId, setSelectedFormulaId] = useState<string>('');
+  const [unit, setUnit] = useState<string>('sqm');
+  const [rate, setRate] = useState<number | ''>(0);
 
-  // 1. Fetch Dynamic Schedule Hierarchy from Master Database
-  const {
-    data: scheduleList = [],
-    isLoading: isLoadingSchedules,
-    isError: isScheduleError,
-    refetch: refetchSchedules,
-  } = useQuery<ScheduleHierarchyItem[]>({
+  // Quality
+  const [qcChecklist, setQcChecklist] = useState<string>('— Select a work category first —');
+  const [qualityLevel, setQualityLevel] = useState<string>('Project default');
+
+  // Sub-items (Measurements) Rows
+  const [measurementRows, setMeasurementRows] = useState<MeasurementRowItem[]>([
+    {
+      id: 'row-1',
+      description: '',
+      nos: '',
+      length: '',
+      width: '',
+      heightDepth: '',
+      formula: 'LxWxH',
+      remarks: '',
+    },
+  ]);
+
+  // Slash Command (/) Autocomplete State
+  const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
+  const [slashQuery, setSlashQuery] = useState('');
+  const [slashTarget, setSlashTarget] = useState<'HEADING' | 'ROW'>('HEADING');
+  const [activeRowIndexForSlash, setActiveRowIndexForSlash] = useState<number>(0);
+  const [importedFormulaNotice, setImportedFormulaNotice] = useState<string | null>(null);
+
+  // Selection Modals State
+  const [isSorModalOpen, setIsSorModalOpen] = useState(false);
+  const [sorSearchTerm, setSorSearchTerm] = useState('');
+  const [isKeywordsModalOpen, setIsKeywordsModalOpen] = useState(false);
+  const [keywordSearchTerm, setKeywordSearchTerm] = useState('');
+  const [isClausePickerOpen, setIsClausePickerOpen] = useState(false);
+  const [clauseSearchTerm, setClauseSearchTerm] = useState('');
+  const [isSubclausePickerOpen, setIsSubclausePickerOpen] = useState(false);
+
+  // Aux Modals
+  const [isExcelPasteModalOpen, setIsExcelPasteModalOpen] = useState(false);
+  const [excelPasteText, setExcelPasteText] = useState('');
+  const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
+  const [isCellFormulaHelpOpen, setIsCellFormulaHelpOpen] = useState(false);
+  const [isDrawingNoticeOpen, setIsDrawingNoticeOpen] = useState(false);
+
+  // 1. Fetch Dynamic Schedule Hierarchy from Master Database (ONLY uploaded/imported SORs)
+  const { data: scheduleList = [], isLoading: isSchedulesLoading } = useQuery<ScheduleHierarchyItem[]>({
     queryKey: ['scheduleHierarchy'],
     queryFn: async () => {
       const res = await api.get('/sor/schedules/hierarchy');
-      return res.data?.data || [];
+      return Array.isArray(res.data?.data) ? res.data.data : [];
     },
     enabled: isOpen,
   });
 
-  // Selected schedule object
-  const selectedSchedule = useMemo(() => {
+  // Filtered SORs for Modal
+  const filteredScheduleList = useMemo(() => {
+    if (!sorSearchTerm.trim()) return scheduleList;
+    const q = sorSearchTerm.toLowerCase();
+    return scheduleList.filter(
+      (s) =>
+        s.sorName?.toLowerCase().includes(q) ||
+        s.authority?.toLowerCase().includes(q) ||
+        s.version?.toLowerCase().includes(q) ||
+        s.category?.toLowerCase().includes(q)
+    );
+  }, [scheduleList, sorSearchTerm]);
+
+  // Current Active Schedule
+  const activeSchedule = useMemo(() => {
     return scheduleList.find((s) => s._id === selectedScheduleId) || scheduleList[0] || null;
   }, [scheduleList, selectedScheduleId]);
 
-  // Set default schedule once loaded (prioritize schedule with largest item count)
+  // Auto-select first schedule on initial load if none set
   useEffect(() => {
     if (scheduleList.length > 0 && !selectedScheduleId) {
       setSelectedScheduleId(scheduleList[0]._id);
     }
   }, [scheduleList, selectedScheduleId]);
 
-  // 2. Fetch Smart SOR Items
-  const { data: smartSearchData, isFetching: isSearching } = useQuery<{ items: SorItem[] }>({
-    queryKey: ['smartSorSearch', selectedScheduleId, searchQuery],
+  // 2. Fetch Dynamic Work Categories for currently selected SOR
+  const { data: categoriesData } = useQuery<{ workCategories: string[]; chapters: string[] }>({
+    queryKey: ['sorCategories', selectedScheduleId],
+    queryFn: async () => {
+      if (!selectedScheduleId) return { workCategories: [], chapters: [] };
+      const res = await api.get(`/sor/categories?sorId=${selectedScheduleId}`);
+      return res.data?.data || { workCategories: [], chapters: [] };
+    },
+    enabled: isOpen && !!selectedScheduleId,
+  });
+
+  const availableWorkCategories = useMemo(() => {
+    return categoriesData?.workCategories || categoriesData?.chapters || [];
+  }, [categoriesData]);
+
+  // 3. Fetch Dynamic Keywords for currently selected SOR & Category
+  const { data: dynamicKeywordsData, isLoading: isKeywordsLoading } = useQuery<{
+    keywords: DynamicKeyword[];
+    categories: string[];
+  }>({
+    queryKey: ['dynamicKeywords', selectedScheduleId, workCategory, keywordSearchTerm],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedScheduleId) params.append('sorId', selectedScheduleId);
-      if (searchQuery) params.append('search', searchQuery);
-      params.append('limit', '30');
-
-      const res = await api.get(`/sor/items/smart-search?${params.toString()}`);
-      return { items: res.data?.data || [] };
+      if (workCategory) params.append('workCategory', workCategory);
+      if (keywordSearchTerm) params.append('search', keywordSearchTerm);
+      params.append('limit', '100');
+      const res = await api.get(`/sor/keywords?${params.toString()}`);
+      return res.data?.data || { keywords: [], categories: [] };
     },
-    enabled: isOpen && (currentStep === 2 || currentStep === 1 || !!searchQuery),
+    enabled: isOpen,
   });
 
-  const searchedItems = smartSearchData?.items || [];
+  const availableKeywords = useMemo(() => {
+    return dynamicKeywordsData?.keywords || [];
+  }, [dynamicKeywordsData]);
 
-  // Reset or initialize on modal open/editing state change
+  // 4. Fetch Available Subclauses when an SOR Clause is selected
+  const parentItemCode = selectedSorItem?.itemCode || '';
+  const { data: subclausesList = [], isLoading: isSubclausesLoading } = useQuery<SubclauseItem[]>({
+    queryKey: ['sorSubclauses', selectedScheduleId, parentItemCode],
+    queryFn: async () => {
+      if (!selectedScheduleId || !parentItemCode) return [];
+      const res = await api.get(
+        `/sor/items/subclauses?sorId=${selectedScheduleId}&parentItemCode=${encodeURIComponent(parentItemCode)}`
+      );
+      return Array.isArray(res.data?.data) ? res.data.data : [];
+    },
+    enabled: isOpen && !!selectedScheduleId && !!parentItemCode,
+  });
+
+  // 5. Fetch Formulas from Quantity Master (/quantity-master/formulas)
+  const { data: qmFormulasData } = useQuery<any>({
+    queryKey: ['quantityMasterFormulas'],
+    queryFn: async () => {
+      const res = await api.get('/quantity-master/formulas?limit=200');
+      return res.data?.data;
+    },
+    enabled: isOpen,
+  });
+
+  const qmFormulas: any[] = useMemo(() => {
+    if (!qmFormulasData) return [];
+    if (Array.isArray(qmFormulasData)) return qmFormulasData;
+    if (Array.isArray(qmFormulasData.items)) return qmFormulasData.items;
+    if (Array.isArray(qmFormulasData.formulas)) return qmFormulasData.formulas;
+    return [];
+  }, [qmFormulasData]);
+
+  // 6. Fetch Existing Measurements for "Copy from Existing Item"
+  const { data: existingMeasurementsData } = useQuery<any>({
+    queryKey: ['existingMeasurementsForCopy', projectId],
+    queryFn: async () => {
+      const res = await api.get(`/projects/${projectId}/measurements?limit=100`);
+      return res.data?.data?.measurements || res.data?.data || [];
+    },
+    enabled: isOpen,
+  });
+
+  const existingMeasurements: Measurement[] = useMemo(() => {
+    return Array.isArray(existingMeasurementsData) ? existingMeasurementsData : [];
+  }, [existingMeasurementsData]);
+
+  // 7. Smart SOR Clause Search
+  const searchQueryForSor =
+    activeInputTab === 'KEYWORDS'
+      ? selectedKeywords.length > 0
+        ? selectedKeywords.join(' ')
+        : keywordsText
+      : clauseSearchTerm || itemHeading;
+
+  const { data: smartSearchData, isLoading: isClausesLoading } = useQuery<{ items: SorItem[] }>({
+    queryKey: ['smartSorSearchModal', selectedScheduleId, searchQueryForSor, workCategory],
+    queryFn: async () => {
+      if (!selectedScheduleId) return { items: [] };
+      const params = new URLSearchParams();
+      params.append('sorId', selectedScheduleId);
+      if (searchQueryForSor) params.append('search', searchQueryForSor);
+      if (workCategory) params.append('chapter', workCategory);
+      params.append('limit', '40');
+      const res = await api.get(`/sor/items/smart-search?${params.toString()}`);
+      const raw = res.data?.data;
+      const items = Array.isArray(raw) ? raw : (Array.isArray(raw?.items) ? raw.items : []);
+      return { items };
+    },
+    enabled: isOpen && !!selectedScheduleId,
+  });
+  const sorSearchResults = smartSearchData?.items || [];
+
+  // Initialize or populate when editing
   useEffect(() => {
     if (!isOpen) return;
 
     if (editingMeasurement) {
-      const entry = editingMeasurement.entries[0] || {};
-      const boqItem = editingMeasurement.boqItemId;
-      setMbDescription(entry.description || '');
-      setMbLocation(entry.location || '');
-      setMbLevel(entry.levelFloor || '');
-      setMbFormula(entry.formula || 'LxWxH');
-      setMbNos(entry.nos || 1);
-      setMbLength(entry.length || '');
-      setMbWidth(entry.width || '');
-      setMbDepth(entry.depth || '');
-      setMbHeight(entry.height || entry.heightDepth || '');
-      setMbThickness(entry.thickness || '');
-      setMbWeight(entry.weight || '');
-      setMbUnitWeight(entry.unitWeight || '');
-      setMbCustomRate(editingMeasurement.unitRate || (boqItem ? boqItem.rate : ''));
-      setMbRemarks(entry.remarks || '');
-
-      if (editingMeasurement.sorItemId && typeof editingMeasurement.sorItemId === 'object') {
-        setSelectedSorItem(editingMeasurement.sorItemId as SorItem);
+      const firstEntry = editingMeasurement.entries?.[0];
+      const boq = editingMeasurement.boqItemId as any;
+      const title = editingMeasurement.sourceItemCode
+        ? `${editingMeasurement.sourceItemCode} - ${firstEntry?.description || boq?.description || ''}`
+        : firstEntry?.description || boq?.description || '';
+      setItemHeading(title);
+      setKeywordsText(title);
+      setSorClauseInput(editingMeasurement.sourceItemCode ? `${editingMeasurement.sourceItemCode} - ${title}` : title);
+      setUnit(firstEntry?.unit || boq?.unit || 'sqm');
+      setRate(editingMeasurement.unitRate ?? boq?.rate ?? 0);
+      setWorkCategory(boq?.chapter || boq?.workCategory || '');
+      setStage(boq?.stage || '');
+      setSelectedFormulaId(boq?.formulaId?.toString() || '');
+      if (editingMeasurement.sorId) {
+        setSelectedScheduleId(editingMeasurement.sorId.toString());
       }
-      setCurrentStep(4);
+
+      if (editingMeasurement.entries && editingMeasurement.entries.length > 0) {
+        setMeasurementRows(
+          editingMeasurement.entries.map((ent, idx) => ({
+            id: `row-${idx}-${Date.now()}`,
+            description: ent.description || '',
+            nos: ent.nos !== undefined ? ent.nos : 1,
+            length: ent.length !== undefined ? ent.length : '',
+            width: ent.width !== undefined ? ent.width : '',
+            heightDepth: ent.heightDepth !== undefined ? ent.heightDepth : (ent.height || ent.depth || ''),
+            formula: ent.formula || 'LxWxH',
+            remarks: ent.remarks || '',
+          }))
+        );
+      }
     } else if (initialBoqItem) {
-      setMbDescription(initialBoqItem.description);
-      setMbCustomRate(initialBoqItem.rate);
-      // Auto deduce formula matching the BOQ item's configured unit
-      const dim = UnitDimensionEngine.getPhysicalDimension(initialBoqItem.unit);
-      if (dim === 'AREA') setMbFormula('LxW');
-      else if (dim === 'WEIGHT') setMbFormula('Weight');
-      else if (dim === 'COUNT') setMbFormula('Count');
-      else if (dim === 'LENGTH') setMbFormula('Length');
-      else setMbFormula('LxWxH');
-      setCurrentStep(4);
-    } else {
-      // Clean create mode
-      setCurrentStep(1);
-      setSelectedSorItem(null);
-      setSearchQuery('');
-      setMbDescription('');
-      setMbLocation('');
-      setMbLevel('');
-      setMbFormula('LxWxH');
-      setMbNos(1);
-      setMbLength('');
-      setMbWidth('');
-      setMbDepth('');
-      setMbHeight('');
-      setMbThickness('');
-      setMbWeight('');
-      setMbUnitWeight('');
-      setMbSelectedRebarDia('');
-      setMbCustomRate('');
-      setMbRemarks('');
+      setItemHeading(initialBoqItem.description || '');
+      setKeywordsText(initialBoqItem.description || '');
+      setSorClauseInput(
+        initialBoqItem.itemCode ? `${initialBoqItem.itemCode} - ${initialBoqItem.description}` : initialBoqItem.description || ''
+      );
+      setUnit(initialBoqItem.unit || 'sqm');
+      setRate(initialBoqItem.rate || 0);
+      setWorkCategory(initialBoqItem.chapter || '');
+      setSelectedFormulaId((initialBoqItem as any).formulaId?.toString() || '');
+      setMeasurementRows([
+        {
+          id: 'row-1',
+          description: initialBoqItem.description || '',
+          nos: 1,
+          length: '',
+          width: '',
+          heightDepth: '',
+          formula: 'LxWxH',
+          remarks: '',
+        },
+      ]);
     }
   }, [isOpen, editingMeasurement, initialBoqItem]);
 
-  // When an item is selected, configure formula and default fields
-  const handleSelectItem = (item: SorItem) => {
+  // Keyboard shortcut Ctrl+I for Input Sheet
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+        e.preventDefault();
+        setIsExcelPasteModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  // SWITCH ACTIVE SOR (Completely clears stale data from previous SOR)
+  const handleSwitchSor = (sor: ScheduleHierarchyItem) => {
+    if (sor._id === selectedScheduleId) {
+      setIsSorModalOpen(false);
+      return;
+    }
+
+    setSelectedScheduleId(sor._id);
+    // Reset all fields derived from previous SOR
+    setSelectedSorItem(null);
+    setSorClauseInput('');
+    setSubClause('');
+    setWorkCategory('');
+    setStage('');
+    setUnit('sqm');
+    setRate(0);
+    setItemHeading('');
+    setKeywordsText('');
+    setSelectedKeywords([]);
+    setMeasurementRows([
+      {
+        id: 'row-1',
+        description: '',
+        nos: '',
+        length: '',
+        width: '',
+        heightDepth: '',
+        formula: 'LxWxH',
+        remarks: '',
+      },
+    ]);
+
+    setIsSorModalOpen(false);
+    setImportedFormulaNotice(`Switched active SOR to "${sor.sorName}". All clauses and rates updated.`);
+    setTimeout(() => setImportedFormulaNotice(null), 3500);
+  };
+
+  // SELECT SOR CLAUSE
+  const handleSelectSorItem = (item: SorItem) => {
     setSelectedSorItem(item);
-    setMbDescription(item.descriptionEnglish);
-    setMbCustomRate(item.rate);
-    
-    // Choose formula dimensionally matching the item
-    let form = item.measurementFormula;
-    if (!form) {
-      const dim = UnitDimensionEngine.getPhysicalDimension(item.unit);
-      if (dim === 'AREA') form = 'LxW';
-      else if (dim === 'WEIGHT') form = 'Weight';
-      else if (dim === 'COUNT') form = 'Count';
-      else if (dim === 'LENGTH') form = 'Length';
-      else form = 'LxWxH';
-    }
-    setMbFormula(form);
+    const clauseTitle = `${item.itemCode} - ${item.descriptionEnglish}`;
+    setItemHeading(item.descriptionEnglish || clauseTitle);
+    setSorClauseInput(clauseTitle);
+    setSubClause(''); // reset subclause when parent clause changes
+    if (item.unit) setUnit(item.unit);
+    if (item.rate !== undefined) setRate(item.rate);
+    if (item.workCategory || item.chapter) setWorkCategory(item.workCategory || item.chapter || '');
 
-    // If steel/reinforcement, auto detect dia if in description
-    if (form === 'Weight' || item.workCategory?.includes('Steel')) {
-      const match = item.descriptionEnglish.match(/(\d+)\s*mm/i);
-      if (match) {
-        const dia = parseInt(match[1], 10);
-        const standard = REBAR_DIAMETERS.find((r) => r.dia === dia);
-        if (standard) {
-          setMbSelectedRebarDia(dia);
-          setMbUnitWeight(standard.weightPerMeter);
-        }
-      }
+    // Auto-match formula from Quantity Master
+    const matchFormula = Array.isArray(qmFormulas)
+      ? qmFormulas.find(
+          (f: any) =>
+            item.descriptionEnglish?.toLowerCase().includes(f?.name?.toLowerCase()) ||
+            (f?.code && item.descriptionEnglish?.toLowerCase().includes(f?.code?.toLowerCase())) ||
+            (item.workCategory && f?.category?.toLowerCase() === item.workCategory?.toLowerCase())
+        )
+      : null;
+    if (matchFormula) {
+      setSelectedFormulaId(matchFormula._id);
     }
-    setCurrentStep(4);
+
+    setIsClausePickerOpen(false);
   };
 
-  // Rebar diameter selection change
-  const handleRebarDiaChange = (diaVal: number | '') => {
-    setMbSelectedRebarDia(diaVal);
-    if (diaVal) {
-      const found = REBAR_DIAMETERS.find((r) => r.dia === diaVal);
-      if (found) {
-        setMbUnitWeight(found.weightPerMeter);
-      }
-    }
-  };
-
-  // Strict Dimensional Validation
-  const rawItemUnit = selectedSorItem?.unit || initialBoqItem?.unit || '';
-  const itemCode = selectedSorItem?.itemCode || initialBoqItem?.itemCode || '';
-  const dimensionalValidation = useMemo(() => {
-    return UnitDimensionEngine.validateDimensionalCompatibility(mbFormula, rawItemUnit, itemCode);
-  }, [mbFormula, rawItemUnit, itemCode]);
-
-  // Canonical unit for display
-  const canonicalUnit = dimensionalValidation.canonicalUnit || UnitDimensionEngine.getCanonicalUnit(rawItemUnit, mbFormula);
-
-  // Live Quantity Calculation Engine (runs on keystroke)
-  const { calculatedQuantity, formulaExpression } = useMemo(() => {
-    const nos = typeof mbNos === 'number' && mbNos > 0 ? mbNos : 1;
-    const l = typeof mbLength === 'number' ? mbLength : 0;
-    const w = typeof mbWidth === 'number' ? mbWidth : 0;
-    const h = typeof mbHeight === 'number' ? mbHeight : (typeof mbDepth === 'number' ? mbDepth : 0);
-    const thk = typeof mbThickness === 'number' ? mbThickness : 0;
-    const wt = typeof mbWeight === 'number' ? mbWeight : 0;
-    const uWt = typeof mbUnitWeight === 'number' ? mbUnitWeight : 0;
-
-    const form = (mbFormula || 'LxWxH').toUpperCase();
-    const expDim = UnitDimensionEngine.getExpectedDimensionForFormula(form);
-
-    let qty = 0;
-    let expr = '';
-
-    if (
-      form.includes('LXWXD') ||
-      form === 'LXWXD' ||
-      form === 'LXWXH' ||
-      form === 'VOLUME' ||
-      expDim === 'VOLUME'
-    ) {
-      // 3D Volume -> Evaluates to m³ (or cum)
-      const depthVal = h > 0 ? h : (thk > 0 ? thk : 1);
-      qty = nos * (l || 0) * (w || 0) * depthVal;
-      expr = `${nos > 1 ? nos + ' × ' : ''}${l}m × ${w}m × ${depthVal}m`;
-    } else if (
-      form.includes('LXW') ||
-      form.includes('LXH') ||
-      form === 'AREA' ||
-      expDim === 'AREA'
-    ) {
-      // 2D Area -> Evaluates to m² (or sqm)
-      const dim2 = w > 0 ? w : (h > 0 ? h : 1);
-      qty = nos * (l || 0) * dim2;
-      expr = `${nos > 1 ? nos + ' × ' : ''}${l}m × ${dim2}m`;
-    } else if (form === 'WEIGHT' || form.includes('STEEL') || expDim === 'WEIGHT') {
-      // Weight (kg or tonne)
-      if (uWt > 0) {
-        qty = nos * (l || 1) * uWt;
-        expr = `${nos} nos × ${l}m × ${uWt} kg/m`;
-      } else if (wt > 0) {
-        qty = nos * wt;
-        expr = `${nos > 1 ? nos + ' × ' : ''}${wt} ${canonicalUnit}`;
-      } else {
-        qty = nos * (l || 1);
-        expr = `${nos > 1 ? nos + ' × ' : ''}${l} ${canonicalUnit}`;
-      }
-    } else if (form === 'COUNT' || form === 'NOSXQTY' || expDim === 'COUNT') {
-      // Count
-      qty = nos;
-      expr = `${nos} ${canonicalUnit}`;
+  // SELECT SUBCLAUSE
+  const handleSelectSubclause = (sub: SubclauseItem) => {
+    setSubClause(`${sub.itemCode} - ${sub.description}`);
+    if (sub.unit) setUnit(sub.unit);
+    if (sub.rate !== undefined) setRate(sub.rate);
+    if (selectedSorItem) {
+      setItemHeading(`${selectedSorItem.itemCode} ${selectedSorItem.descriptionEnglish} - ${sub.description}`);
     } else {
-      // Linear or custom
-      const dimW = w > 0 ? w : 1;
-      const dimH = h > 0 ? h : 1;
-      qty = nos * (l || 1) * dimW * dimH;
-      expr = `${nos > 1 ? nos + ' × ' : ''}${l || 1}m`;
+      setItemHeading(sub.description);
+    }
+    setIsSubclausePickerOpen(false);
+  };
+
+  // TOGGLE KEYWORD SELECTION
+  const handleToggleKeyword = (kw: string) => {
+    setSelectedKeywords((prev) => {
+      const exists = prev.includes(kw);
+      const updated = exists ? prev.filter((k) => k !== kw) : [...prev, kw];
+      setKeywordsText(updated.join(', '));
+      return updated;
+    });
+  };
+
+  const handleRemoveKeyword = (kw: string) => {
+    setSelectedKeywords((prev) => {
+      const updated = prev.filter((k) => k !== kw);
+      setKeywordsText(updated.join(', '));
+      return updated;
+    });
+  };
+
+  // Import Formula from Quantity Master
+  const handleImportFormula = (formula: any) => {
+    setSelectedFormulaId(formula._id);
+    if (formula.unit) setUnit(formula.unit);
+    if (formula.category && !workCategory) setWorkCategory(formula.category);
+
+    if (slashTarget === 'HEADING') {
+      const queryPart = `/${slashQuery}`;
+      if (itemHeading.includes(queryPart)) {
+        setItemHeading(itemHeading.replace(queryPart, formula.name));
+      } else if (!itemHeading.trim()) {
+        setItemHeading(formula.name);
+      } else {
+        setItemHeading(`${itemHeading} (${formula.name})`);
+      }
+    } else if (slashTarget === 'ROW') {
+      const rows = [...measurementRows];
+      const targetRow = rows[activeRowIndexForSlash];
+      if (targetRow) {
+        const queryPart = `/${slashQuery}`;
+        if (targetRow.description.includes(queryPart)) {
+          targetRow.description = targetRow.description.replace(queryPart, formula.name);
+        } else if (!targetRow.description.trim()) {
+          targetRow.description = formula.name;
+        } else {
+          targetRow.description = `${targetRow.description} - ${formula.name}`;
+        }
+        targetRow.formula = formula.code || 'LxWxH';
+        setMeasurementRows(rows);
+      }
     }
 
-    if (isNaN(qty) || !isFinite(qty)) qty = 0;
-    const rounded = Number(qty.toFixed(3));
+    setIsSlashMenuOpen(false);
+    setSlashQuery('');
+    setImportedFormulaNotice(`✨ Linked Quantity Master formula: "${formula.name}"`);
+    setTimeout(() => setImportedFormulaNotice(null), 3500);
+  };
 
-    return {
-      calculatedQuantity: rounded,
-      formulaExpression: `${expr} = ${rounded} ${canonicalUnit}`,
-    };
-  }, [mbNos, mbLength, mbWidth, mbHeight, mbDepth, mbThickness, mbWeight, mbUnitWeight, mbFormula, canonicalUnit]);
+  // Monitor text input for slash commands (/)
+  const handleTextChangeForSlash = (
+    text: string,
+    target: 'HEADING' | 'ROW',
+    rowIndex: number = 0,
+    cursorPos?: number
+  ) => {
+    if (target === 'HEADING') {
+      if (activeInputTab === 'KEYWORDS') {
+        setKeywordsText(text);
+      } else {
+        setItemHeading(text);
+      }
+    }
 
-  // Live Rate & Amount Preview
-  const activeRate = typeof mbCustomRate === 'number' && mbCustomRate >= 0 ? mbCustomRate : (selectedSorItem?.rate || initialBoqItem?.rate || 0);
-  const liveAmount = Number((calculatedQuantity * activeRate).toFixed(2));
-  const formattedRateDisplay = UnitDimensionEngine.formatRateWithUnit(activeRate, rawItemUnit, mbFormula);
+    const slashIdx = text.lastIndexOf('/');
+    if (slashIdx !== -1 && (cursorPos === undefined || cursorPos > slashIdx)) {
+      const afterSlash = text.slice(slashIdx + 1).split(/\s/)[0];
+      setSlashQuery(afterSlash);
+      setSlashTarget(target);
+      setActiveRowIndexForSlash(rowIndex);
+      setIsSlashMenuOpen(true);
+    } else {
+      setIsSlashMenuOpen(false);
+    }
+  };
 
-  // Live Resource Breakdown Preview (Derived from Rate Analysis)
-  const resourcePreview = useMemo(() => {
-    const analysis = selectedSorItem?.rateAnalysis;
-    if (!analysis) return null;
+  // Filter Quantity Master formulas by slash query
+  const filteredQmFormulas = useMemo(() => {
+    if (!Array.isArray(qmFormulas)) return [];
+    if (!slashQuery.trim()) return qmFormulas.slice(0, 15);
+    const q = slashQuery.toLowerCase();
+    return qmFormulas
+      .filter(
+        (f: any) =>
+          f?.name?.toLowerCase().includes(q) ||
+          f?.code?.toLowerCase().includes(q) ||
+          f?.category?.toLowerCase().includes(q)
+      )
+      .slice(0, 15);
+  }, [qmFormulas, slashQuery]);
 
-    const materials = (analysis.materials || []).map((m) => {
-      const reqQty = Number((calculatedQuantity * m.coefficient).toFixed(3));
-      const cost = Number((reqQty * m.unitRate).toFixed(2));
-      return { ...m, requiredQuantity: reqQty, amount: cost };
+  // Selected formula object
+  const activeFormulaDoc = useMemo(() => {
+    if (!Array.isArray(qmFormulas)) return null;
+    return qmFormulas.find((f: any) => f?._id === selectedFormulaId) || null;
+  }, [qmFormulas, selectedFormulaId]);
+
+  // Calculate Row Quantities
+  const calculatedRows = useMemo(() => {
+    return measurementRows.map((row) => {
+      if (row.isSubheading) {
+        return {
+          ...row,
+          calculatedQuantity: 0,
+        };
+      }
+
+      const nos = typeof row.nos === 'number' && row.nos > 0 ? row.nos : 1;
+      const l = typeof row.length === 'number' ? row.length : 0;
+      const w = typeof row.width === 'number' ? row.width : 0;
+      const h = typeof row.heightDepth === 'number' ? row.heightDepth : 0;
+
+      let qty = 0;
+      if (l > 0 && w > 0 && h > 0) {
+        qty = nos * l * w * h;
+      } else if (l > 0 && w > 0) {
+        qty = nos * l * w;
+      } else if (l > 0) {
+        qty = nos * l;
+      } else {
+        qty = typeof row.nos === 'number' && row.nos > 0 ? row.nos : 0;
+      }
+
+      return {
+        ...row,
+        calculatedQuantity: Number(qty.toFixed(3)),
+      };
+    });
+  }, [measurementRows]);
+
+  // Grand Total Quantity
+  const totalCalculatedQuantity = useMemo(() => {
+    const sum = calculatedRows.reduce((acc, r) => acc + (r.calculatedQuantity || 0), 0);
+    return Number(sum.toFixed(3));
+  }, [calculatedRows]);
+
+  const activeRateNum = typeof rate === 'number' && rate >= 0 ? rate : 0;
+  const totalBoqAmount = Number((totalCalculatedQuantity * activeRateNum).toFixed(2));
+
+  // Live Analysis & Resource Breakdown from Server
+  const { data: serverPreview } = useQuery({
+    queryKey: [
+      'measurementLivePreviewDirect',
+      projectId,
+      totalCalculatedQuantity,
+      activeRateNum,
+      selectedFormulaId,
+      selectedScheduleId,
+      selectedSorItem?._id,
+      itemHeading,
+    ],
+    queryFn: async () => {
+      if (totalCalculatedQuantity <= 0) return null;
+      const res = await api.post(`/projects/${projectId}/measurements/preview`, {
+        sorId: selectedScheduleId || undefined,
+        sorItemId: selectedSorItem?._id,
+        itemCode: selectedSorItem?.itemCode,
+        description: itemHeading.trim() || keywordsText.trim() || 'Measured Item',
+        unit,
+        rate: activeRateNum,
+        formulaId: selectedFormulaId || undefined,
+        formulaCode: activeFormulaDoc?.code || undefined,
+        entries: calculatedRows
+          .filter((r) => !r.isSubheading)
+          .map((r) => ({
+            description: r.description,
+            nos: typeof r.nos === 'number' ? r.nos : 1,
+            length: typeof r.length === 'number' ? r.length : 0,
+            width: typeof r.width === 'number' ? r.width : 0,
+            heightDepth: typeof r.heightDepth === 'number' ? r.heightDepth : 0,
+            formula: r.formula,
+            remarks: r.remarks,
+          })),
+      });
+      return res.data?.data;
+    },
+    enabled: isOpen && totalCalculatedQuantity > 0,
+  });
+
+  // Add a new measurement sub-row
+  const handleAddMeasurementRow = () => {
+    setMeasurementRows((prev) => [
+      ...prev,
+      {
+        id: `row-${prev.length + 1}-${Date.now()}`,
+        description: '',
+        nos: '',
+        length: '',
+        width: '',
+        heightDepth: '',
+        formula: 'LxWxH',
+        remarks: '',
+      },
+    ]);
+  };
+
+  // Add a sub-heading row
+  const handleAddSubheading = () => {
+    setMeasurementRows((prev) => [
+      ...prev,
+      {
+        id: `subhead-${Date.now()}`,
+        isSubheading: true,
+        description: 'New Sub-heading (e.g. Ground Floor / Bed 1)',
+        nos: '',
+        length: '',
+        width: '',
+        heightDepth: '',
+        formula: '',
+        remarks: '',
+      },
+    ]);
+  };
+
+  // Remove a measurement row
+  const handleRemoveMeasurementRow = (index: number) => {
+    if (measurementRows.length <= 1) {
+      setMeasurementRows([
+        {
+          id: 'row-1',
+          description: '',
+          nos: '',
+          length: '',
+          width: '',
+          heightDepth: '',
+          formula: 'LxWxH',
+          remarks: '',
+        },
+      ]);
+      return;
+    }
+    setMeasurementRows((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  // Handle Excel Paste
+  const handleApplyExcelPaste = () => {
+    if (!excelPasteText.trim()) return;
+
+    const lines = excelPasteText.trim().split(/\r?\n/);
+    const newRows: MeasurementRowItem[] = [];
+
+    lines.forEach((line, idx) => {
+      const parts = line.split(/\t|,/);
+      if (parts.length >= 1) {
+        const desc = parts[0]?.trim() || `Sub-item ${idx + 1}`;
+        const nosVal = parseFloat(parts[1]?.trim() || '1');
+        const lVal = parseFloat(parts[2]?.trim() || '');
+        const wVal = parseFloat(parts[3]?.trim() || '');
+        const hVal = parseFloat(parts[4]?.trim() || '');
+        const rem = parts[5]?.trim() || '';
+
+        newRows.push({
+          id: `paste-row-${idx}-${Date.now()}`,
+          description: desc,
+          nos: !isNaN(nosVal) ? nosVal : '',
+          length: !isNaN(lVal) ? lVal : '',
+          width: !isNaN(wVal) ? wVal : '',
+          heightDepth: !isNaN(hVal) ? hVal : '',
+          formula: 'LxWxH',
+          remarks: rem,
+        });
+      }
     });
 
-    const labour = (analysis.labour || []).map((l) => {
-      const reqMandays = Number((calculatedQuantity * l.coefficient).toFixed(2));
-      const cost = Number((reqMandays * l.unitRate).toFixed(2));
-      return { ...l, requiredQuantity: reqMandays, amount: cost };
-    });
+    if (newRows.length > 0) {
+      setMeasurementRows(newRows);
+      setIsExcelPasteModalOpen(false);
+      setExcelPasteText('');
+    }
+  };
 
-    const machinery = (analysis.machinery || []).map((mac) => {
-      const reqHours = Number((calculatedQuantity * mac.coefficient).toFixed(2));
-      const cost = Number((reqHours * mac.unitRate).toFixed(2));
-      return { ...mac, requiredQuantity: reqHours, amount: cost };
-    });
+  // Copy from an existing measurement
+  const handleApplyCopyFromExisting = (m: Measurement) => {
+    const title = m.entries?.[0]?.description || (m.boqItemId as any)?.description || 'Copied Item';
+    setItemHeading(title);
+    setKeywordsText(title);
+    setSorClauseInput(m.sourceItemCode ? `${m.sourceItemCode} - ${title}` : title);
+    setUnit(m.entries?.[0]?.unit || 'sqm');
+    setRate(m.unitRate || 0);
+    if (m.sorId) setSelectedScheduleId(m.sorId.toString());
+    if ((m.boqItemId as any)?.chapter) setWorkCategory((m.boqItemId as any).chapter);
 
-    const matTotal = materials.reduce((s, m) => s + m.amount, 0);
-    const labTotal = labour.reduce((s, l) => s + l.amount, 0);
-    const macTotal = machinery.reduce((s, mac) => s + mac.amount, 0);
+    if (m.entries && m.entries.length > 0) {
+      setMeasurementRows(
+        m.entries.map((ent, idx) => ({
+          id: `copied-row-${idx}-${Date.now()}`,
+          description: ent.description || '',
+          nos: ent.nos !== undefined ? ent.nos : '',
+          length: ent.length !== undefined ? ent.length : '',
+          width: ent.width !== undefined ? ent.width : '',
+          heightDepth: ent.heightDepth !== undefined ? ent.heightDepth : '',
+          formula: ent.formula || 'LxWxH',
+          remarks: ent.remarks || '',
+        }))
+      );
+    }
+    setIsCopyModalOpen(false);
+    setImportedFormulaNotice(`📋 Copied details and rows from "${title}"!`);
+    setTimeout(() => setImportedFormulaNotice(null), 3000);
+  };
 
-    return {
-      materials,
-      labour,
-      machinery,
-      matTotal,
-      labTotal,
-      macTotal,
-      grandResourceCost: matTotal + labTotal + macTotal,
-      hasAnalysis: materials.length > 0 || labour.length > 0 || machinery.length > 0,
-    };
-  }, [calculatedQuantity, selectedSorItem]);
-
-  // Save / Submit Mutation
-  const saveMeasurementMutation = useMutation({
+  // Save to Measurement Book Mutation
+  const saveToMeasurementBookMutation = useMutation({
     mutationFn: async () => {
-      if (calculatedQuantity <= 0) {
-        throw new Error('Calculated quantity must be greater than zero.');
+      const activeTitle = itemHeading.trim() || keywordsText.trim() || sorClauseInput.trim();
+      if (!activeTitle) {
+        throw new Error('Please provide an Item Heading or Description.');
+      }
+      if (totalCalculatedQuantity <= 0) {
+        throw new Error('Total calculated quantity must be greater than zero. Please enter dimensions.');
       }
 
       const payload = {
+        sorId: selectedScheduleId || undefined,
         sorItemId: selectedSorItem?._id,
-        itemCode: selectedSorItem?.itemCode || initialBoqItem?.itemCode,
+        itemCode: selectedSorItem?.itemCode,
         boqItemId: initialBoqItem?._id || editingMeasurement?.boqItemId?._id,
-        description: mbDescription.trim() || selectedSorItem?.descriptionEnglish || 'Measured Item',
-        location: mbLocation.trim(),
-        levelFloor: mbLevel.trim(),
-        formula: mbFormula,
-        nos: typeof mbNos === 'number' ? mbNos : 1,
-        length: typeof mbLength === 'number' ? mbLength : 0,
-        width: typeof mbWidth === 'number' ? mbWidth : 0,
-        breadth: typeof mbWidth === 'number' ? mbWidth : 0,
-        depth: typeof mbDepth === 'number' ? mbDepth : 0,
-        height: typeof mbHeight === 'number' ? mbHeight : 0,
-        heightDepth: typeof mbHeight === 'number' ? mbHeight : (typeof mbDepth === 'number' ? mbDepth : 0),
-        thickness: typeof mbThickness === 'number' ? mbThickness : 0,
-        weight: typeof mbWeight === 'number' ? mbWeight : 0,
-        unitWeight: typeof mbUnitWeight === 'number' ? mbUnitWeight : 0,
-        unit: selectedSorItem?.unit || initialBoqItem?.unit || 'cum',
-        rate: activeRate,
-        remarks: mbRemarks.trim(),
+        description: activeTitle,
+        category: workCategory.trim() || 'General Civil Works',
+        stage: stage.trim(),
+        subClause: subClause.trim(),
+        formulaId: selectedFormulaId || undefined,
+        formulaCode: activeFormulaDoc?.code || undefined,
+        unit,
+        rate: activeRateNum,
+        formula: 'LxWxH',
+        nos: 1,
+        entries: calculatedRows
+          .filter((r) => !r.isSubheading)
+          .map((r) => ({
+            description: r.description.trim() || activeTitle,
+            nos: typeof r.nos === 'number' ? r.nos : 1,
+            length: typeof r.length === 'number' ? r.length : 0,
+            width: typeof r.width === 'number' ? r.width : 0,
+            breadth: typeof r.width === 'number' ? r.width : 0,
+            height: typeof r.heightDepth === 'number' ? r.heightDepth : 0,
+            heightDepth: typeof r.heightDepth === 'number' ? r.heightDepth : 0,
+            remarks: r.remarks.trim(),
+            formula: r.formula || 'LxWxH',
+          })),
       };
 
       if (editingMeasurement) {
@@ -410,13 +798,37 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
       onSuccess();
       onClose();
     },
-    onError: (err: unknown) => {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      alert(e.response?.data?.message || e.message || 'Failed to save measurement');
+    onError: (err: any) => {
+      alert(err.response?.data?.message || err.message || 'Failed to save measurement');
     },
   });
 
-  const isFormValid = calculatedQuantity > 0 && activeRate > 0 && dimensionalValidation.isValid;
+  // Clear Form
+  const handleClearForm = () => {
+    setItemHeading('');
+    setKeywordsText('');
+    setSelectedKeywords([]);
+    setSorClauseInput('');
+    setSelectedSorItem(null);
+    setSubClause('');
+    setWorkCategory('');
+    setStage('');
+    setSelectedFormulaId('');
+    setUnit('sqm');
+    setRate(0);
+    setMeasurementRows([
+      {
+        id: 'row-1',
+        description: '',
+        nos: '',
+        length: '',
+        width: '',
+        heightDepth: '',
+        formula: 'LxWxH',
+        remarks: '',
+      },
+    ]);
+  };
 
   return (
     <Modal
@@ -424,774 +836,1443 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
       onClose={onClose}
       title={
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-glow">
-            <Ruler className="w-4 h-4" />
+          <div className="w-5 h-5 rounded-full border-2 border-blue-400 flex items-center justify-center text-blue-400">
+            <Plus className="w-3 h-3 stroke-[3]" />
           </div>
-          <div>
-            <h2 className="text-base font-bold text-erp-text">
-              {editingMeasurement ? 'Edit Measurement Book Entry' : 'Smart Measurement Entry'}
-            </h2>
-            <p className="text-[11px] text-erp-text-muted">
-              Measurement-Driven Automated Civil Estimation & BOQ Engine
-            </p>
-          </div>
+          <h3 className="text-sm font-bold text-white tracking-wide">New Item</h3>
         </div>
       }
-      maxWidth="2xl"
+      maxWidth="7xl"
     >
-      <div className="space-y-4">
-        {/* Progress Step Indicator */}
-        {!editingMeasurement && (
-          <div className="grid grid-cols-5 gap-1 p-1 bg-slate-900/80 rounded-xl border border-erp-border text-[11px] font-medium">
-            <button
-              type="button"
-              onClick={() => setCurrentStep(1)}
-              className={cn(
-                'py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 transition-all',
-                currentStep === 1
-                  ? 'bg-blue-600 text-white shadow font-semibold'
-                  : 'text-slate-400 hover:text-slate-200'
-              )}
-            >
-              <span>1. Schedule</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentStep(2)}
-              className={cn(
-                'py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 transition-all',
-                currentStep === 2
-                  ? 'bg-blue-600 text-white shadow font-semibold'
-                  : 'text-slate-400 hover:text-slate-200'
-              )}
-            >
-              <span>2. Search</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => selectedSorItem && setCurrentStep(3)}
-              disabled={!selectedSorItem}
-              className={cn(
-                'py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 transition-all disabled:opacity-40',
-                currentStep === 3
-                  ? 'bg-blue-600 text-white shadow font-semibold'
-                  : 'text-slate-400 hover:text-slate-200'
-              )}
-            >
-              <span>3. Item</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => selectedSorItem && setCurrentStep(4)}
-              disabled={!selectedSorItem}
-              className={cn(
-                'py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 transition-all disabled:opacity-40',
-                currentStep === 4
-                  ? 'bg-blue-600 text-white shadow font-semibold'
-                  : 'text-slate-400 hover:text-slate-200'
-              )}
-            >
-              <span>4. Dimensions</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => selectedSorItem && setCurrentStep(5)}
-              disabled={!selectedSorItem || calculatedQuantity <= 0}
-              className={cn(
-                'py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 transition-all disabled:opacity-40',
-                currentStep === 5
-                  ? 'bg-blue-600 text-white shadow font-semibold'
-                  : 'text-slate-400 hover:text-slate-200'
-              )}
-            >
-              <span>5. Impact</span>
-            </button>
+      <div className="space-y-4 max-h-[82vh] overflow-y-auto pr-1 text-slate-200">
+        {/* Floating Notice */}
+        {importedFormulaNotice && (
+          <div className="p-2.5 bg-blue-500/15 border border-blue-500/40 rounded-xl flex items-center gap-2 text-xs font-semibold text-blue-300 animate-in fade-in slide-in-from-top-2">
+            <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+            <span>{importedFormulaNotice}</span>
           </div>
         )}
 
         {/* ======================================================================
-            STEP 1 & 2: SCHEDULE SELECTOR & SEARCH
+            SECTION 1: KEYWORDS & ITEM HEADING
            ====================================================================== */}
-        {(currentStep === 1 || currentStep === 2) && !editingMeasurement && (
-          <div className="space-y-4">
-            {/* Schedule Selector */}
-            <div className="bg-slate-900/60 p-4 rounded-xl border border-erp-border space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-erp-text uppercase tracking-wider flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-blue-400" />
-                  STEP 1: Select Master Schedule (DSR / SOR)
+        <div className="p-3.5 rounded-xl border border-[#1e2433] bg-[#0c1017] space-y-2.5 relative">
+          {/* Top Tabs */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveInputTab('KEYWORDS');
+                  setIsKeywordsModalOpen(true);
+                }}
+                className={cn(
+                  'px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border',
+                  activeInputTab === 'KEYWORDS'
+                    ? 'border-blue-500/60 bg-blue-600/20 text-blue-300 shadow-sm'
+                    : 'border-slate-700 bg-[#161d2b] text-slate-300 hover:text-white'
+                )}
+              >
+                <span>💡 Keywords</span>
+                {selectedKeywords.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-blue-500 text-white text-[10px] font-bold">
+                    {selectedKeywords.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveInputTab('ITEM_HEADING')}
+                className={cn(
+                  'px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border',
+                  activeInputTab === 'ITEM_HEADING'
+                    ? 'border-blue-500/60 bg-blue-600/20 text-blue-300 shadow-sm'
+                    : 'border-slate-700 bg-[#161d2b] text-slate-300 hover:text-white'
+                )}
+              >
+                <span>ITEM HEADING</span>
+              </button>
+            </div>
+
+            {/* Hint for Slash Command */}
+            <div className="flex items-center gap-1.5 text-[11px] text-blue-400/90 font-medium">
+              <Code2 className="w-3.5 h-3.5" />
+              <span>
+                Type <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono border border-slate-700">/</kbd> to import Quantity Master formula
+              </span>
+            </div>
+          </div>
+
+          {/* Active Selected Keyword Chips Bar */}
+          {selectedKeywords.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap p-2 bg-[#080b11] border border-[#1e2433] rounded-lg">
+              <span className="text-[11px] text-slate-400 font-semibold flex items-center gap-1">
+                <Tag className="w-3 h-3 text-blue-400" />
+                Active Keywords:
+              </span>
+              {selectedKeywords.map((kw) => (
+                <span
+                  key={kw}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/40"
+                >
+                  <span>{kw}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveKeyword(kw)}
+                    className="hover:text-white cursor-pointer ml-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+              <button
+                type="button"
+                onClick={() => setIsKeywordsModalOpen(true)}
+                className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold cursor-pointer underline ml-1"
+              >
+                + Manage Keywords
+              </button>
+            </div>
+          )}
+
+          {/* Text Area */}
+          <div className="relative">
+            <textarea
+              rows={2}
+              value={activeInputTab === 'ITEM_HEADING' ? itemHeading : keywordsText}
+              onChange={(e) =>
+                handleTextChangeForSlash(
+                  e.target.value,
+                  'HEADING',
+                  0,
+                  e.target.selectionStart
+                )
+              }
+              placeholder={
+                activeInputTab === 'ITEM_HEADING'
+                  ? 'e.g. Cleaning of under ground sump, Over Head R.C.C. Tank (type / for formulas)...'
+                  : 'Search keywords e.g. excavation, concrete, plaster, RCC (or click Keywords tab above)...'
+              }
+              className="w-full px-3.5 py-2.5 bg-[#080b11] border border-[#1e2536] border-l-4 border-l-blue-500 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 resize-none font-medium placeholder:text-slate-500"
+            />
+
+            {/* Slash Command Floating Popover Menu */}
+            {isSlashMenuOpen && (
+              <div className="absolute left-0 top-full mt-1 z-50 w-full max-w-md bg-[#11141f] border border-blue-500/50 rounded-xl shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95">
+                <div className="p-2.5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+                  <span className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Quantity Master Formulas {slashQuery && `matching "/${slashQuery}"`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsSlashMenuOpen(false)}
+                    className="text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="max-h-56 overflow-y-auto divide-y divide-slate-800/60 p-1">
+                  {filteredQmFormulas.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-slate-400">
+                      No matching formulas found in Quantity Master.
+                    </div>
+                  ) : (
+                    filteredQmFormulas.map((formula: any) => (
+                      <button
+                        key={formula._id}
+                        type="button"
+                        onClick={() => handleImportFormula(formula)}
+                        className="w-full text-left p-2 rounded-lg hover:bg-blue-600/20 transition-all flex flex-col gap-1 cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white group-hover:text-blue-300">
+                            {formula.name}
+                          </span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                            {formula.code}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                          <span>Unit: <strong className="text-slate-200">{formula.unit}</strong></span>
+                          <span>•</span>
+                          <span>Category: <strong className="text-slate-200">{formula.category || 'Standard'}</strong></span>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Instant SOR Auto-Suggestions dropdown if searching */}
+          {sorSearchResults.length > 0 && !selectedSorItem && (
+            <div className="bg-[#090c13] border border-[#1e2536] rounded-xl p-2.5 space-y-1.5 animate-in fade-in">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 flex items-center justify-between">
+                <span>Matching Clauses in {activeSchedule?.sorName || 'Selected SOR'} ({sorSearchResults.length})</span>
+                <button
+                  type="button"
+                  onClick={() => setIsClausePickerOpen(true)}
+                  className="text-blue-400 hover:text-blue-300 font-normal lowercase cursor-pointer"
+                >
+                  view all
+                </button>
+              </div>
+              <div className="max-h-36 overflow-y-auto space-y-1">
+                {sorSearchResults.slice(0, 5).map((item) => (
+                  <div
+                    key={item._id}
+                    onClick={() => handleSelectSorItem(item)}
+                    className="p-2 rounded-lg bg-[#111622] hover:bg-blue-600/20 border border-slate-800 hover:border-blue-500/40 cursor-pointer flex items-center justify-between text-xs transition-all"
+                  >
+                    <div className="flex items-center gap-2 truncate pr-2">
+                      <span className="font-mono text-cyan-400 font-bold shrink-0">{item.itemCode}</span>
+                      <span className="text-slate-200 truncate">{item.descriptionEnglish}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 font-medium">
+                      <span className="text-slate-400">{item.unit}</span>
+                      <span className="text-emerald-400 font-bold">{formatCurrency(item.rate, 'INR')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ======================================================================
+            SECTION 2: SOR CLAUSE & CATEGORY (Dynamic Selection)
+           ====================================================================== */}
+        <div className="p-3.5 rounded-xl border border-[#1e2433] bg-[#0c1017] space-y-2.5">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5" />
+              SOR CLAUSE & CATEGORY
+            </h4>
+
+            {/* Dynamic SOR Selection Trigger */}
+            <button
+              type="button"
+              onClick={() => setIsSorModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-md bg-[#0e2a22] text-[#34d399] border border-emerald-500/40 hover:bg-[#143d31] transition-all cursor-pointer tracking-wide"
+              title="Click to switch or select active Schedule of Rates (SOR)"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+              <span>
+                {activeSchedule
+                  ? `${activeSchedule.sorName} (${activeSchedule.authority})`
+                  : 'Select SOR Schedule'}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* SOR Clause */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+                  SOR CLAUSE
                 </label>
-                {scheduleList.length > 0 && (
-                  <span className="text-[11px] text-blue-400 font-medium">
-                    {scheduleList.length} Active Master {scheduleList.length === 1 ? 'Schedule' : 'Schedules'}
+                <button
+                  type="button"
+                  onClick={() => setIsClausePickerOpen(true)}
+                  className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer"
+                >
+                  Browse Clauses
+                </button>
+              </div>
+              <input
+                type="text"
+                value={sorClauseInput}
+                onClick={() => setIsClausePickerOpen(true)}
+                onChange={(e) => {
+                  setSorClauseInput(e.target.value);
+                  setItemHeading(e.target.value);
+                }}
+                placeholder="Click to pick or search clause..."
+                className="w-full px-3 py-2 bg-[#080b11] border border-[#1e2536] border-l-4 border-l-cyan-400 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-400 truncate font-medium cursor-pointer"
+              />
+            </div>
+
+            {/* Subclause */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+                  SUBCLAUSE
+                </label>
+                {subclausesList.length > 0 && (
+                  <span className="text-[10px] text-purple-400 font-semibold">
+                    {subclausesList.length} sub-items
                   </span>
                 )}
               </div>
+              <input
+                type="text"
+                value={subClause}
+                onClick={() => {
+                  if (subclausesList.length > 0) {
+                    setIsSubclausePickerOpen(true);
+                  }
+                }}
+                onChange={(e) => setSubClause(e.target.value)}
+                placeholder={
+                  subclausesList.length > 0
+                    ? `Click to pick (${subclausesList.length} subclauses)`
+                    : 'Click or type subclause'
+                }
+                className={cn(
+                  'w-full px-3 py-2 bg-[#080b11] border border-[#1e2536] rounded-lg text-xs text-slate-300 focus:outline-none focus:border-blue-500',
+                  subclausesList.length > 0 && 'cursor-pointer border-purple-500/40 text-purple-300 font-medium'
+                )}
+              />
+            </div>
 
-              {/* Loading State */}
-              {isLoadingSchedules ? (
-                <div className="p-4 bg-slate-950 rounded-xl border border-erp-border flex items-center justify-center gap-2 text-xs text-slate-400">
-                  <RefreshCw className="w-4 h-4 text-blue-400 animate-spin" />
-                  <span>Loading available DSR / SOR schedules from master database...</span>
+            {/* Work Category */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1 uppercase tracking-wide">
+                WORK CATEGORY
+              </label>
+              <select
+                value={workCategory}
+                onChange={(e) => setWorkCategory(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080b11] border border-[#1e2536] border-l-4 border-l-purple-400 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-purple-400"
+              >
+                <option value="">-- All Categories --</option>
+                {availableWorkCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Stage */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1 uppercase tracking-wide flex items-center gap-1">
+                <Settings className="w-3 h-3 text-blue-400" />
+                <span>STAGE</span>
+              </label>
+              <select
+                value={stage}
+                onChange={(e) => setStage(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080b11] border border-[#1e2536] border-l-4 border-l-blue-400 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-blue-400"
+              >
+                <option value="">-- Project Stage --</option>
+                <option value="Substructure / Foundation">Substructure / Foundation</option>
+                <option value="Superstructure Frame">Superstructure Frame</option>
+                <option value="Brickwork & Masonry">Brickwork & Masonry</option>
+                <option value="Plastering & Pointing">Plastering & Pointing</option>
+                <option value="Flooring & Finishing">Flooring & Finishing</option>
+                <option value="Waterproofing & Roofing">Waterproofing & Roofing</option>
+                <option value="Plumbing & Drainage">Plumbing & Drainage</option>
+                <option value="External Works & Development">External Works & Development</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* ======================================================================
+            SECTION 3: ESTIMATION (FORMULA, UNIT, RATE)
+           ====================================================================== */}
+        <div className="p-3.5 rounded-xl border border-[#1e2433] bg-[#0c1017] space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Calculator className="w-3.5 h-3.5" />
+              ESTIMATION
+            </h4>
+            <a
+              href="/planning/quantity-master"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[11px] text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 transition-colors"
+            >
+              <span>Manage Quantity Master</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+            {/* FORMULA (FOR BOM CALCULATION) */}
+            <div className="md:col-span-6">
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1 uppercase tracking-wide flex items-center justify-between">
+                <span>FORMULA (FOR BOM CALCULATION)</span>
+                {selectedFormulaId && (
+                  <span className="text-blue-400 font-normal">Active Formula</span>
+                )}
+              </label>
+              <select
+                value={selectedFormulaId}
+                onChange={(e) => {
+                  const fId = e.target.value;
+                  setSelectedFormulaId(fId);
+                  const f = Array.isArray(qmFormulas) ? qmFormulas.find((item: any) => item._id === fId) : null;
+                  if (f) {
+                    if (f.unit) setUnit(f.unit);
+                    if (f.category && !workCategory) setWorkCategory(f.category);
+                    setImportedFormulaNotice(`Linked formula "${f.name}" for automated BOM calculations.`);
+                    setTimeout(() => setImportedFormulaNotice(null), 3000);
+                  }
+                }}
+                className="w-full px-3 py-2 bg-[#080b11] border border-[#1e2536] rounded-lg text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
+              >
+                <option value="">-- No Formula / Standard --</option>
+                {Array.isArray(qmFormulas) &&
+                  qmFormulas.map((f: any) => (
+                    <option key={f._id} value={f._id}>
+                      [{f.code}] {f.name} ({f.unit}) - {f.category || 'General'}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            {/* UNIT */}
+            <div className="md:col-span-3">
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1 uppercase tracking-wide flex items-center gap-1">
+                <Settings className="w-3 h-3 text-cyan-400" />
+                <span>UNIT</span>
+              </label>
+              <input
+                type="text"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                placeholder="sqm"
+                className="w-full px-3 py-2 bg-[#080b11] border border-[#1e2536] border-l-4 border-l-cyan-400 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-400 font-mono font-semibold"
+              />
+            </div>
+
+            {/* RATE (₹) */}
+            <div className="md:col-span-3">
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1 uppercase tracking-wide">
+                RATE (₹)
+              </label>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                value={rate}
+                onChange={(e) => setRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                placeholder="0.00"
+                className="w-full px-3 py-2 bg-[#080b11] border border-[#1e2536] border-l-4 border-l-emerald-400 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-400 font-mono font-bold"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ======================================================================
+            SECTION 4: QUALITY CHECKLIST
+           ====================================================================== */}
+        <div className="p-3.5 rounded-xl border border-[#1e2433] bg-[#0c1017] space-y-2.5">
+          <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            QUALITY CHECKLIST
+          </h4>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1 uppercase tracking-wide">
+                QC CHECKLIST
+              </label>
+              <input
+                type="text"
+                value={qcChecklist}
+                onChange={(e) => setQcChecklist(e.target.value)}
+                placeholder="— Select a work category first —"
+                className="w-full px-3 py-2 bg-[#080b11] border border-[#1e2536] rounded-lg text-xs text-slate-400 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1 uppercase tracking-wide">
+                QUALITY LEVEL
+              </label>
+              <select
+                value={qualityLevel}
+                onChange={(e) => setQualityLevel(e.target.value)}
+                className="w-full px-3 py-2 bg-[#080b11] border border-[#1e2536] rounded-lg text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
+              >
+                <option value="Project default">Project default</option>
+                <option value="Standard checks">Standard checks</option>
+                <option value="High precision — critical structural">High precision — critical structural</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* ======================================================================
+            SECTION 5: SUB ITEMS (MEASUREMENTS) - Multi-Row Spreadsheet Table
+           ====================================================================== */}
+        <div className="p-3.5 rounded-xl border border-[#1e2433] bg-[#0c1017] space-y-3">
+          {/* Header & Action Toolbar */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 pb-2 border-b border-[#1e2433]">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Ruler className="w-3.5 h-3.5" />
+                SUB ITEMS (MEASUREMENTS)
+              </h4>
+              <span className="text-[11px] px-2.5 py-0.5 rounded-md bg-[#161c28] border border-slate-700 text-slate-300 font-mono">
+                ACTIVE UNIT: <strong className="text-white">m (Meters)</strong>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setIsExcelPasteModalOpen(true)}
+                className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>PASTE DIRECTLY FROM EXCEL</span>
+              </button>
+
+              <span className="text-blue-400/70 flex items-center gap-1 cursor-default">
+                <span>◫ RIGHT-CLICK A ROW FOR COPY / PASTE / INSERT</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setIsCellFormulaHelpOpen(true)}
+                className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span>Cell formula help</span>
+              </button>
+
+              <a
+                href="/planning/quantity-master"
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>Manage Formulas</span>
+              </a>
+
+              <button
+                type="button"
+                onClick={() => setIsExcelPasteModalOpen(true)}
+                className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Input Sheet (Ctrl+I)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Measurement Spreadsheet Table */}
+          <div className="overflow-x-auto rounded-lg border border-[#1e2433] bg-[#090c13]">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-[#0b0e16] text-slate-400 font-bold uppercase tracking-wider text-[11px] border-b border-[#1e2433]">
+                <tr>
+                  <th className="py-2 px-2 w-10 text-center">#</th>
+                  <th className="py-2 px-3 min-w-[260px]">SUB-ITEM NAME</th>
+                  <th className="py-2 px-2 w-24 text-center text-[#22D3EE]">NOS ▾</th>
+                  <th className="py-2 px-2 w-28 text-center text-[#34D399]">LENGTH (M) ▾</th>
+                  <th className="py-2 px-2 w-28 text-center text-[#FBBF24]">BREADTH (M) ▾</th>
+                  <th className="py-2 px-2 w-28 text-center text-[#A78BFA]">H/DEPTH (M) ▾</th>
+                  <th className="py-2 px-2 w-28 text-center text-[#60A5FA]">QTY ▾</th>
+                  <th className="py-2 px-3 w-32 text-center text-slate-400">REMARKS</th>
+                  <th className="py-2 px-2 w-10 text-center"></th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-[#181e2b]">
+                {calculatedRows.map((row, idx) => {
+                  if (row.isSubheading) {
+                    return (
+                      <tr key={row.id} className="bg-[#121724] border-y border-blue-500/20">
+                        <td className="py-2 px-2 text-center text-slate-500 font-mono text-[11px]">
+                          <div className="flex items-center justify-center gap-1">
+                            <GripVertical className="w-3.5 h-3.5 text-slate-600" />
+                            <span>{idx + 1}</span>
+                          </div>
+                        </td>
+                        <td colSpan={7} className="py-2 px-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-mono tracking-wider">
+                              SUB-HEADING
+                            </span>
+                            <input
+                              type="text"
+                              value={row.description}
+                              onChange={(e) => {
+                                const rows = [...measurementRows];
+                                rows[idx].description = e.target.value;
+                                setMeasurementRows(rows);
+                              }}
+                              placeholder="Enter sub-heading name..."
+                              className="w-full bg-transparent font-bold text-xs text-white focus:outline-none placeholder:text-slate-500"
+                            />
+                          </div>
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMeasurementRow(idx)}
+                            className="p-1 rounded text-slate-500 hover:text-rose-400"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return (
+                    <tr key={row.id} className="hover:bg-[#121622]/60 group transition-colors">
+                      {/* # and drag handle */}
+                      <td className="py-2 px-2 text-center text-slate-500 font-mono text-[11px] align-top pt-3">
+                        <div className="flex items-center justify-center gap-1">
+                          <GripVertical className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 cursor-grab" />
+                          <span>{idx + 1}</span>
+                        </div>
+                      </td>
+
+                      {/* SUB-ITEM NAME */}
+                      <td className="py-2 px-2 align-top">
+                        <div className="space-y-1.5">
+                          <input
+                            type="text"
+                            value={row.description}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const rows = [...measurementRows];
+                              rows[idx].description = val;
+                              setMeasurementRows(rows);
+                              handleTextChangeForSlash(val, 'ROW', idx, e.target.selectionStart || 0);
+                            }}
+                            placeholder="e.g. Bedroom X -> or type @ to pick a saved item"
+                            className="w-full px-3 py-1.5 bg-[#080b11] border border-[#1e2536] focus:border-blue-500 rounded-lg text-xs text-white focus:outline-none transition-colors"
+                          />
+                          <div
+                            onClick={() => {
+                              setActiveRowIndexForSlash(idx);
+                              setSlashTarget('ROW');
+                              setSlashQuery('');
+                              setIsSlashMenuOpen(true);
+                            }}
+                            className="px-2 py-0.5 bg-[#0a0d15] border border-purple-500/30 rounded text-[10px] text-purple-400 font-mono flex items-center justify-between cursor-pointer hover:border-purple-500/60 transition-colors w-fit"
+                          >
+                            <span>type / for formula</span>
+                            {row.formula && row.formula !== 'LxWxH' && (
+                              <span className="ml-2 font-bold text-blue-400">[{row.formula}]</span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* NOS */}
+                      <td className="py-2 px-1.5 align-top">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={row.nos}
+                          onChange={(e) => {
+                            const rows = [...measurementRows];
+                            rows[idx].nos = e.target.value === '' ? '' : parseFloat(e.target.value);
+                            setMeasurementRows(rows);
+                          }}
+                          placeholder="N1"
+                          className="w-full px-2 py-1.5 bg-[#080b11] border border-[#1e2536] focus:border-cyan-400 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium"
+                        />
+                      </td>
+
+                      {/* LENGTH (M) */}
+                      <td className="py-2 px-1.5 align-top">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={row.length}
+                          onChange={(e) => {
+                            const rows = [...measurementRows];
+                            rows[idx].length = e.target.value === '' ? '' : parseFloat(e.target.value);
+                            setMeasurementRows(rows);
+                          }}
+                          placeholder="L1"
+                          className="w-full px-2 py-1.5 bg-[#080b11] border border-[#1e2536] border-l-2 border-l-emerald-400 focus:border-emerald-400 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium"
+                        />
+                      </td>
+
+                      {/* BREADTH (M) */}
+                      <td className="py-2 px-1.5 align-top">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={row.width}
+                          onChange={(e) => {
+                            const rows = [...measurementRows];
+                            rows[idx].width = e.target.value === '' ? '' : parseFloat(e.target.value);
+                            setMeasurementRows(rows);
+                          }}
+                          placeholder="B1"
+                          className="w-full px-2 py-1.5 bg-[#080b11] border border-[#1e2536] border-l-2 border-l-amber-400 focus:border-amber-400 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium"
+                        />
+                      </td>
+
+                      {/* H/DEPTH (M) */}
+                      <td className="py-2 px-1.5 align-top">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={row.heightDepth}
+                          onChange={(e) => {
+                            const rows = [...measurementRows];
+                            rows[idx].heightDepth = e.target.value === '' ? '' : parseFloat(e.target.value);
+                            setMeasurementRows(rows);
+                          }}
+                          placeholder="H1"
+                          className="w-full px-2 py-1.5 bg-[#080b11] border border-[#1e2536] border-l-2 border-l-purple-400 focus:border-purple-400 rounded-lg text-xs text-white text-center focus:outline-none font-mono font-medium"
+                        />
+                      </td>
+
+                      {/* QTY */}
+                      <td className="py-2 px-1.5 align-top">
+                        <div className="w-full px-2 py-1.5 bg-[#080b11] border border-blue-500/60 rounded-lg text-xs text-blue-300 font-bold font-mono text-center">
+                          {typeof row.calculatedQuantity === 'number' && row.calculatedQuantity > 0
+                            ? row.calculatedQuantity.toFixed(3)
+                            : 'Q1'}
+                        </div>
+                      </td>
+
+                      {/* REMARKS */}
+                      <td className="py-2 px-1.5 align-top">
+                        <input
+                          type="text"
+                          value={row.remarks}
+                          onChange={(e) => {
+                            const rows = [...measurementRows];
+                            rows[idx].remarks = e.target.value;
+                            setMeasurementRows(rows);
+                          }}
+                          placeholder=""
+                          className="w-full px-2 py-1.5 bg-[#080b11] border border-[#1e2536] focus:border-slate-500 rounded-lg text-xs text-slate-300 focus:outline-none"
+                        />
+                      </td>
+
+                      {/* Delete action (red ✕) */}
+                      <td className="py-2 px-1 text-center align-top pt-2.5">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMeasurementRow(idx)}
+                          title="Delete Row"
+                          className="text-red-500/80 hover:text-red-400 hover:bg-red-500/10 p-1 rounded transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* GROUP TOTAL row right-aligned */}
+          <div className="flex justify-end items-center px-4 py-1.5 text-xs font-bold text-slate-400">
+            <span className="tracking-wider uppercase">GROUP TOTAL =</span>
+            <span className="text-white font-mono font-bold text-sm ml-4 min-w-[70px] text-right">
+              {totalCalculatedQuantity.toFixed(3)}
+            </span>
+          </div>
+
+          {/* Sub-row action buttons */}
+          <div className="flex items-center gap-2 pt-1 flex-wrap">
+            <button
+              type="button"
+              onClick={handleAddMeasurementRow}
+              className="px-3 py-1.5 rounded-lg bg-[#141824] hover:bg-[#1a2030] text-slate-200 border border-slate-700/80 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-blue-400" />
+              <span>Add Sub-row</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleAddSubheading}
+              className="px-3 py-1.5 rounded-lg bg-[#141824] hover:bg-[#1a2030] text-slate-200 border border-slate-700/80 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <span className="font-bold text-[11px] text-purple-400">H3</span>
+              <span>Add Sub-heading</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsDrawingNoticeOpen(true)}
+              className="px-3 py-1.5 rounded-lg bg-[#141824] hover:bg-[#1a2030] text-slate-200 border border-slate-700/80 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Maximize2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Measure from Drawing</span>
+            </button>
+          </div>
+
+          {/* Live Summary Bar */}
+          <div className="p-3 bg-[#080b11] rounded-xl border border-[#1e2433] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs mt-2">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-mono">TOTAL QUANTITY</span>
+                <span className="text-base font-bold text-emerald-400 font-mono">
+                  {totalCalculatedQuantity} {unit}
+                </span>
+              </div>
+              <div className="h-7 w-px bg-slate-800 hidden sm:block" />
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-mono">ESTIMATED RATE</span>
+                <span className="text-base font-bold text-white font-mono">
+                  {formatCurrency(activeRateNum, 'INR')} / {unit}
+                </span>
+              </div>
+              <div className="h-7 w-px bg-slate-800 hidden sm:block" />
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-mono">TOTAL ITEM AMOUNT</span>
+                <span className="text-base font-bold text-blue-400 font-mono">
+                  {formatCurrency(totalBoqAmount, 'INR')}
+                </span>
+              </div>
+            </div>
+
+            {/* Live Automated Breakdown Badge */}
+            {serverPreview?.impact && (
+              <div className="flex items-center gap-2 bg-[#101420] px-3 py-1.5 rounded-lg border border-slate-800">
+                <span className="text-[11px] text-slate-400">Automated Resources:</span>
+                <span className="text-[11px] font-semibold text-blue-400">
+                  Mat: {formatCurrency(serverPreview.impact.totalMaterialCost || 0, 'INR')}
+                </span>
+                <span className="text-slate-600">•</span>
+                <span className="text-[11px] font-semibold text-amber-400">
+                  Lab: {formatCurrency(serverPreview.impact.totalLabourCost || 0, 'INR')}
+                </span>
+                <span className="text-slate-600">•</span>
+                <span className="text-[11px] font-semibold text-purple-400">
+                  Mach: {formatCurrency(serverPreview.impact.totalMachineryCost || 0, 'INR')}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ======================================================================
+            FOOTER ACTIONS: Clear Form & Save to Measurement Book
+           ====================================================================== */}
+        <div className="flex items-center justify-between pt-3 border-t border-[#1e2433]">
+          {/* Left: Copy from Existing Item */}
+          <button
+            type="button"
+            onClick={() => setIsCopyModalOpen(true)}
+            className="px-3.5 py-2 rounded-lg bg-[#141824] hover:bg-[#1a2030] text-slate-200 border border-slate-700/80 text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <FileText className="w-4 h-4 text-blue-400" />
+            <span>Copy from Existing Item</span>
+          </button>
+
+          {/* Right: Clear Form and Save */}
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleClearForm}
+              className="px-4 py-2 rounded-lg bg-[#1e2330] hover:bg-[#252c3c] text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Clear Form
+            </button>
+
+            <button
+              type="button"
+              onClick={() => saveToMeasurementBookMutation.mutate()}
+              disabled={
+                totalCalculatedQuantity <= 0 ||
+                (!itemHeading.trim() && !keywordsText.trim() && !sorClauseInput.trim()) ||
+                saveToMeasurementBookMutation.isPending
+              }
+              className="px-5 py-2 rounded-lg bg-[#2563EB] hover:bg-[#1d4ed8] text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+            >
+              {saveToMeasurementBookMutation.isPending ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              <span>Save to Measurement Book</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ======================================================================
+          DYNAMIC SOR SELECTION MODAL (Zero Hardcoding)
+         ====================================================================== */}
+      {isSorModalOpen && (
+        <Modal
+          isOpen={isSorModalOpen}
+          onClose={() => setIsSorModalOpen(false)}
+          title={
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-emerald-400" />
+              <span>Select Schedule of Rates (SOR)</span>
+            </div>
+          }
+          maxWidth="2xl"
+        >
+          <div className="space-y-3.5">
+            <p className="text-xs text-slate-400">
+              Choose an active Schedule of Rates from the database. All clauses, subclauses, categories, and rates will update dynamically:
+            </p>
+
+            {/* Search filter */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={sorSearchTerm}
+                onChange={(e) => setSorSearchTerm(e.target.value)}
+                placeholder="Search by schedule name, authority (CPWD, State PWD), version..."
+                className="w-full pl-9 pr-3 py-2 bg-[#080b11] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            {/* SOR List */}
+            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+              {isSchedulesLoading ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-slate-400" />
+                  Loading uploaded SOR schedules...
                 </div>
-              ) : isScheduleError ? (
-                /* Error State */
-                <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-center justify-between gap-3 text-xs text-rose-300">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                    <span>Failed to load DSR/SOR schedules from server.</span>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={() => refetchSchedules()} className="text-xs">
-                    Retry
-                  </Button>
-                </div>
-              ) : scheduleList.length === 0 ? (
-                /* Empty State */
-                <div className="p-6 bg-slate-950/80 rounded-xl border border-dashed border-erp-border text-center space-y-2">
-                  <Package className="w-8 h-8 text-slate-500 mx-auto" />
-                  <p className="text-xs font-semibold text-slate-300">No DSR/SOR master data available.</p>
-                  <p className="text-[11px] text-slate-500 max-w-md mx-auto">
-                    Import a DSR/SOR dataset (CPWD DSR, CGPWD, Maharashtra PWD, etc.) from Admin → DSR/SOR Master to enable measurement-driven estimations.
-                  </p>
+              ) : filteredScheduleList.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  No imported SOR schedules found in database matching "{sorSearchTerm}".
                 </div>
               ) : (
-                /* Dynamic Schedule Dropdown */
-                <div className="space-y-3">
-                  <select
-                    value={selectedScheduleId}
-                    onChange={(e) => {
-                      setSelectedScheduleId(e.target.value);
-                      setSelectedSorItem(null);
-                    }}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-erp-border rounded-xl text-xs text-erp-text font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                  >
-                    {scheduleList.map((s) => (
-                      <option key={s._id} value={s._id}>
-                        {s.authority} {s.scheduleType} {s.version} — {s.sorName} ({s.itemCount.toLocaleString('en-IN')} items{s.rateAnalysisStatus === 'Available' ? ' | Rate Analysis Available' : s.rateAnalysisStatus === 'Partial' ? ' | Partial Analysis' : ''})
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* Dynamic Active Schedule Details Card */}
-                  {selectedSchedule && (
-                    <div className="p-3.5 bg-slate-950/90 rounded-xl border border-blue-500/20 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block uppercase font-medium">Authority & Type</span>
-                        <span className="font-bold text-blue-300">
-                          {selectedSchedule.authority} ({selectedSchedule.scheduleType})
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block uppercase font-medium">Version / Year</span>
-                        <span className="font-bold text-erp-text">
-                          v{selectedSchedule.version} {selectedSchedule.volume ? `• ${selectedSchedule.volume}` : ''}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block uppercase font-medium">Category / Items</span>
-                        <span className="font-bold text-emerald-400">
-                          {selectedSchedule.itemCount.toLocaleString('en-IN')} items
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block uppercase font-medium">Rate Analysis</span>
-                        <span
-                          className={cn(
-                            'font-bold text-[11px] px-2 py-0.5 rounded-full inline-block mt-0.5',
-                            selectedSchedule.rateAnalysisStatus === 'Available'
-                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                              : selectedSchedule.rateAnalysisStatus === 'Partial'
-                              ? 'bg-amber-950 text-amber-300 border border-amber-800'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700'
-                          )}
-                        >
-                          {selectedSchedule.rateAnalysisStatus === 'Available'
-                            ? 'Available'
-                            : selectedSchedule.rateAnalysisStatus === 'Partial'
-                            ? 'Partial DAR'
-                            : 'Not Available'}
-                        </span>
-                      </div>
-
-                      {/* Source Document File Metadata */}
-                      {selectedSchedule.documentName && (
-                        <div className="col-span-2 sm:col-span-4 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                          <span className="flex items-center gap-1.5 truncate">
-                            <FileSpreadsheet className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                            Source Document: <strong className="text-slate-300 truncate">{selectedSchedule.documentName}</strong>
+                filteredScheduleList.map((sor) => {
+                  const isSelected = sor._id === selectedScheduleId;
+                  return (
+                    <div
+                      key={sor._id}
+                      onClick={() => handleSwitchSor(sor)}
+                      className={cn(
+                        'p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between',
+                        isSelected
+                          ? 'bg-emerald-950/30 border-emerald-500/60 shadow-lg shadow-emerald-950/50'
+                          : 'bg-[#0a0d15] hover:bg-[#111724] border-slate-800 hover:border-slate-700'
+                      )}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white tracking-wide">
+                            {sor.sorName}
                           </span>
-                          <span className="text-[10px] text-slate-500 shrink-0">
-                            {selectedSchedule.category || selectedSchedule.department}
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                            {sor.authority} {sor.version}
                           </span>
                         </div>
-                      )}
+                        <div className="text-[11px] text-slate-400 flex items-center gap-3">
+                          <span>Department: <strong className="text-slate-300">{sor.department || 'Civil'}</strong></span>
+                          <span>•</span>
+                          <span>Category: <strong className="text-slate-300">{sor.category || 'Standard'}</strong></span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right font-mono">
+                          <span className="text-xs font-bold text-emerald-400">
+                            {sor.itemCount ? sor.itemCount.toLocaleString() : 0}
+                          </span>
+                          <span className="text-[10px] text-slate-500 block uppercase">items</span>
+                        </div>
+                        {isSelected && (
+                          <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-emerald-400">
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button variant="outline" size="sm" onClick={() => setIsSorModalOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ======================================================================
+          DYNAMIC KEYWORDS MULTI-SELECTOR MODAL
+         ====================================================================== */}
+      {isKeywordsModalOpen && (
+        <Modal
+          isOpen={isKeywordsModalOpen}
+          onClose={() => setIsKeywordsModalOpen(false)}
+          title={
+            <div className="flex items-center gap-2">
+              <Tag className="w-5 h-5 text-blue-400" />
+              <span>Select Construction Keywords</span>
+            </div>
+          }
+          maxWidth="2xl"
+        >
+          <div className="space-y-3.5">
+            <p className="text-xs text-slate-400">
+              Select keywords derived dynamically from the database for <strong>{activeSchedule?.sorName}</strong> to filter matching clauses and auto-complete headings:
+            </p>
+
+            {/* Keyword Search */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={keywordSearchTerm}
+                onChange={(e) => setKeywordSearchTerm(e.target.value)}
+                placeholder="Search keywords (e.g. concrete, excavation, shuttering, beam)..."
+                className="w-full pl-9 pr-3 py-2 bg-[#080b11] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Selected Chips */}
+            {selectedKeywords.length > 0 && (
+              <div className="p-2.5 bg-[#090c13] border border-blue-500/30 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Selected Keywords ({selectedKeywords.length}):</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedKeywords([]);
+                      setKeywordsText('');
+                    }}
+                    className="text-rose-400 hover:text-rose-300 font-medium cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {selectedKeywords.map((kw) => (
+                    <span
+                      key={kw}
+                      className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-md bg-blue-600 text-white font-medium"
+                    >
+                      <span>{kw}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveKeyword(kw)}
+                        className="hover:text-blue-200 cursor-pointer ml-0.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Available Keywords Grid */}
+            <div className="max-h-72 overflow-y-auto p-1 pr-2">
+              {isKeywordsLoading ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-slate-400" />
+                  Loading keywords from database...
+                </div>
+              ) : availableKeywords.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  No keywords found matching "{keywordSearchTerm}".
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {availableKeywords.map((k) => {
+                    const isSelected = selectedKeywords.includes(k.label);
+                    return (
+                      <button
+                        key={k.label}
+                        type="button"
+                        onClick={() => handleToggleKeyword(k.label)}
+                        className={cn(
+                          'px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer border',
+                          isSelected
+                            ? 'bg-blue-600 text-white border-blue-400 shadow-sm'
+                            : 'bg-[#10141f] hover:bg-[#161c2b] text-slate-300 hover:text-white border-slate-800 hover:border-slate-700'
+                        )}
+                      >
+                        <span>{k.label}</span>
+                        {k.count > 1 && (
+                          <span
+                            className={cn(
+                              'text-[10px] px-1.5 py-0.2 rounded-full font-mono',
+                              isSelected ? 'bg-blue-700 text-blue-100' : 'bg-slate-800 text-slate-400'
+                            )}
+                          >
+                            {k.count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            {/* STEP 2: Keyword Quick Chips & Search */}
-            <div className={cn('space-y-3 transition-opacity', !selectedScheduleId ? 'opacity-50 pointer-events-none' : 'opacity-100')}>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-erp-text uppercase tracking-wider flex items-center gap-1.5">
-                    <Search className="w-4 h-4 text-blue-400" />
-                    STEP 2: Search Work Item by Keyword
-                  </label>
-                  {selectedSchedule && (
-                    <span className="text-[10px] text-slate-400">
-                      Searching in <strong className="text-blue-300">{selectedSchedule.sorName}</strong>
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {QUICK_KEYWORDS.map((kw) => (
-                    <button
-                      key={kw}
-                      type="button"
-                      disabled={!selectedScheduleId}
-                      onClick={() => {
-                        setSearchQuery(kw);
-                        setCurrentStep(2);
-                      }}
-                      className={cn(
-                        'px-2.5 py-1 text-xs rounded-lg border transition-all',
-                        searchQuery.toLowerCase() === kw.toLowerCase()
-                          ? 'bg-blue-600 text-white border-blue-500 shadow'
-                          : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-slate-800'
-                      )}
-                    >
-                      {kw}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Search Box */}
-                <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    disabled={!selectedScheduleId}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={
-                      selectedSchedule
-                        ? `Search across ${selectedSchedule.itemCount.toLocaleString('en-IN')} items in ${selectedSchedule.sorName} (e.g. 4.1.3, PCC, Plaster, Concrete)...`
-                        : 'Select a schedule in Step 1 first...'
+            <div className="flex justify-between items-center pt-2 border-t border-slate-800">
+              <span className="text-xs text-slate-500">
+                {selectedKeywords.length} selected
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsKeywordsModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setIsKeywordsModalOpen(false);
+                    if (selectedKeywords.length > 0) {
+                      setKeywordsText(selectedKeywords.join(', '));
                     }
-                    className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-erp-border rounded-xl text-xs text-erp-text placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all disabled:opacity-50"
-                    autoFocus
-                  />
-                  {isSearching && (
-                    <RefreshCw className="w-3.5 h-3.5 text-blue-400 animate-spin absolute right-3 top-1/2 -translate-y-1/2" />
-                  )}
-                </div>
-              </div>
-
-              {/* Search Results List */}
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {searchedItems.length === 0 ? (
-                  <div className="p-8 text-center bg-slate-900/40 rounded-xl border border-dashed border-erp-border text-xs text-slate-400">
-                    {searchQuery
-                      ? `No matching items found for "${searchQuery}" in ${selectedSchedule?.sorName || 'selected schedule'}. Try another keyword or item code.`
-                      : 'Type a keyword or select one from the quick chips above to search items.'}
-                  </div>
-                ) : (
-                  searchedItems.map((item) => (
-                    <div
-                      key={item._id}
-                      onClick={() => handleSelectItem(item)}
-                      className={cn(
-                        'p-3 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-3 group',
-                        selectedSorItem?._id === item._id
-                          ? 'bg-blue-600/15 border-blue-500/50 shadow-md'
-                          : 'bg-slate-900/60 border-erp-border hover:border-blue-500/30 hover:bg-slate-850'
-                      )}
-                    >
-                      <div className="space-y-1 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
-                            {item.itemCode}
-                          </span>
-                          {item.workCategory && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                              {item.workCategory}
-                            </span>
-                          )}
-                          {item.rateAnalysisStatus === 'AVAILABLE' ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950/70 text-emerald-300 border border-emerald-800 flex items-center gap-1 font-medium">
-                              <Sparkles className="w-2.5 h-2.5" />
-                              DAR Composition Available
-                            </span>
-                          ) : (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950/50 text-amber-300 border border-amber-800/70">
-                              Analysis Not Configured
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-erp-text font-medium line-clamp-2">
-                          {item.descriptionEnglish}
-                        </p>
-                        <div className="text-[10px] text-slate-400 flex items-center gap-3">
-                          <span>Unit: <strong className="text-slate-300">{item.unit}</strong></span>
-                          <span>Rate: <strong className="text-emerald-400">₹{item.rate.toLocaleString('en-IN')}/{item.unit}</strong></span>
-                          {item.measurementFormula && (
-                            <span>Formula: <strong className="font-mono text-blue-300">{item.measurementFormula}</strong></span>
-                          )}
-                        </div>
-                      </div>
-                      <Button size="sm" variant="ghost" className="shrink-0 group-hover:translate-x-1 transition-transform">
-                        <ChevronRight className="w-4 h-4 text-blue-400" />
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ======================================================================
-            STEP 3: SELECTED ITEM DETAILS CARD
-           ====================================================================== */}
-        {(currentStep === 3 || currentStep === 4 || currentStep === 5) && selectedSorItem && (
-          <div className="p-3.5 bg-gradient-to-r from-blue-950/40 via-slate-900 to-indigo-950/40 rounded-xl border border-blue-500/30 flex items-start justify-between gap-4">
-            <div className="space-y-1.5 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-600 text-white">
-                  {selectedSorItem.itemCode}
-                </span>
-                <span className="text-[10px] text-slate-300 font-semibold px-2 py-0.5 rounded bg-slate-800 border border-slate-700">
-                  {typeof selectedSorItem.sorId === 'object' ? selectedSorItem.sorId.sorName : 'SOR Item'}
-                </span>
-                {selectedSorItem.rateAnalysisStatus === 'AVAILABLE' ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> DAR Available
-                  </span>
-                ) : (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                    Analysis Not Configured
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-erp-text font-medium line-clamp-2">
-                {selectedSorItem.descriptionEnglish}
-              </p>
-              <div className="flex items-center gap-4 text-xs font-semibold">
-                <span className="text-slate-400">
-                  Unit: <strong className="text-erp-text font-mono">{selectedSorItem.unit}</strong>
-                </span>
-                <span className="text-emerald-400">
-                  Rate: <strong>₹{activeRate.toLocaleString('en-IN')}/{selectedSorItem.unit}</strong>
-                </span>
-              </div>
-            </div>
-
-            {!editingMeasurement && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setCurrentStep(2)}
-                className="text-xs text-blue-400 hover:text-blue-300 shrink-0"
-              >
-                Change Item
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* ======================================================================
-            STEP 4: MEASUREMENT DIMENSIONS ENTRY (MEASUREMENT-FIRST UI)
-           ====================================================================== */}
-        {currentStep === 4 && (
-          <div className="space-y-4">
-            {/* Strict Dimensional Compatibility Warning Banner */}
-            {!dimensionalValidation.isValid && (
-              <div className="p-3.5 bg-rose-500/15 border border-rose-500/40 rounded-xl flex items-start gap-2.5 text-xs text-rose-300">
-                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                <div className="space-y-0.5 flex-1">
-                  <strong className="font-bold text-rose-200">DATA CONFIGURATION ERROR:</strong>
-                  <p className="text-[11px] text-rose-300/90 leading-relaxed">
-                    {dimensionalValidation.errorMessage}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-erp-text uppercase tracking-wider flex items-center gap-1.5">
-                <Calculator className="w-4 h-4 text-blue-400" />
-                Measurement Dimensions & Formula
-              </h3>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-400">Formula:</span>
-                <select
-                  value={mbFormula}
-                  onChange={(e) => setMbFormula(e.target.value as MeasurementFormula)}
-                  className="px-2.5 py-1 bg-slate-900 border border-erp-border rounded-lg text-xs font-mono text-blue-300"
+                  }}
                 >
-                  <option value="LxWxH">Length × Width × Height / Depth (Volume - m³)</option>
-                  <option value="LxW">Length × Width (Area - m²)</option>
-                  <option value="Weight">Weight / Steel Reinforcement (kg / tonne)</option>
-                  <option value="Count">Count / Numbers (Nos)</option>
-                  <option value="Length">Running Length (m)</option>
-                  <option value="Custom">Custom Formula</option>
+                  Apply Keywords
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ======================================================================
+          DYNAMIC SOR CLAUSE SELECTOR MODAL
+         ====================================================================== */}
+      {isClausePickerOpen && (
+        <Modal
+          isOpen={isClausePickerOpen}
+          onClose={() => setIsClausePickerOpen(false)}
+          title={
+            <div className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-cyan-400" />
+              <span>Select SOR Clause ({activeSchedule?.sorName})</span>
+            </div>
+          }
+          maxWidth="4xl"
+        >
+          <div className="space-y-3.5">
+            {/* Clause Search & Category Filter */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+              <div className="sm:col-span-8 relative">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={clauseSearchTerm}
+                  onChange={(e) => setClauseSearchTerm(e.target.value)}
+                  placeholder="Search item code (e.g. 14.78, 2.16) or description..."
+                  className="w-full pl-9 pr-3 py-2 bg-[#080b11] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="sm:col-span-4">
+                <select
+                  value={workCategory}
+                  onChange={(e) => setWorkCategory(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#080b11] border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="">-- All Categories --</option>
+                  {availableWorkCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
 
-            {/* Location & Floor */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                  Location / Grid Reference
-                </label>
-                <input
-                  type="text"
-                  value={mbLocation}
-                  onChange={(e) => setMbLocation(e.target.value)}
-                  placeholder="e.g. Footing F1-F8 / Tower A"
-                  className="w-full px-3 py-2 bg-slate-950 border border-erp-border rounded-lg text-xs text-erp-text"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                  Level / Floor
-                </label>
-                <input
-                  type="text"
-                  value={mbLevel}
-                  onChange={(e) => setMbLevel(e.target.value)}
-                  placeholder="e.g. Foundation Level -3.5m"
-                  className="w-full px-3 py-2 bg-slate-950 border border-erp-border rounded-lg text-xs text-erp-text"
-                />
-              </div>
-            </div>
-
-            {/* Dynamic Dimension Inputs */}
-            <div className="p-3.5 bg-slate-900/70 rounded-xl border border-erp-border space-y-3">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* Nos */}
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                    Nos (Members) *
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={mbNos}
-                    onChange={(e) => setMbNos(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-950 border border-erp-border rounded-lg text-xs text-erp-text font-bold"
-                  />
+            {/* Clauses List */}
+            <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1">
+              {isClausesLoading ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-slate-400" />
+                  Loading clauses...
                 </div>
-
-                {/* Length (shown for all except pure count) */}
-                {mbFormula !== 'Count' && (
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                      Length (m) *
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      min={0}
-                      value={mbLength}
-                      onChange={(e) => setMbLength(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="0.00"
-                      className="w-full px-3 py-2 bg-slate-950 border border-erp-border rounded-lg text-xs text-erp-text"
-                    />
-                  </div>
-                )}
-
-                {/* Width / Breadth (shown for LxWxH, LxW, LxWxD) */}
-                {(mbFormula === 'LxWxH' || mbFormula === 'LxW' || mbFormula === 'LxWxD' || mbFormula === 'Custom') && (
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                      Width / Breadth (m) *
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      min={0}
-                      value={mbWidth}
-                      onChange={(e) => setMbWidth(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="0.00"
-                      className="w-full px-3 py-2 bg-slate-950 border border-erp-border rounded-lg text-xs text-erp-text"
-                    />
-                  </div>
-                )}
-
-                {/* Depth / Height / Thickness (shown for 3D formulas) */}
-                {(mbFormula === 'LxWxH' || mbFormula === 'LxWxD' || mbFormula === 'Custom') && (
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                      {selectedSorItem?.workCategory?.includes('Earthwork') ? 'Depth / Cut (m) *' : 'Height / Depth (m) *'}
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      min={0}
-                      value={mbHeight}
-                      onChange={(e) => {
-                        setMbHeight(e.target.value === '' ? '' : Number(e.target.value));
-                        setMbDepth(e.target.value === '' ? '' : Number(e.target.value));
-                      }}
-                      placeholder="0.00"
-                      className="w-full px-3 py-2 bg-slate-950 border border-erp-border rounded-lg text-xs text-erp-text"
-                    />
-                  </div>
-                )}
-
-                {/* Steel Rebar Diameter / Unit Weight Selector */}
-                {(mbFormula === 'Weight' || selectedSorItem?.workCategory?.includes('Steel')) && (
-                  <>
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                        Bar Dia (mm)
-                      </label>
-                      <select
-                        value={mbSelectedRebarDia}
-                        onChange={(e) => handleRebarDiaChange(e.target.value === '' ? '' : Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-slate-950 border border-erp-border rounded-lg text-xs text-erp-text"
-                      >
-                        <option value="">Custom Weight</option>
-                        {REBAR_DIAMETERS.map((r) => (
-                          <option key={r.dia} value={r.dia}>
-                            {r.dia} mm ({r.weightPerMeter} kg/m)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                        Unit Weight (kg/m)
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        min={0}
-                        value={mbUnitWeight}
-                        onChange={(e) => setMbUnitWeight(e.target.value === '' ? '' : Number(e.target.value))}
-                        placeholder="e.g. 0.888"
-                        className="w-full px-3 py-2 bg-slate-950 border border-erp-border rounded-lg text-xs text-erp-text font-mono"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* LIVE COMPUTATION PREVIEW BOX */}
-              <div className="p-3 bg-gradient-to-r from-emerald-950/40 to-slate-900 border border-emerald-500/30 rounded-xl space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-300 font-semibold flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                    Live Formula Evaluation:
-                  </span>
-                  <span className="font-mono text-xs text-emerald-300">
-                    {formulaExpression}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-emerald-500/20 text-center">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">Calculated Quantity</span>
-                    <span className="text-base font-bold text-emerald-400">
-                      {calculatedQuantity.toLocaleString('en-IN')} {canonicalUnit}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">DSR/SOR Rate</span>
-                    <span className="text-sm font-bold text-erp-text">
-                      {formattedRateDisplay}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">BOQ Amount</span>
-                    <span className="text-base font-bold text-blue-400">
-                      ₹{liveAmount.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ======================================================================
-            STEP 5: LIVE IMPACT PREVIEW (BOQ, MATERIALS, MANPOWER, MACHINERY)
-           ====================================================================== */}
-        {currentStep === 5 && (
-          <div className="space-y-4">
-            <div className="p-4 bg-slate-900 rounded-xl border border-erp-border space-y-3">
-              <h3 className="text-xs font-bold text-erp-text uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-emerald-400" />
-                Live Automated Execution Impact Preview
-              </h3>
-              <p className="text-[11px] text-erp-text-muted">
-                Saving this measurement will automatically create/update the BOQ and derive the following resource requirements without manual entry:
-              </p>
-
-              {/* BOQ Summary Card */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-950 rounded-xl border border-erp-border text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">Measured Quantity</span>
-                  <span className="text-sm font-bold text-emerald-400">
-                    {calculatedQuantity} {canonicalUnit}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">Item Rate</span>
-                  <span className="text-sm font-bold text-erp-text">{formattedRateDisplay}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">BOQ Amount</span>
-                  <span className="text-sm font-bold text-blue-400">₹{liveAmount.toLocaleString('en-IN')}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">Rate Analysis</span>
-                  <span className={cn('text-xs font-bold', resourcePreview?.hasAnalysis ? 'text-emerald-400' : 'text-amber-400')}>
-                    {resourcePreview?.hasAnalysis ? 'Official CPWD DAR' : 'Not Configured'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Resource Breakdown Tables */}
-              {resourcePreview?.hasAnalysis ? (
-                <div className="space-y-3 pt-2">
-                  {/* Bill of Materials Preview */}
-                  {resourcePreview.materials.length > 0 && (
-                    <div className="p-3 bg-slate-950/60 rounded-xl border border-erp-border space-y-1.5">
-                      <div className="flex items-center justify-between text-xs font-semibold text-erp-text">
-                        <span className="flex items-center gap-1.5 text-blue-400">
-                          <Package className="w-3.5 h-3.5" />
-                          Bill of Materials (BOM) Auto-Calculated
-                        </span>
-                        <span className="text-blue-300">₹{resourcePreview.matTotal.toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="divide-y divide-slate-800 text-[11px]">
-                        {resourcePreview.materials.map((m, idx) => (
-                          <div key={idx} className="py-1 flex items-center justify-between text-slate-300">
-                            <span>{m.name} ({m.coefficient} {m.unit}/{selectedSorItem?.unit})</span>
-                            <span className="font-mono font-semibold text-emerald-400">
-                              {m.requiredQuantity} {m.unit} @ ₹{m.unitRate} = ₹{m.amount.toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bill of Manpower Preview */}
-                  {resourcePreview.labour.length > 0 && (
-                    <div className="p-3 bg-slate-950/60 rounded-xl border border-erp-border space-y-1.5">
-                      <div className="flex items-center justify-between text-xs font-semibold text-erp-text">
-                        <span className="flex items-center gap-1.5 text-purple-400">
-                          <Users2 className="w-3.5 h-3.5" />
-                          Bill of Manpower Auto-Calculated
-                        </span>
-                        <span className="text-purple-300">₹{resourcePreview.labTotal.toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="divide-y divide-slate-800 text-[11px]">
-                        {resourcePreview.labour.map((l, idx) => (
-                          <div key={idx} className="py-1 flex items-center justify-between text-slate-300">
-                            <span>{l.name} ({l.coefficient} Day/{selectedSorItem?.unit})</span>
-                            <span className="font-mono font-semibold text-purple-300">
-                              {l.requiredQuantity} Mandays @ ₹{l.unitRate} = ₹{l.amount.toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bill of Machinery Preview */}
-                  {resourcePreview.machinery.length > 0 && (
-                    <div className="p-3 bg-slate-950/60 rounded-xl border border-erp-border space-y-1.5">
-                      <div className="flex items-center justify-between text-xs font-semibold text-erp-text">
-                        <span className="flex items-center gap-1.5 text-amber-400">
-                          <Truck className="w-3.5 h-3.5" />
-                          Bill of Machinery Auto-Calculated
-                        </span>
-                        <span className="text-amber-300">₹{resourcePreview.macTotal.toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="divide-y divide-slate-800 text-[11px]">
-                        {resourcePreview.machinery.map((mac, idx) => (
-                          <div key={idx} className="py-1 flex items-center justify-between text-slate-300">
-                            <span>{mac.name} ({mac.coefficient} Hr/{selectedSorItem?.unit})</span>
-                            <span className="font-mono font-semibold text-amber-300">
-                              {mac.requiredQuantity} Hours @ ₹{mac.unitRate} = ₹{mac.amount.toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+              ) : sorSearchResults.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  No clauses found for {activeSchedule?.sorName} matching "{clauseSearchTerm || searchQueryForSor}".
                 </div>
               ) : (
-                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs text-amber-300">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong>Rate Analysis Not Configured:</strong>
-                    <p className="text-[11px] text-amber-200/80 mt-0.5">
-                      BOQ item amount will be updated automatically. To generate granular material, labour, and machinery requirements, configure custom rate analysis from the BOQ tab.
-                    </p>
-                  </div>
-                </div>
+                sorSearchResults.map((item) => {
+                  const isSelected = selectedSorItem?._id === item._id;
+                  return (
+                    <div
+                      key={item._id}
+                      onClick={() => handleSelectSorItem(item)}
+                      className={cn(
+                        'p-3 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-3',
+                        isSelected
+                          ? 'bg-cyan-950/30 border-cyan-500/60 shadow-md'
+                          : 'bg-[#090c13] hover:bg-[#111726] border-slate-800 hover:border-slate-700'
+                      )}
+                    >
+                      <div className="space-y-1 pr-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-cyan-400 font-bold text-xs">
+                            {item.itemCode}
+                          </span>
+                          {item.chapter && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                              {item.chapter}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-200 line-clamp-2">
+                          {item.descriptionEnglish}
+                        </p>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="font-mono font-bold text-emerald-400 text-xs">
+                          {formatCurrency(item.rate, 'INR')}
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono block">
+                          per {item.unit || 'unit'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
-          </div>
-        )}
 
-        {/* Modal Navigation Buttons */}
-        <div className="pt-3 border-t border-erp-border flex items-center justify-between gap-3">
-          <div>
-            {currentStep > 1 && !editingMeasurement && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentStep((prev) => (prev - 1) as any)}
-                leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
-              >
-                Back
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button variant="outline" size="sm" onClick={() => setIsClausePickerOpen(false)}>
+                Close
               </Button>
-            )}
+            </div>
           </div>
+        </Modal>
+      )}
 
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
+      {/* ======================================================================
+          DYNAMIC SUBCLAUSE PICKER MODAL
+         ====================================================================== */}
+      {isSubclausePickerOpen && (
+        <Modal
+          isOpen={isSubclausePickerOpen}
+          onClose={() => setIsSubclausePickerOpen(false)}
+          title={
+            <div className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-purple-400" />
+              <span>
+                Available Subclauses for Clause {selectedSorItem?.itemCode}
+              </span>
+            </div>
+          }
+          maxWidth="2xl"
+        >
+          <div className="space-y-3.5">
+            <p className="text-xs text-slate-400">
+              Select an applicable subclause specification. The unit and rate will automatically adjust:
+            </p>
 
-            {currentStep === 4 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setCurrentStep(5)}
-                disabled={calculatedQuantity <= 0}
-                rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-              >
-                Preview Impact
+            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+              {isSubclausesLoading ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-slate-400" />
+                  Loading subclauses...
+                </div>
+              ) : subclausesList.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  No child subclauses found for clause {selectedSorItem?.itemCode}.
+                </div>
+              ) : (
+                subclausesList.map((sub) => (
+                  <div
+                    key={sub._id}
+                    onClick={() => handleSelectSubclause(sub)}
+                    className="p-3 rounded-xl bg-[#090c13] hover:bg-purple-950/20 border border-slate-800 hover:border-purple-500/40 cursor-pointer flex items-center justify-between transition-all"
+                  >
+                    <div className="pr-3">
+                      <div className="font-mono text-xs font-bold text-purple-400">
+                        {sub.itemCode}
+                      </div>
+                      <div className="text-xs text-slate-200 mt-0.5">
+                        {sub.description}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 font-mono">
+                      <span className="text-xs font-bold text-emerald-400">
+                        {formatCurrency(sub.rate, 'INR')}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block uppercase">
+                        per {sub.unit || 'unit'}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button variant="outline" size="sm" onClick={() => setIsSubclausePickerOpen(false)}>
+                Close
               </Button>
-            )}
-
-            {(currentStep === 4 || currentStep === 5 || editingMeasurement) && (
-              <Button
-                size="sm"
-                onClick={() => saveMeasurementMutation.mutate()}
-                disabled={!isFormValid}
-                isLoading={saveMeasurementMutation.isPending}
-                leftIcon={<CheckCircle2 className="w-4 h-4" />}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg"
-              >
-                {editingMeasurement ? 'Update & Recalculate' : 'Save Measurement & Sync All'}
-              </Button>
-            )}
+            </div>
           </div>
-        </div>
-      </div>
+        </Modal>
+      )}
+
+      {/* Direct Excel Paste Modal */}
+      {isExcelPasteModalOpen && (
+        <Modal
+          isOpen={isExcelPasteModalOpen}
+          onClose={() => setIsExcelPasteModalOpen(false)}
+          title="Paste Directly from Excel (Ctrl+I)"
+          maxWidth="lg"
+        >
+          <div className="space-y-3">
+            <p className="text-xs text-slate-400">
+              Copy rows from Excel or Google Sheets and paste here. Columns should match:
+              <br />
+              <code className="text-blue-400 font-mono">Description | Nos | Length | Width | Height | Remarks</code>
+            </p>
+            <textarea
+              rows={8}
+              value={excelPasteText}
+              onChange={(e) => setExcelPasteText(e.target.value)}
+              placeholder={"Footing F1\t2\t3.5\t2.0\t0.4\tBase pad\nColumn C1\t4\t0.5\t0.5\t3.2\tLift 1"}
+              className="w-full p-3 bg-[#080a0f] border border-slate-750 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+            />
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <Button variant="outline" size="sm" onClick={() => setIsExcelPasteModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleApplyExcelPaste} disabled={!excelPasteText.trim()}>
+                Import Measurement Rows
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Copy from Existing Item Modal */}
+      {isCopyModalOpen && (
+        <Modal
+          isOpen={isCopyModalOpen}
+          onClose={() => setIsCopyModalOpen(false)}
+          title="Copy from Existing Measurement"
+          maxWidth="2xl"
+        >
+          <div className="space-y-3">
+            <p className="text-xs text-slate-400">
+              Select an existing measurement from this project to clone its item description, unit, rate, and dimension rows:
+            </p>
+            <div className="max-h-80 overflow-y-auto space-y-1.5 pr-1">
+              {existingMeasurements.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500">
+                  No existing measurements found in this project.
+                </div>
+              ) : (
+                existingMeasurements.map((m) => {
+                  const mTitle = m.entries?.[0]?.description || (m.boqItemId as any)?.description || 'Measurement Item';
+                  const mQty = m.totalQuantity || (m as any).quantity || 0;
+                  const mUnit = m.entries?.[0]?.unit || 'sqm';
+                  return (
+                    <div
+                      key={m._id}
+                      onClick={() => handleApplyCopyFromExisting(m)}
+                      className="p-3 rounded-xl bg-[#090c13] hover:bg-blue-600/20 border border-slate-800 hover:border-blue-500/40 cursor-pointer flex items-center justify-between transition-all"
+                    >
+                      <div className="pr-3 truncate">
+                        <div className="text-xs font-bold text-white truncate">{mTitle}</div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                          <span>{m.entries?.length || 1} sub-rows</span>
+                          <span>•</span>
+                          <span>Unit: {mUnit}</span>
+                          {m.unitRate ? (
+                            <>
+                              <span>•</span>
+                              <span className="text-emerald-400">{formatCurrency(m.unitRate, 'INR')}</span>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-bold font-mono text-cyan-400">
+                          {mQty} {mUnit}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button variant="outline" size="sm" onClick={() => setIsCopyModalOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Cell Formula Help Modal */}
+      {isCellFormulaHelpOpen && (
+        <Modal
+          isOpen={isCellFormulaHelpOpen}
+          onClose={() => setIsCellFormulaHelpOpen(false)}
+          title="Measurement Calculation & Formula Guide"
+          maxWidth="lg"
+        >
+          <div className="space-y-3.5 text-xs text-slate-300">
+            <div className="p-3 rounded-lg bg-[#0b0e16] border border-slate-800 space-y-1.5">
+              <div className="font-bold text-white text-sm">Standard Formulas</div>
+              <p className="text-slate-400">
+                The spreadsheet table automatically computes quantities based on your input dimensions:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 font-mono text-[11px] text-emerald-400">
+                <li>Volume: Nos × Length × Breadth × Height/Depth</li>
+                <li>Area: Nos × Length × Breadth</li>
+                <li>Length / Linear: Nos × Length</li>
+                <li>Count: Nos</li>
+              </ul>
+            </div>
+
+            <div className="p-3 rounded-lg bg-[#0b0e16] border border-slate-800 space-y-1.5">
+              <div className="font-bold text-blue-400 text-sm">Slash (/) Commands</div>
+              <p className="text-slate-400">
+                Type <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono border border-slate-700">/</kbd> in the Item Heading or any Sub-item row to search and import formulas directly from Quantity Master.
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button size="sm" onClick={() => setIsCellFormulaHelpOpen(false)}>
+                Got it
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Measure from Drawing Notice */}
+      {isDrawingNoticeOpen && (
+        <Modal
+          isOpen={isDrawingNoticeOpen}
+          onClose={() => setIsDrawingNoticeOpen(false)}
+          title="Measure from Drawing (CAD / PDF)"
+          maxWidth="md"
+        >
+          <div className="space-y-3 text-xs text-slate-300">
+            <div className="p-4 rounded-xl bg-[#090c13] border border-slate-800 text-center space-y-2">
+              <Maximize2 className="w-8 h-8 text-emerald-400 mx-auto" />
+              <div className="font-bold text-white text-sm">Interactive CAD & Blueprint Scale Tool</div>
+              <p className="text-slate-400 text-xs">
+                To measure lengths or areas directly from your uploaded architectural floor plans or drawings, visit the Drawings viewer and click the calibrate & measure tool.
+              </p>
+            </div>
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button size="sm" onClick={() => setIsDrawingNoticeOpen(false)}>
+                Understood
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </Modal>
   );
 };

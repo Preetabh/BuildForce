@@ -842,7 +842,7 @@ export class QuantityMasterPdfService {
       if (headerKeywords.filter((k) => lower.includes(k)).length >= 3) {
         continue;
       }
-      if (lower.startsWith('buildforce') || lower.startsWith('page ') || lower.startsWith('quantity master')) {
+      if (lower.startsWith('buildforce') || lower.startsWith('budgetpilot') || lower.startsWith('page ') || lower.startsWith('quantity master')) {
         continue;
       }
 
@@ -987,7 +987,7 @@ export class QuantityMasterPdfService {
     for (const line of lines) {
       const lower = line.toLowerCase();
       if (headerKeywords.filter((k) => lower.includes(k)).length >= 3) continue;
-      if (lower.startsWith('buildforce') || lower.startsWith('page ') || lower.startsWith('quantity master')) continue;
+      if (lower.startsWith('buildforce') || lower.startsWith('budgetpilot') || lower.startsWith('page ') || lower.startsWith('quantity master')) continue;
 
       let parts: string[] = [];
       if (line.includes('|')) {
@@ -1098,7 +1098,7 @@ export class QuantityMasterPdfService {
     for (const line of lines) {
       const lower = line.toLowerCase();
       if (headerKeywords.filter((k) => lower.includes(k)).length >= 3) continue;
-      if (lower.startsWith('buildforce') || lower.startsWith('page ') || lower.startsWith('quantity master')) continue;
+      if (lower.startsWith('buildforce') || lower.startsWith('budgetpilot') || lower.startsWith('page ') || lower.startsWith('quantity master')) continue;
 
       let parts: string[] = [];
       if (line.includes('|')) {
@@ -1197,7 +1197,7 @@ export class QuantityMasterPdfService {
     for (const line of lines) {
       const lower = line.toLowerCase();
       if (headerKeywords.filter((k) => lower.includes(k)).length >= 3) continue;
-      if (lower.startsWith('buildforce') || lower.startsWith('page ') || lower.startsWith('quantity master')) continue;
+      if (lower.startsWith('buildforce') || lower.startsWith('budgetpilot') || lower.startsWith('page ') || lower.startsWith('quantity master')) continue;
 
       let parts: string[] = [];
       if (line.includes('|')) {
@@ -1298,7 +1298,7 @@ export class QuantityMasterPdfService {
         currentListName = line.split(':')[1]?.trim() || currentListName;
         continue;
       }
-      if (lower.includes('rate list') || lower.includes('coverage') || lower.startsWith('buildforce')) continue;
+      if (lower.includes('rate list') || lower.includes('coverage') || lower.startsWith('buildforce') || lower.startsWith('budgetpilot')) continue;
 
       let parts: string[] = [];
       if (line.includes('|')) {

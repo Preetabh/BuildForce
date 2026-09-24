@@ -53,7 +53,10 @@ router.use(authenticate);
 
 // 2. Rate Master Queries
 router.get('/items/smart-search', requirePermission('sor.view'), SorController.smartSearchSorItems);
+router.get('/items/subclauses', requirePermission('sor.view'), SorController.getSubclauses);
 router.get('/schedules/hierarchy', requirePermission('sor.view'), SorController.getScheduleHierarchy);
+router.get('/keywords', requirePermission('sor.view'), SorController.getDynamicKeywords);
+router.get('/categories', requirePermission('sor.view'), SorController.getSorCategories);
 router.get('/export', requirePermission('sor.view'), SorController.exportSor);
 router.get('/items', requirePermission('sor.view'), SorController.getSorItems);
 router.post('/items', requirePermission('sor.import'), SorController.createSorItem);
