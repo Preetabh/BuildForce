@@ -215,6 +215,46 @@ export const ComingSoonModule: React.FC = () => {
       ],
       workflowSteps: ['Vendor Onboarding', 'KYC Verification', 'Rate Contract', 'PO / Work Allocation', 'Performance Audit'],
     },
+    '/vendors/suppliers': {
+      title: 'Material Suppliers & Vendor Registry',
+      category: 'VENDOR MANAGEMENT',
+      icon: Truck,
+      description: 'Catalog of verified building material suppliers, steel rolling mills, cement stockists, and RMC batching plants.',
+      phase: 'Phase 2.1 (Q4 2026)',
+      keyMetrics: [
+        { label: 'Active Suppliers', value: '88 Companies' },
+        { label: 'Rate Contracts (SRC)', value: '32 Active' },
+        { label: 'Avg Lead Time', value: '2.4 Days' },
+      ],
+      features: [
+        'Itemized supplier rate agreements for cement, steel, bricks, aggregate, and finishes',
+        '3-Way match integration with POs and delivery Goods Receipt Notes (GRN)',
+        'Supplier credit period and credit limit compliance tracking',
+        'Automated Request for Quotation (RFQ) distribution to eligible suppliers',
+        'Quality non-conformance and damaged material rejection logs',
+      ],
+      workflowSteps: ['Supplier Registration', 'Rate Card Freezing', 'RFQ Dispatch', 'Comparative Bid Review', 'PO Dispatch'],
+    },
+    '/vendors/workers': {
+      title: 'Workers & Subcontractor Gangs',
+      category: 'VENDOR MANAGEMENT',
+      icon: HardHat,
+      description: 'Worker registry, labour contractors, Mukadam gang allocations, piece-rate wages, and site deployment.',
+      phase: 'Phase 2.1 (Q4 2026)',
+      keyMetrics: [
+        { label: 'Total Workers', value: '340 Labourers' },
+        { label: 'Contractor Gangs', value: '24 Gangs' },
+        { label: 'Today On-site', value: '286 Deployed' },
+      ],
+      features: [
+        'Labour contractor and subcontractor piece-rate gang management',
+        'Skill classification (Mason, Bar-bender, Carpenter, Helper, Welder)',
+        'Daily muster roll attendance linked to contractor work measurement logs',
+        'Advance payment, retention money, and piece-rate wage calculation',
+        'Worker safety compliance, ESI/PF registration, and site gate-pass issuance',
+      ],
+      workflowSteps: ['Gang Registration', 'Identity Verification', 'Shift Deployment', 'Output Measurement', 'Wage Settlement'],
+    },
 
     // PLANNING
     '/planning': {

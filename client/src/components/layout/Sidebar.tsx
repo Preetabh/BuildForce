@@ -25,6 +25,10 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
+  Building2,
+  CreditCard,
+  Handshake,
+  HardHat,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -70,11 +74,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Resize drag state
   const [isDragging, setIsDragging] = useState(false);
 
+  // Hover expansion state when sidebar is minimized ("after hover expand navbar")
+  const [isHovered, setIsHovered] = useState(false);
+
   // Group accordion state (only ONE section open at a time: "jab ek section open ho dusra close")
   const [openGroupId, setOpenGroupId] = useState<string | null>('plannings');
 
-  // Popover state for minimized mode flyout menus
-  const [activeFlyoutGroup, setActiveFlyoutGroup] = useState<string | null>(null);
+  // The sidebar is visually compact ONLY if it is minimized AND not currently hovered
+  const isCompact = isMinimized && !isHovered;
 
   const toggleGroup = (groupId: string) => {
     // When clicking the currently open group, toggle it closed; otherwise open it and close any other
@@ -99,10 +106,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'LEAD MANAGEMENT',
       icon: Target,
       items: [
-        { label: 'Lead Pipeline & Enquiries', path: '/leads', icon: Target, isComingSoon: true },
-        { label: 'Client Quotations & Bids', path: '/sales/bids', icon: FileSpreadsheet, isComingSoon: true },
-        { label: 'Tender Estimation', path: '/sales/tenders', icon: BadgePercent, isComingSoon: true },
-        { label: 'Work Orders & Contracts', path: '/sales/work-orders', icon: ClipboardCheck, isComingSoon: true },
+        { label: 'Leads', path: '/leads', icon: Target, isComingSoon: true },
+        { label: 'Client', path: '/leads/clients', icon: Building2, isComingSoon: true },
+        { label: 'Payment', path: '/leads/payments', icon: CreditCard, isComingSoon: true },
+        { label: 'Reference Partners', path: '/leads/partners', icon: Handshake, isComingSoon: true },
+        { label: 'Commission Report', path: '/leads/commission-reports', icon: FileSpreadsheet, isComingSoon: true },
       ],
     },
     {
@@ -110,11 +118,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'VENDOR MANAGEMENT',
       icon: Truck,
       items: [
-        { label: 'Vendor Directory & KYC', path: '/vendors', icon: Truck, isComingSoon: true },
-        { label: 'Purchase Orders (PO)', path: '/materials/purchase-orders', icon: FileSpreadsheet, isComingSoon: true },
-        { label: 'Material Requisitions (MRN)', path: '/materials/mrn', icon: Layers, isComingSoon: true },
-        { label: 'Goods Receipt Notes (GRN)', path: '/materials/grn', icon: ClipboardCheck, isComingSoon: true },
-        { label: 'Subcontractor Work Logs', path: '/execution/subcontractor-logs', icon: Wrench, isComingSoon: true },
+        { label: 'Suppliers', path: '/vendors/suppliers', icon: Truck, isComingSoon: true },
+        { label: 'Workers', path: '/vendors/workers', icon: HardHat, isComingSoon: true },
       ],
     },
     {
@@ -183,7 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onWidthChange?.(260);
   };
 
-  const currentEffectiveWidth = isMinimized ? 68 : width;
+  const currentEffectiveWidth = isCompact ? 68 : width;
 
   return (
     <>
@@ -195,40 +200,76 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container with Hover-Expand Support */}
       <aside
+        onMouseEnter={() => {
+          if (isMinimized) setIsHovered(true);
+        }}
+        onMouseLeave={() => {
+          if (isMinimized) setIsHovered(false);
+        }}
         style={{
           width: `${currentEffectiveWidth}px`,
           maxWidth: 'calc(100vw - 2.5rem)',
-          transition: isDragging ? 'none' : 'width 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms ease-in-out',
+          transition: isDragging
+            ? 'none'
+            : 'width 240ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms ease-in-out',
         }}
         className={cn(
           'fixed top-0 bottom-0 left-0 z-50 bg-[#0A0D14] border-r border-[#161D2E] flex flex-col md:translate-x-0 select-none shadow-2xl',
+          isMinimized && isHovered && 'shadow-[0_0_35px_rgba(0,0,0,0.85)] border-r-blue-500/40 z-50',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Brand Header */}
-        <div className="p-3 border-b border-[#161D2E] flex items-center justify-between bg-[#0E1528] shrink-0 min-h-[58px]">
-          {isMinimized ? (
-            /* Minimized Brand Header */
-            <div className="w-full flex items-center justify-center">
+        <div
+          className={cn(
+            'border-b border-[#161D2E] bg-[#0E1528] shrink-0 transition-all duration-200',
+            isCompact ? 'p-2.5 flex flex-col items-center gap-2' : 'p-3.5 flex items-center justify-between min-h-[62px]'
+          )}
+        >
+          {isCompact ? (
+            /* Minimized Brand Header with Prominent Logo */
+            <div className="w-full flex flex-col items-center gap-2">
+              {/* Clickable Logo with glow */}
+              <button
+                onClick={onToggleMinimize}
+                title="BudgetPilot (Click or hover to expand sidebar)"
+                className="w-11 h-11 rounded-xl overflow-hidden shadow-lg shadow-blue-500/30 border border-cyan-500/50 bg-gradient-to-br from-[#0c1426] via-[#080d19] to-black p-1 flex items-center justify-center hover:scale-105 hover:border-cyan-400 transition-all cursor-pointer group"
+              >
+                <img
+                  src="/logo-dark.png"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (!target.src.includes('logo.png')) target.src = '/logo.png';
+                  }}
+                  alt="BudgetPilot Logo"
+                  className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(56,189,248,0.7)] group-hover:drop-shadow-[0_0_12px_rgba(56,189,248,1)] transition-all"
+                />
+              </button>
+
+              {/* Expand Toggle Button */}
               <button
                 onClick={onToggleMinimize}
                 title="Expand Sidebar"
-                className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-800/60 hover:bg-blue-600/20 text-slate-300 hover:text-cyan-300 transition-all border border-slate-700/60 group"
+                className="w-8 h-6 rounded-md flex items-center justify-center text-slate-400 hover:text-cyan-300 hover:bg-slate-800/80 transition-all border border-transparent hover:border-slate-700/60"
               >
-                <PanelLeftOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                <PanelLeftOpen className="w-4 h-4" />
               </button>
             </div>
           ) : (
-            /* Full Brand Header */
+            /* Full Expanded Brand Header (also shown when hovered!) */
             <>
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-blue-500/20 shrink-0 border border-cyan-500/40 bg-gradient-to-br from-[#0c1426] via-[#080d19] to-black p-1 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-blue-500/25 shrink-0 border border-cyan-500/50 bg-gradient-to-br from-[#0c1426] via-[#080d19] to-black p-1 flex items-center justify-center">
                   <img
-                    src={isDark ? '/logo-dark.png' : '/logo.png'}
+                    src="/logo-dark.png"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      if (!target.src.includes('logo.png')) target.src = '/logo.png';
+                    }}
                     alt="BudgetPilot Logo"
-                    className="w-full h-full object-contain filter drop-shadow-[0_0_6px_rgba(56,189,248,0.5)]"
+                    className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]"
                   />
                 </div>
                 <div className="min-w-0">
@@ -248,7 +289,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {onToggleMinimize && (
                   <button
                     onClick={onToggleMinimize}
-                    title="Minimize Sidebar"
+                    title={isMinimized ? 'Pin Expanded' : 'Minimize Sidebar'}
                     className="hidden md:flex p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/80 transition-colors"
                   >
                     <PanelLeftClose className="w-4 h-4" />
@@ -273,11 +314,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               to="/"
               end
               onClick={() => onClose()}
-              title={isMinimized ? 'Home' : undefined}
+              title={isCompact ? 'Home' : undefined}
               className={({ isActive }) =>
                 cn(
                   'group flex items-center rounded-lg font-medium transition-all duration-150',
-                  isMinimized ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2',
+                  isCompact ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2',
                   isActive
                     ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.35)]'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -292,7 +333,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
                     )}
                   />
-                  {!isMinimized && <span className="font-semibold truncate">Home</span>}
+                  {!isCompact && <span className="font-semibold truncate">Home</span>}
                 </>
               )}
             </NavLink>
@@ -305,46 +346,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
               const hasActiveChild = group.items.some(
                 (item) => location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path))
               );
-              const isFlyoutOpen = activeFlyoutGroup === group.id;
 
               return (
-                <div
-                  key={group.id}
-                  className="relative rounded-lg"
-                  onMouseEnter={() => isMinimized && setActiveFlyoutGroup(group.id)}
-                  onMouseLeave={() => isMinimized && setActiveFlyoutGroup(null)}
-                >
+                <div key={group.id} className="relative rounded-lg">
                   {/* Group Header Button */}
                   <button
                     onClick={() => {
-                      if (isMinimized && onToggleMinimize) {
+                      if (isCompact && onToggleMinimize) {
                         onToggleMinimize();
                         setOpenGroupId(group.id);
                       } else {
                         toggleGroup(group.id);
                       }
                     }}
-                    title={isMinimized ? group.label : undefined}
+                    title={isCompact ? group.label : undefined}
                     className={cn(
                       'w-full flex items-center rounded-lg font-semibold tracking-wider text-[11px] transition-all duration-150',
-                      isMinimized ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
-                      isOpenGroup && !isMinimized
+                      isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
+                      isOpenGroup && !isCompact
                         ? 'text-blue-400 bg-blue-500/10'
                         : hasActiveChild
                         ? 'text-cyan-300 bg-slate-800/50'
                         : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
                     )}
                   >
-                    <div className={cn('flex items-center min-w-0', !isMinimized && 'gap-2.5')}>
+                    <div className={cn('flex items-center min-w-0', !isCompact && 'gap-2.5')}>
                       <group.icon
                         className={cn(
                           'w-4 h-4 shrink-0 transition-colors',
                           isOpenGroup || hasActiveChild ? 'text-cyan-400' : 'text-slate-400'
                         )}
                       />
-                      {!isMinimized && <span className="truncate">{group.label}</span>}
+                      {!isCompact && <span className="truncate">{group.label}</span>}
                     </div>
-                    {!isMinimized && (
+                    {!isCompact && (
                       isOpenGroup ? (
                         <ChevronDown className="w-3.5 h-3.5 text-blue-400 transition-transform shrink-0 ml-1" />
                       ) : (
@@ -353,60 +388,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     )}
                   </button>
 
-                  {/* Minimized Mode Floating Flyout Menu */}
-                  {isMinimized && isFlyoutOpen && (
-                    <div className="absolute left-full top-0 ml-2.5 z-[60] w-56 bg-[#0E1528] border border-slate-700/80 rounded-xl p-2 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
-                      <div className="px-2.5 py-1.5 border-b border-slate-800/80 mb-1 flex items-center gap-2">
-                        <group.icon className="w-3.5 h-3.5 text-cyan-400" />
-                        <span className="font-bold text-[11px] text-white tracking-wider">{group.label}</span>
-                      </div>
-                      <div className="space-y-0.5">
-                        {group.items.map((subItem) => {
-                          const SubIcon = subItem.icon || FileSpreadsheet;
-                          return (
-                            <NavLink
-                              key={subItem.path}
-                              to={subItem.path}
-                              onClick={() => {
-                                onClose();
-                                setActiveFlyoutGroup(null);
-                              }}
-                              className={({ isActive }) =>
-                                cn(
-                                  'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
-                                  isActive
-                                    ? 'bg-blue-600 text-white shadow-sm'
-                                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                                )
-                              }
-                            >
-                              {({ isActive }) => (
-                                <>
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <SubIcon
-                                      className={cn(
-                                        'w-3.5 h-3.5 shrink-0 transition-colors',
-                                        isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
-                                      )}
-                                    />
-                                    <span className="truncate">{subItem.label}</span>
-                                  </div>
-                                  {subItem.isComingSoon && (
-                                    <span className="text-[9px] px-1 py-0.2 rounded font-medium bg-slate-800 text-slate-400 border border-slate-700/50">
-                                      Soon
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                            </NavLink>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Group Sub-Items in Full Mode (Single accordion active) */}
-                  {!isMinimized && isOpenGroup && (
+                  {/* Group Sub-Items (Single accordion active) */}
+                  {!isCompact && isOpenGroup && (
                     <div className="pl-4 pr-1 py-1 space-y-0.5 border-l border-blue-500/30 ml-4 my-1 animate-in fade-in slide-in-from-top-1 duration-150">
                       {group.items.map((subItem) => {
                         const SubIcon = subItem.icon || FileSpreadsheet;
@@ -464,11 +447,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <NavLink
               to="/recycle-bin"
               onClick={() => onClose()}
-              title={isMinimized ? `Recycle Bin ${deletedCount ? `(${deletedCount})` : ''}` : undefined}
+              title={isCompact ? `Recycle Bin ${deletedCount ? `(${deletedCount})` : ''}` : undefined}
               className={({ isActive }) =>
                 cn(
                   'group flex items-center rounded-lg font-medium transition-all duration-150 relative',
-                  isMinimized ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
+                  isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
                   isActive
                     ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.35)]'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -477,25 +460,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               {({ isActive }) => (
                 <>
-                  <div className={cn('flex items-center min-w-0', !isMinimized && 'gap-2.5')}>
+                  <div className={cn('flex items-center min-w-0', !isCompact && 'gap-2.5')}>
                     <Trash2
                       className={cn(
                         'w-4 h-4 shrink-0 transition-colors',
                         isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
                       )}
                     />
-                    {!isMinimized && <span className="font-semibold truncate">Recycle Bin</span>}
+                    {!isCompact && <span className="font-semibold truncate">Recycle Bin</span>}
                   </div>
                   {deletedCount !== undefined && deletedCount > 0 && (
                     <span
                       className={cn(
                         'text-[10px] rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30',
-                        isMinimized
+                        isCompact
                           ? 'absolute top-1 right-1 w-2 h-2 p-0 bg-amber-400 rounded-full'
                           : 'px-1.5 py-0.2 shrink-0'
                       )}
                     >
-                      {!isMinimized && deletedCount}
+                      {!isCompact && deletedCount}
                     </span>
                   )}
                 </>
@@ -505,11 +488,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <NavLink
               to="/settings"
               onClick={() => onClose()}
-              title={isMinimized ? 'Settings' : undefined}
+              title={isCompact ? 'Settings' : undefined}
               className={({ isActive }) =>
                 cn(
                   'group flex items-center rounded-lg font-medium transition-all duration-150',
-                  isMinimized ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2',
+                  isCompact ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2',
                   isActive
                     ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.35)]'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -524,7 +507,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
                     )}
                   />
-                  {!isMinimized && <span className="font-semibold truncate">Settings</span>}
+                  {!isCompact && <span className="font-semibold truncate">Settings</span>}
                 </>
               )}
             </NavLink>
@@ -533,7 +516,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* User Profile Footer */}
         <div className="p-2.5 border-t border-[#161D2E] bg-[#0E121E] shrink-0">
-          {isMinimized ? (
+          {isCompact ? (
             /* Minimized Profile Footer */
             <div className="flex flex-col items-center gap-2">
               <div
@@ -560,7 +543,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           ) : (
-            /* Full Profile Footer */
+            /* Full Profile Footer (also shown on hover!) */
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-md">
@@ -602,8 +585,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Desktop Mouse Drag Resize Handle (Only active when not minimized) */}
-        {!isMinimized && (
+        {/* Desktop Mouse Drag Resize Handle (Only active when not in compact rail mode) */}
+        {!isCompact && (
           <div
             onMouseDown={handleMouseDown}
             onDoubleClick={handleResetWidth}

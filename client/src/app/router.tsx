@@ -116,6 +116,8 @@ export const AppRouter: React.FC = () => {
           {/* VENDOR MANAGEMENT */}
           <Route path="/vendors" element={<ComingSoonModule />} />
           <Route path="/vendor-management" element={<ComingSoonModule />} />
+          <Route path="/vendors/suppliers" element={<ComingSoonModule />} />
+          <Route path="/vendors/workers" element={<ComingSoonModule />} />
 
           {/* SALES & TENDERING */}
           <Route path="/sales" element={<ComingSoonModule />} />
