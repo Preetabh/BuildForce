@@ -39,8 +39,8 @@ export const Login: React.FC = () => {
   };
 
   const handleFillDemo = () => {
-    setEmail('admin@civilguruji.com');
-    setPassword('Civil@123');
+    setEmail('admin@gmail.com');
+    setPassword('111111');
     setError(null);
   };
 
