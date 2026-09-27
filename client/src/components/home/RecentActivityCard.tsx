@@ -57,7 +57,7 @@ export const RecentActivityCard: React.FC = () => {
       dotColor = 'bg-slate-400 ring-slate-400/20';
     }
 
-    const author = log.userId?.name || 'Preetabh Awasthi';
+    const author = log.userId?.name || (log.userId as any)?.email?.split('@')[0] || 'Team Member';
     const timeAgo = formatRelativeTime(log.timestamp) || 'Just now';
 
     return { title, author, timeAgo, dotColor };

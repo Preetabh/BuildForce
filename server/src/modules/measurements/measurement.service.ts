@@ -556,7 +556,7 @@ export class MeasurementService {
         unit,
         formula,
         formulaExpression,
-        calculatedQuantity,
+        calculatedQuantity,   
         remarks: input.remarks || '',
       });
     }

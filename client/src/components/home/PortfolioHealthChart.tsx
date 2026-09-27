@@ -185,7 +185,7 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
       <div className="relative pt-4 pb-2">
         {/* Hover Tooltip Popup */}
         {hoveredMonth && totalBudgetValue > 0 && (
-          <div className="absolute top-0 right-4 z-20 bg-slate-900/90 dark:bg-slate-800/95 backdrop-blur text-white text-xs px-3 py-1.5 rounded-lg shadow-lg border border-slate-700 pointer-events-none flex items-center gap-3">
+          <div className="absolute top-0 right-2 sm:right-4 z-20 bg-slate-900/90 dark:bg-slate-800/95 backdrop-blur text-white text-[11px] sm:text-xs px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg shadow-lg border border-slate-700 pointer-events-none flex flex-wrap items-center gap-2 sm:gap-3 max-w-[calc(100%-16px)]">
             <span className="font-semibold text-blue-300">{hoveredMonth.month}</span>
             <span>Planned: {formatTooltipVal(hoveredMonth.planned)}</span>
             {!hoveredMonth.isFuture && (
@@ -324,7 +324,7 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
       </div>
 
       {/* Legend Footer */}
-      <div className="flex items-center justify-center gap-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 font-medium">
+      <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 font-medium">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" />
           <span>Planned Spend</span>

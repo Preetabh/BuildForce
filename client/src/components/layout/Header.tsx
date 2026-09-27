@@ -106,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* User Avatar */}
           <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-sm ring-2 ring-blue-500/20">
-            {user?.name?.charAt(0).toUpperCase() || 'P'}
+            {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
           </div>
 
           {/* New Project CTA */}

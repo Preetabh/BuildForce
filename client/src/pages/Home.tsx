@@ -216,7 +216,30 @@ export const Home: React.FC = () => {
     year: 'numeric',
   }).format(new Date());
 
-  const firstName = user?.name ? user.name.split(' ')[0] : 'Preetabh';
+  // Dynamic Time-Based Greeting (Morning, Afternoon, Evening, Night)
+  const greeting = useMemo(() => {
+    const currentHour = new Date().getHours();
+    if (currentHour >= 4 && currentHour < 12) {
+      return 'Good morning';
+    } else if (currentHour >= 12 && currentHour < 17) {
+      return 'Good afternoon';
+    } else if (currentHour >= 17 && currentHour < 22) {
+      return 'Good evening';
+    } else {
+      return 'Good night';
+    }
+  }, []);
+
+  const displayName = useMemo(() => {
+    if (user?.name && user.name.trim()) {
+      return user.name.trim().split(' ')[0];
+    }
+    if (user?.email) {
+      const emailPrefix = user.email.split('@')[0];
+      return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+    }
+    return '';
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 transition-colors">
@@ -243,7 +266,7 @@ export const Home: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Good morning, {firstName}
+              {displayName ? `${greeting}, ${displayName}` : greeting}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
               Here's what's happening across your construction portfolio today.

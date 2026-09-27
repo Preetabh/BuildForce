@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2,
@@ -34,7 +35,70 @@ export const ProjectsTable: React.FC<ProjectsTableProps> = ({
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'draft' | 'on_hold' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
+  const [activeMenu, setActiveMenu] = useState<{
+    project: Project;
+    top: number;
+    left: number;
+    openUpward: boolean;
+  } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on click outside, scroll, resize, or escape key
+  useEffect(() => {
+    if (!activeMenu) return;
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActiveMenu(null);
+      }
+    };
+
+    const handleScrollOrResize = () => {
+      setActiveMenu(null);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActiveMenu(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeMenu]);
+
+  const handleToggleMenu = (e: React.MouseEvent<HTMLButtonElement>, project: Project) => {
+    e.stopPropagation();
+    if (activeMenu?.project._id === project._id) {
+      setActiveMenu(null);
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuHeight = 175;
+    const menuWidth = 176;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward = spaceBelow < menuHeight && rect.top > menuHeight;
+
+    const top = openUpward ? rect.top - menuHeight - 4 : rect.bottom + 4;
+    const left = Math.max(12, Math.min(window.innerWidth - menuWidth - 12, rect.right - menuWidth));
+
+    setActiveMenu({
+      project,
+      top,
+      left,
+      openUpward,
+    });
+  };
 
   // STRICT FILTER: Subprojects must NEVER be shown here, ONLY main projects!
   const mainProjects = projects.filter((p) => {
@@ -187,18 +251,18 @@ export const ProjectsTable: React.FC<ProjectsTableProps> = ({
       </div>
 
       {/* Table Content */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs">
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left border-collapse text-xs min-w-[760px]">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 text-slate-500 dark:text-slate-400 font-semibold">
-              <th className="py-3 px-5">Project</th>
-              <th className="py-3 px-4">Location</th>
-              <th className="py-3 px-4">Status</th>
-              <th className="py-3 px-4">Progress</th>
-              <th className="py-3 px-4">Budget</th>
-              <th className="py-3 px-4">Forecast</th>
-              <th className="py-3 px-4">Health</th>
-              <th className="py-3 px-4 text-right">Actions</th>
+            <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 text-slate-500 dark:text-slate-400 font-semibold select-none">
+              <th className="py-3 px-5 whitespace-nowrap min-w-[200px]">Project</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[130px]">Location</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[100px]">Status</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[120px]">Progress</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[100px]">Budget</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[100px]">Forecast</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[100px]">Health</th>
+              <th className="py-3 px-4 whitespace-nowrap text-right w-14">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -230,13 +294,15 @@ export const ProjectsTable: React.FC<ProjectsTableProps> = ({
               </tr>
             ) : (
               filteredProjects.map((p) => {
-                const isMenuOpen = actionMenuOpenId === p._id;
+                const isMenuOpen = activeMenu?.project._id === p._id;
                 const progressPct = p.progress ?? 0;
 
                 return (
                   <tr
                     key={p._id}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group cursor-pointer"
+                    className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group cursor-pointer ${
+                      isMenuOpen ? 'bg-slate-50/60 dark:bg-slate-800/30' : ''
+                    }`}
                     onClick={() => navigate(`/projects/${p._id}`)}
                   >
                     {/* Project Name & Code */}
@@ -294,12 +360,12 @@ export const ProjectsTable: React.FC<ProjectsTableProps> = ({
                     </td>
 
                     {/* Budget */}
-                    <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
+                    <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
                       {formatCrValue(p.contractValue || p.estimatedValue)}
                     </td>
 
                     {/* Forecast */}
-                    <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
+                    <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
                       {formatCrValue(p.contractValue || p.estimatedValue)}
                     </td>
 
@@ -308,65 +374,22 @@ export const ProjectsTable: React.FC<ProjectsTableProps> = ({
                       {getHealthBadge(p)}
                     </td>
 
-                    {/* Actions Menu */}
+                    {/* Actions Menu Trigger */}
                     <td
-                      className="py-3.5 px-4 text-right relative"
+                      className="py-3.5 px-4 text-right"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
-                        onClick={() => setActionMenuOpenId(isMenuOpen ? null : p._id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        onClick={(e) => handleToggleMenu(e, p)}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          isMenuOpen
+                            ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400 shadow-sm'
+                            : 'text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
                         title="Options"
                       >
                         <MoreVertical className="w-4 h-4" />
                       </button>
-
-                      {/* Dropdown Popover */}
-                      {isMenuOpen && (
-                        <div className="absolute right-4 top-10 w-44 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 py-1.5 z-30 text-left">
-                          <button
-                            onClick={() => {
-                              setActionMenuOpenId(null);
-                              navigate(`/projects/${p._id}`);
-                            }}
-                            className="w-full px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5 text-blue-500" />
-                            <span>Open Workspace</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setActionMenuOpenId(null);
-                              onEdit(p);
-                            }}
-                            className="w-full px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2"
-                          >
-                            <Edit className="w-3.5 h-3.5 text-slate-400" />
-                            <span>Edit Details</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setActionMenuOpenId(null);
-                              onArchive(p._id);
-                            }}
-                            className="w-full px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2"
-                          >
-                            <Archive className="w-3.5 h-3.5 text-amber-500" />
-                            <span>{p.isArchived ? 'Unarchive' : 'Archive'}</span>
-                          </button>
-                          <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
-                          <button
-                            onClick={() => {
-                              setActionMenuOpenId(null);
-                              onDelete(p._id, p.name);
-                            }}
-                            className="w-full px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center gap-2"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Move to Trash</span>
-                          </button>
-                        </div>
-                      )}
                     </td>
                   </tr>
                 );
@@ -375,6 +398,69 @@ export const ProjectsTable: React.FC<ProjectsTableProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* Floating Portal Action Dropdown Menu */}
+      {activeMenu &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: 'fixed',
+              top: `${activeMenu.top}px`,
+              left: `${activeMenu.left}px`,
+              zIndex: 99999,
+            }}
+            className="w-44 bg-white dark:bg-[#151C2C] rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800/90 py-1.5 text-left animate-in fade-in zoom-in-95 duration-100 select-none backdrop-blur-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                const id = activeMenu.project._id;
+                setActiveMenu(null);
+                navigate(`/projects/${id}`);
+              }}
+              className="w-full px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-2.5 transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <span>Open Workspace</span>
+            </button>
+            <button
+              onClick={() => {
+                const p = activeMenu.project;
+                setActiveMenu(null);
+                onEdit(p);
+              }}
+              className="w-full px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5 transition-colors"
+            >
+              <Edit className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span>Edit Details</span>
+            </button>
+            <button
+              onClick={() => {
+                const id = activeMenu.project._id;
+                setActiveMenu(null);
+                onArchive(id);
+              }}
+              className="w-full px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5 transition-colors"
+            >
+              <Archive className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>{activeMenu.project.isArchived ? 'Unarchive' : 'Archive'}</span>
+            </button>
+            <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+            <button
+              onClick={() => {
+                const { _id, name } = activeMenu.project;
+                setActiveMenu(null);
+                onDelete(_id, name);
+              }}
+              className="w-full px-3.5 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2.5 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Move to Trash</span>
+            </button>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

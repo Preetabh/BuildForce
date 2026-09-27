@@ -22,6 +22,10 @@ import {
   CheckCircle2,
   BellRing,
   Check,
+  Target,
+  Building2,
+  CreditCard,
+  Handshake,
 } from 'lucide-react';
 import { Header } from '../components/layout/Header';
 import { Button } from '../components/common/Button';
@@ -48,6 +52,90 @@ export const ComingSoonModule: React.FC = () => {
   const [subscribed, setSubscribed] = useState(false);
 
   const moduleConfigs: Record<string, FeatureConfig> = {
+    // LEAD MANAGEMENT
+    '/leads': {
+      title: 'Lead Management & CRM Pipeline',
+      category: 'LEAD MANAGEMENT',
+      icon: Target,
+      description: 'Comprehensive lead tracking, client enquiry intake, opportunity scoring, and tender pipeline conversions.',
+      phase: 'Phase 2.1 (Q4 2026)',
+      keyMetrics: [
+        { label: 'Active Enquiries', value: '38 Leads' },
+        { label: 'Conversion Rate', value: '24.6%' },
+        { label: 'Pipeline Value', value: '₹14.2 Cr' },
+      ],
+      features: [
+        'Centralized lead repository for government tenders and private developers',
+        'Sales pipeline stages from initial RFP to contract award',
+        'Automated reminders for submission deadlines and EMD deposits',
+        'Direct conversion of won leads into active Project Workspaces',
+        'Client interaction history and document storage',
+      ],
+      workflowSteps: ['Lead Inward', 'Feasibility Review', 'Tender Estimation', 'Proposal Submission', 'Contract Award'],
+    },
+    '/lead-management': {
+      title: 'Lead Management & CRM Pipeline',
+      category: 'LEAD MANAGEMENT',
+      icon: Target,
+      description: 'Comprehensive lead tracking, client enquiry intake, opportunity scoring, and tender pipeline conversions.',
+      phase: 'Phase 2.1 (Q4 2026)',
+      keyMetrics: [
+        { label: 'Active Enquiries', value: '38 Leads' },
+        { label: 'Conversion Rate', value: '24.6%' },
+        { label: 'Pipeline Value', value: '₹14.2 Cr' },
+      ],
+      features: [
+        'Centralized lead repository for government tenders and private developers',
+        'Sales pipeline stages from initial RFP to contract award',
+        'Automated reminders for submission deadlines and EMD deposits',
+        'Direct conversion of won leads into active Project Workspaces',
+        'Client interaction history and document storage',
+      ],
+      workflowSteps: ['Lead Inward', 'Feasibility Review', 'Tender Estimation', 'Proposal Submission', 'Contract Award'],
+    },
+
+    // VENDOR MANAGEMENT
+    '/vendors': {
+      title: 'Vendor Management & Subcontractor Directory',
+      category: 'VENDOR MANAGEMENT',
+      icon: Truck,
+      description: 'Centralized vendor database, KYC compliance, rate contracts, and performance evaluation scorecards.',
+      phase: 'Phase 2.1 (Q4 2026)',
+      keyMetrics: [
+        { label: 'Registered Vendors', value: '142 Suppliers' },
+        { label: 'KYC Verified', value: '96%' },
+        { label: 'Avg Rating', value: '4.7 / 5.0' },
+      ],
+      features: [
+        'Comprehensive vendor registry (Suppliers, Subcontractors, Plant Hire agencies)',
+        'Digital KYC document collection (GSTIN, PAN, Bank Details, MSME)',
+        'Standard Rate Contract (SRC) locking per vendor category',
+        'Vendor performance scoring: On-time delivery, material quality, billing compliance',
+        'Blacklist and warning registry for non-performing contractors',
+      ],
+      workflowSteps: ['Vendor Onboarding', 'KYC Verification', 'Rate Contract', 'PO / Work Allocation', 'Performance Audit'],
+    },
+    '/vendor-management': {
+      title: 'Vendor Management & Subcontractor Directory',
+      category: 'VENDOR MANAGEMENT',
+      icon: Truck,
+      description: 'Centralized vendor database, KYC compliance, rate contracts, and performance evaluation scorecards.',
+      phase: 'Phase 2.1 (Q4 2026)',
+      keyMetrics: [
+        { label: 'Registered Vendors', value: '142 Suppliers' },
+        { label: 'KYC Verified', value: '96%' },
+        { label: 'Avg Rating', value: '4.7 / 5.0' },
+      ],
+      features: [
+        'Comprehensive vendor registry (Suppliers, Subcontractors, Plant Hire agencies)',
+        'Digital KYC document collection (GSTIN, PAN, Bank Details, MSME)',
+        'Standard Rate Contract (SRC) locking per vendor category',
+        'Vendor performance scoring: On-time delivery, material quality, billing compliance',
+        'Blacklist and warning registry for non-performing contractors',
+      ],
+      workflowSteps: ['Vendor Onboarding', 'KYC Verification', 'Rate Contract', 'PO / Work Allocation', 'Performance Audit'],
+    },
+
     // PLANNING
     '/planning': {
       title: 'Planning & Scheduling Master',
