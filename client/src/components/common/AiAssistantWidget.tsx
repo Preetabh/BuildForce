@@ -7,7 +7,7 @@ export const AiAssistantWidget: React.FC = () => {
   const [messages, setMessages] = useState<Array<{ role: 'ai' | 'user'; text: string; time: string }>>([
     {
       role: 'ai',
-      text: 'Hello Engineer! I am your Civil Guru AI copilot. How can I help you with DSR/SOR clauses, measurement formulas, or rate analysis today?',
+      text: 'Hello Engineer! I am your InfraPilot copilot. How can I help you with DSR/SOR clauses, measurement formulas, or rate analysis today?',
       time: 'Just now',
     },
   ]);
@@ -66,7 +66,7 @@ export const AiAssistantWidget: React.FC = () => {
       <div className="fixed bottom-6 right-6 z-50">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          aria-label="Open Civil Guru AI Copilot"
+          aria-label="Open InfraPilot Copilot"
           className={cn(
             'w-13 h-13 p-3.5 rounded-full bg-gradient-to-tr from-pink-600 via-rose-500 to-fuchsia-500 text-white shadow-xl flex items-center justify-center transition-all duration-300 transform hover:scale-110 active:scale-95 focus:outline-none ring-4 ring-pink-500/20 hover:ring-pink-500/40',
             isOpen && 'rotate-90 ring-pink-500/50 shadow-pink-500/30'
@@ -87,7 +87,7 @@ export const AiAssistantWidget: React.FC = () => {
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-sm text-white">Civil Guru AI</span>
+                  <span className="font-bold text-sm text-white">InfraPilot</span>
                   <span className="text-[10px] px-1.5 py-0.2 rounded bg-pink-500/20 text-pink-300 font-semibold border border-pink-500/30">
                     COPILOT
                   </span>
