@@ -1,5 +1,5 @@
 /**
- * Decimal-safe currency and monetary calculation utilities in INR for BudgetPilot
+ * Decimal-safe currency and monetary calculation utilities in INR for InfraPilot
  * Prevents floating point errors in measurement books, estimate formulas, and rate sheets.
  */
 

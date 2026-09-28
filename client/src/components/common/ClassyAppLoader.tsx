@@ -10,7 +10,7 @@ interface ClassyAppLoaderProps {
 }
 
 const DEFAULT_MESSAGES = [
-  'Initializing BudgetPilot Engineering Engine...',
+  'Initializing InfraPilot Engineering Engine...',
   'Connecting Master Schedule of Rates (SOR)...',
   'Calibrating Intelligent Measurement Book...',
   'Synchronizing Real-Time Portfolio Telemetry...',
@@ -112,7 +112,7 @@ export const ClassyAppLoader: React.FC<ClassyAppLoaderProps> = ({
 
             <img
               src="/logo-dark.png"
-              alt="BudgetPilot Logo"
+              alt="InfraPilot Logo"
               className="w-full h-full object-contain filter drop-shadow-[0_0_12px_rgba(245,158,11,0.7)] transform hover:scale-105 transition-transform"
             />
           </div>
@@ -124,7 +124,7 @@ export const ClassyAppLoader: React.FC<ClassyAppLoaderProps> = ({
         {/* Brand Title with High-End Tracking */}
         <h1 className="text-xl sm:text-2xl font-black tracking-[0.25em] text-white uppercase flex items-center justify-center gap-1 font-mono">
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-500">
-            BUDGETPILOT
+            INFRAPILOT
           </span>
         </h1>
 

@@ -1129,7 +1129,7 @@ export const ComingSoonModule: React.FC = () => {
               >
                 Back to Dashboard
               </Button>
-              <span className="text-[11px] text-slate-500 font-mono">BudgetPilot ERP</span>
+              <span className="text-[11px] text-slate-500 font-mono">InfraPilot ERP</span>
             </div>
           </div>
         </div>

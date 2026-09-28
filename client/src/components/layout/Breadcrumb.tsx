@@ -20,7 +20,7 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({ items }) => {
         className="flex items-center gap-1.5 hover:text-white transition-colors"
       >
         <Home className="w-3.5 h-3.5 text-amber-500" />
-        <span className="font-medium text-slate-300">BudgetPilot</span>
+        <span className="font-medium text-slate-300">InfraPilot</span>
       </Link>
 
       {items.map((item, index) => {

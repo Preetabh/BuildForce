@@ -73,7 +73,7 @@ export const ComingSoon: React.FC<ComingSoonProps> = ({
               Back to Home
             </Button>
             <span className="text-xs text-erp-text-subtle">
-              BudgetPilot
+              InfraPilot
             </span>
           </div>
         </div>

@@ -1,6 +1,6 @@
 /**
  * Physical Dimension Categories and Unit Normalization Engine
- * BuildForce 360 Construction ERP
+ * InfraPilot Construction ERP
  */
 
 export type PhysicalDimension = 'VOLUME' | 'AREA' | 'LENGTH' | 'WEIGHT' | 'COUNT' | 'TIME' | 'CUSTOM';

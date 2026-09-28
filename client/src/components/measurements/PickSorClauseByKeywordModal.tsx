@@ -88,7 +88,7 @@ export const PickSorClauseByKeywordModal: React.FC<PickSorClauseByKeywordModalPr
         } else {
           // fallback to localStorage
           try {
-            const saved = localStorage.getItem('budgetpilot_keyword_aliases');
+            const saved = localStorage.getItem('infrapilot_keyword_aliases') || localStorage.getItem('budgetpilot_keyword_aliases');
             if (saved) setKeywordAliases(JSON.parse(saved));
           } catch {
             // ignore
@@ -97,7 +97,7 @@ export const PickSorClauseByKeywordModal: React.FC<PickSorClauseByKeywordModalPr
       })
       .catch(() => {
         try {
-          const saved = localStorage.getItem('budgetpilot_keyword_aliases');
+          const saved = localStorage.getItem('infrapilot_keyword_aliases') || localStorage.getItem('budgetpilot_keyword_aliases');
           if (saved) setKeywordAliases(JSON.parse(saved));
         } catch {
           // ignore

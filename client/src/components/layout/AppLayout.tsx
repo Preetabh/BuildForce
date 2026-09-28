@@ -13,7 +13,7 @@ export const AppLayout: React.FC = () => {
   // Sidebar dynamic width with localStorage persistence
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     try {
-      const saved = localStorage.getItem('budgetpilot_sidebar_width');
+      const saved = localStorage.getItem('infrapilot_sidebar_width') || localStorage.getItem('budgetpilot_sidebar_width');
       if (saved) {
         const parsed = parseInt(saved, 10);
         if (!isNaN(parsed) && parsed >= 210 && parsed <= 500) {
@@ -29,7 +29,7 @@ export const AppLayout: React.FC = () => {
   // Sidebar minimized state (collapsed to 68px rail) with localStorage persistence
   const [isMinimized, setIsMinimized] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('budgetpilot_sidebar_minimized') === 'true';
+      return (localStorage.getItem('infrapilot_sidebar_minimized') ?? localStorage.getItem('budgetpilot_sidebar_minimized')) === 'true';
     } catch {
       return false;
     }
@@ -52,13 +52,13 @@ export const AppLayout: React.FC = () => {
     if (isMinimized) {
       setIsMinimized(false);
       try {
-        localStorage.setItem('budgetpilot_sidebar_minimized', 'false');
+        localStorage.setItem('infrapilot_sidebar_minimized', 'false');
       } catch {
         // ignore
       }
     }
     try {
-      localStorage.setItem('budgetpilot_sidebar_width', newWidth.toString());
+      localStorage.setItem('infrapilot_sidebar_width', newWidth.toString());
     } catch {
       // ignore
     }
@@ -68,7 +68,7 @@ export const AppLayout: React.FC = () => {
     setIsMinimized((prev) => {
       const next = !prev;
       try {
-        localStorage.setItem('budgetpilot_sidebar_minimized', next.toString());
+        localStorage.setItem('infrapilot_sidebar_minimized', next.toString());
       } catch {
         // ignore
       }

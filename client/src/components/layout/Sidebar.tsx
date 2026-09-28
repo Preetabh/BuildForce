@@ -230,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {/* Clickable Logo with glow */}
               <button
                 onClick={onToggleMinimize}
-                title="BudgetPilot (Click or hover to expand sidebar)"
+                title="InfraPilot (Click or hover to expand sidebar)"
                 className="w-11 h-11 rounded-xl overflow-hidden shadow-lg shadow-amber-500/25 border border-amber-500/40 bg-gradient-to-br from-[#161F30] via-[#0E1528] to-black p-1 flex items-center justify-center hover:scale-105 hover:border-amber-400 transition-all cursor-pointer group"
               >
                 <img
@@ -239,7 +239,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     const target = e.target as HTMLImageElement;
                     if (!target.src.includes('logo.png')) target.src = '/logo.png';
                   }}
-                  alt="BudgetPilot Logo"
+                  alt="InfraPilot Logo"
                   className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(245,158,11,0.7)] group-hover:drop-shadow-[0_0_12px_rgba(245,158,11,1)] transition-all"
                 />
               </button>
@@ -264,14 +264,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       const target = e.target as HTMLImageElement;
                       if (!target.src.includes('logo.png')) target.src = '/logo.png';
                     }}
-                    alt="BudgetPilot Logo"
+                    alt="InfraPilot Logo"
                     className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]"
                   />
                 </div>
                 <div className="min-w-0">
                   <h1 className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5 font-mono truncate">
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-amber-100 to-amber-300">
-                      BudgetPilot
+                      InfraPilot
                     </span>
                   </h1>
                   <p className="text-[10px] font-medium tracking-wider uppercase text-amber-400/90 truncate">

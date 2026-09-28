@@ -108,7 +108,7 @@ export const CreateSorModal: React.FC<CreateSorModalProps> = ({
               <h3 className="text-sm font-bold text-white tracking-wide">
                 Create Schedule of Rates (SOR)
               </h3>
-              <p className="text-[11px] text-slate-400">BudgetPilot Organization Master</p>
+              <p className="text-[11px] text-slate-400">InfraPilot Organization Master</p>
             </div>
           </div>
 

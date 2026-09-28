@@ -30,22 +30,22 @@ async function runTests() {
   console.log(`✓ 0.1 + 0.2 = ${floatSum} (No floating point inaccuracies)`);
 
   // 2. Setup Test Company and User
-  let testCompany = await Company.findOne({ name: 'BudgetPilot Test Corp' });
+  let testCompany = await Company.findOne({ name: 'InfraPilot Test Corp' });
   if (!testCompany) {
     testCompany = await Company.create({
-      name: 'BudgetPilot Test Corp',
-      code: 'BPTC',
-      email: 'test@budgetpilot.io',
+      name: 'InfraPilot Test Corp',
+      code: 'IPTC',
+      email: 'test@infrapilot.io',
       status: 'active',
     });
   }
 
-  let testUser = await User.findOne({ email: 'sor_tester@budgetpilot.io' });
+  let testUser = await User.findOne({ email: 'sor_tester@infrapilot.io' });
   if (!testUser) {
     testUser = await User.create({
       companyId: testCompany._id,
       name: 'SOR System Tester',
-      email: 'sor_tester@budgetpilot.io',
+      email: 'sor_tester@infrapilot.io',
       role: 'ADMIN',
       passwordHash: 'hashedpassword',
     });

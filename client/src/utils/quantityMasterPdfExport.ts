@@ -41,7 +41,7 @@ const applyDocumentDecorations = (
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(255, 255, 255);
-  doc.text('BudgetPilot — ' + title, 14, 13);
+  doc.text('InfraPilot — ' + title, 14, 13);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
@@ -81,7 +81,7 @@ const addPageFooters = (doc: jsPDF) => {
     doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12);
 
     doc.text(
-      'BudgetPilot Construction ERP Platform — Confidential & Internal Use Only',
+      'InfraPilot Construction ERP Platform — Confidential & Internal Use Only',
       14,
       pageHeight - 7
     );
@@ -156,7 +156,7 @@ export const exportMaterialsPdf = (materials: MasterMaterial[], filterName?: str
   });
 
   addPageFooters(doc);
-  doc.save(`BudgetPilot_Materials_Master_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`InfraPilot_Materials_Master_${new Date().toISOString().slice(0, 10)}.pdf`);
 };
 
 /**
@@ -215,7 +215,7 @@ export const exportManpowerPdf = (labourItems: MasterLabour[], filterName?: stri
   });
 
   addPageFooters(doc);
-  doc.save(`BudgetPilot_Manpower_Master_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`InfraPilot_Manpower_Master_${new Date().toISOString().slice(0, 10)}.pdf`);
 };
 
 /**
@@ -274,7 +274,7 @@ export const exportMachineryPdf = (machineryItems: MasterMachinery[], filterName
   });
 
   addPageFooters(doc);
-  doc.save(`BudgetPilot_Machinery_Master_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`InfraPilot_Machinery_Master_${new Date().toISOString().slice(0, 10)}.pdf`);
 };
 
 /**
@@ -345,7 +345,7 @@ export const exportFormulasPdf = (formulas: MasterFormula[]) => {
   });
 
   addPageFooters(doc);
-  doc.save(`BudgetPilot_Formulas_Master_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`InfraPilot_Formulas_Master_${new Date().toISOString().slice(0, 10)}.pdf`);
 };
 
 /**
@@ -404,7 +404,7 @@ export const exportRateListsPdf = (rateLists: MasterRateList[]) => {
   });
 
   addPageFooters(doc);
-  doc.save(`BudgetPilot_Rate_Lists_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`InfraPilot_Rate_Lists_${new Date().toISOString().slice(0, 10)}.pdf`);
 };
 
 /**

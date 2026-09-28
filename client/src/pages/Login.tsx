@@ -54,10 +54,10 @@ export const Login: React.FC = () => {
         {/* Header Branding */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#161F30] via-[#0E1528] to-black border border-amber-500/40 shadow-2xl shadow-amber-500/20 mb-4 p-2.5">
-            <img src="/logo-dark.png" alt="BudgetPilot Logo" className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+            <img src="/logo-dark.png" alt="InfraPilot Logo" className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            BudgetPilot
+            InfraPilot
           </h1>
           <p className="text-sm text-erp-text-muted mt-1">
             Construction Project Management & Estimation Platform

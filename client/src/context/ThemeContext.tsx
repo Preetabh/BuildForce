@@ -20,6 +20,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.setAttribute('data-theme', 'dark');
     root.style.colorScheme = 'dark';
     try {
+      localStorage.setItem('infrapilot-theme', 'dark');
       localStorage.setItem('budgetpilot-theme', 'dark');
     } catch {
       // ignore

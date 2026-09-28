@@ -70,7 +70,7 @@ export const ManageKeywordAliasesModal: React.FC<ManageKeywordAliasesModalProps>
 }) => {
   const [aliases, setAliases] = useState<KeywordAliasItem[]>(() => {
     try {
-      const saved = localStorage.getItem('budgetpilot_keyword_aliases');
+      const saved = localStorage.getItem('infrapilot_keyword_aliases') || localStorage.getItem('budgetpilot_keyword_aliases');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -133,6 +133,7 @@ export const ManageKeywordAliasesModal: React.FC<ManageKeywordAliasesModalProps>
           }));
           setAliases(mapped);
           try {
+            localStorage.setItem('infrapilot_keyword_aliases', JSON.stringify(mapped));
             localStorage.setItem('budgetpilot_keyword_aliases', JSON.stringify(mapped));
           } catch {
             // ignore
@@ -155,6 +156,7 @@ export const ManageKeywordAliasesModal: React.FC<ManageKeywordAliasesModalProps>
   const persistAliases = (updated: KeywordAliasItem[]) => {
     setAliases(updated);
     try {
+      localStorage.setItem('infrapilot_keyword_aliases', JSON.stringify(updated));
       localStorage.setItem('budgetpilot_keyword_aliases', JSON.stringify(updated));
     } catch {
       // ignore

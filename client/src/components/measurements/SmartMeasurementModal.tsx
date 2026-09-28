@@ -183,7 +183,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
   const [isManageFormulasModalOpen, setIsManageFormulasModalOpen] = useState(false);
   const [customFormulasList, setCustomFormulasList] = useState<SlashFormulaDefinition[]>(() => {
     try {
-      const saved = localStorage.getItem('budgetpilot_custom_formulas');
+      const saved = localStorage.getItem('infrapilot_custom_formulas') || localStorage.getItem('budgetpilot_custom_formulas');
       if (saved) return JSON.parse(saved);
     } catch {
       // fallback
@@ -3410,6 +3410,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
                   const updated = [...customFormulasList, newFormula];
                   setCustomFormulasList(updated);
                   try {
+                    localStorage.setItem('infrapilot_custom_formulas', JSON.stringify(updated));
                     localStorage.setItem('budgetpilot_custom_formulas', JSON.stringify(updated));
                   } catch {
                     // ignore

@@ -16,7 +16,7 @@ const router = Router();
 router.get('/health', (req, res) => {
   res.status(200).json({
     status: 'online',
-    system: 'BudgetPilot Construction ERP Backend',
+    system: 'InfraPilot Construction ERP Backend',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
