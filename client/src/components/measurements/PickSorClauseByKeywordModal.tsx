@@ -271,11 +271,11 @@ export const PickSorClauseByKeywordModal: React.FC<PickSorClauseByKeywordModalPr
           aria-modal="true"
         >
           {/* ======================================================================
-              HEADER: Deep Royal Blue Banner with Lightbulb icon & Manage/Add Button
+              HEADER: Sleek Dark Charcoal Banner with Amber Orange Insignia Accent
              ====================================================================== */}
-          <div className="flex items-center justify-between px-4 py-3 bg-[#1e40af] text-white select-none shadow-md shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 bg-[#101726] border-b border-amber-500/30 text-white select-none shadow-md shrink-0">
             <div className="flex items-center gap-2">
-              <Lightbulb className="w-4 h-4 text-white fill-white" />
+              <Lightbulb className="w-4 h-4 text-[#F59E0B] fill-[#F59E0B]" />
               <h3 className="text-sm font-bold tracking-wide">Pick SOR Clause by Keyword</h3>
             </div>
 
@@ -459,7 +459,7 @@ export const PickSorClauseByKeywordModal: React.FC<PickSorClauseByKeywordModalPr
                 type="button"
                 onClick={handleAiMatch}
                 disabled={isAiMatching || displayCards.length === 0}
-                className="px-3.5 py-1.5 rounded-lg bg-[#2563eb] hover:bg-blue-600 disabled:opacity-50 text-white font-semibold flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg bg-[#F59E0B] hover:bg-[#D97706] disabled:opacity-50 text-slate-950 font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
               >
                 <Bot className="w-3.5 h-3.5" />
                 <span>{isAiMatching ? 'Matching...' : 'AI Match'}</span>
@@ -469,9 +469,9 @@ export const PickSorClauseByKeywordModal: React.FC<PickSorClauseByKeywordModalPr
               <button
                 type="button"
                 onClick={() => setIsManageModalOpen(true)}
-                className="px-3.5 py-1.5 rounded-lg bg-[#141a29] hover:bg-[#1c2438] border border-slate-700/80 hover:border-blue-500/60 text-slate-200 hover:text-white font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                className="px-3.5 py-1.5 rounded-lg bg-[#141a29] hover:bg-[#1c2438] border border-slate-700/80 hover:border-amber-500/60 text-slate-200 hover:text-white font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
               >
-                <Plus className="w-3.5 h-3.5 text-blue-400" />
+                <Plus className="w-3.5 h-3.5 text-amber-400" />
                 <span>Manage / Add</span>
               </button>
             </div>

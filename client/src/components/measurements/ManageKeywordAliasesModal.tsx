@@ -389,11 +389,11 @@ export const ManageKeywordAliasesModal: React.FC<ManageKeywordAliasesModalProps>
         aria-modal="true"
       >
         {/* ======================================================================
-            HEADER: Deep Royal Blue Banner matching reference screenshot 2
+            HEADER: Sleek Dark Charcoal Banner with Amber Orange Insignia Accent
            ====================================================================== */}
-        <div className="flex items-center justify-between px-4 py-3 bg-[#1e40af] text-white select-none shadow-md">
+        <div className="flex items-center justify-between px-4 py-3 bg-[#101726] border-b border-amber-500/30 text-white select-none shadow-md">
           <div className="flex items-center gap-2">
-            <Edit2 className="w-4 h-4 text-white" />
+            <Edit2 className="w-4 h-4 text-[#F59E0B]" />
             <h3 className="text-sm font-bold tracking-wide">Manage Keyword Aliases</h3>
           </div>
 
@@ -504,7 +504,7 @@ export const ManageKeywordAliasesModal: React.FC<ManageKeywordAliasesModalProps>
                 <div className="sm:col-span-2">
                   <button
                     type="submit"
-                    className="w-full py-1.5 px-3 bg-[#2563eb] hover:bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                    className="w-full py-1.5 px-3 bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5 stroke-[3]" />
                     <span>Add</span>

@@ -285,9 +285,9 @@ export const Home: React.FC = () => {
 
             <button
               onClick={handleOpenCreateModal}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-all hover:shadow"
+              className="px-4 py-2 bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all hover:shadow cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4 stroke-[3]" />
               <span>New project</span>
             </button>
           </div>

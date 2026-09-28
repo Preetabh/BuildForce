@@ -99,8 +99,8 @@ export const Header: React.FC<HeaderProps> = ({
             <Button
               onClick={onNewProject}
               size="sm"
-              leftIcon={<Plus className="w-4 h-4" />}
-              className="bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-sm"
+              leftIcon={<Plus className="w-4 h-4 text-slate-950 stroke-[3]" />}
+              className="bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 font-bold shadow-md shadow-amber-500/20 border-amber-400"
             >
               <span className="hidden sm:inline">New project</span>
               <span className="sm:hidden">New</span>

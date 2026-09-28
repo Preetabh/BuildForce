@@ -43,30 +43,36 @@ body,
   border-color: #1E293B !important;
 }
 
-/* Golden accents replacing blue across the entire website */
+/* Amber Orange #F59E0B accents replacing blue across the entire website */
 .bg-blue-600,
-.bg-blue-700 {
-  background-color: #D97706 !important; /* rich golden amber */
-  color: #FFFFFF !important;
+.bg-blue-700,
+.bg-\[\#2563EB\],
+.bg-\[\#2563eb\],
+.bg-\[\#1e40af\],
+.bg-\[\#1E40AF\] {
+  background-color: #F59E0B !important; /* Amber Orange — #F59E0B */
+  color: #0B0F17 !important;
+  font-weight: 600 !important;
 }
 
 .hover\:bg-blue-700:hover,
-.hover\:bg-blue-600:hover {
-  background-color: #B45309 !important; /* deeper gold hover */
+.hover\:bg-blue-600:hover,
+.hover\:bg-\[\#1d4ed8\]:hover {
+  background-color: #D97706 !important; /* deeper amber orange hover */
 }
 
 .text-blue-600,
 .text-blue-500,
 .text-blue-400,
 .dark\:text-blue-400 {
-  color: #FBBF24 !important; /* warm gold text */
+  color: #F59E0B !important; /* Amber Orange — #F59E0B */
 }
 
 .border-blue-600,
 .border-blue-500,
 .border-blue-400,
 .dark\:border-blue-400 {
-  border-color: #D97706 !important;
+  border-color: #F59E0B !important;
 }
 
 .bg-blue-50,
@@ -82,11 +88,11 @@ body,
 .border-blue-500\/20,
 .border-blue-500\/30,
 .border-blue-500\/40 {
-  border-color: rgba(245, 158, 11, 0.3) !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
 }
 
 .ring-blue-500\/20 {
-  --tw-ring-color: rgba(245, 158, 11, 0.3) !important;
+  --tw-ring-color: rgba(245, 158, 11, 0.35) !important;
 }
 
 .focus\:border-blue-500:focus,
@@ -140,9 +146,9 @@ body,
 }
 
 .badge-completed {
-  background: rgba(59, 130, 246, 0.12);
-  color: #60A5FA;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: rgba(16, 185, 129, 0.12);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .badge-on_hold {

@@ -77,7 +77,7 @@ export const Login: React.FC = () => {
             <button
               type="button"
               onClick={handleFillDemo}
-              className="text-xs font-semibold px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-md transition-colors"
+              className="text-xs font-bold px-2.5 py-1 bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 rounded-md transition-colors shadow-sm"
             >
               Fill Demo
             </button>

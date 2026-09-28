@@ -316,7 +316,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   'group flex items-center rounded-lg font-medium transition-all duration-150',
                   isCompact ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2',
                   isActive
-                    ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.35)]'
+                    ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 )
               }
@@ -326,7 +326,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Home
                     className={cn(
                       'w-4 h-4 shrink-0 transition-colors',
-                      isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                      isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-white'
                     )}
                   />
                   {!isCompact && <span className="font-semibold truncate">Home</span>}
@@ -398,7 +398,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               cn(
                                 'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
                                 isActive
-                                  ? 'bg-amber-600 text-white shadow-sm'
+                                  ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
                                   : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                               )
                             }
@@ -409,7 +409,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                   <SubIcon
                                     className={cn(
                                       'w-3.5 h-3.5 shrink-0 transition-colors',
-                                      isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+                                      isActive ? 'text-slate-950' : 'text-slate-400 group-hover:text-slate-200'
                                     )}
                                   />
                                   <span className="truncate">{subItem.label}</span>
@@ -419,7 +419,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     className={cn(
                                       'text-[9px] px-1 py-0.2 rounded font-medium shrink-0 ml-1.5',
                                       isActive
-                                        ? 'bg-blue-800 text-blue-100'
+                                        ? 'bg-amber-900/60 text-amber-200 border border-amber-600/50'
                                         : 'bg-slate-800/90 text-slate-400 border border-slate-700/50'
                                     )}
                                   >
@@ -449,7 +449,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   'group flex items-center rounded-lg font-medium transition-all duration-150 relative',
                   isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
                   isActive
-                    ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.35)]'
+                    ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 )
               }
@@ -460,7 +460,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <Trash2
                       className={cn(
                         'w-4 h-4 shrink-0 transition-colors',
-                        isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                        isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-white'
                       )}
                     />
                     {!isCompact && <span className="font-semibold truncate">Recycle Bin</span>}
@@ -468,7 +468,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {deletedCount !== undefined && deletedCount > 0 && (
                     <span
                       className={cn(
-                        'text-[10px] rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30',
+                        'text-[10px] rounded-full font-semibold',
+                        isActive
+                          ? 'bg-slate-950 text-[#F59E0B]'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
                         isCompact
                           ? 'absolute top-1 right-1 w-2 h-2 p-0 bg-amber-400 rounded-full'
                           : 'px-1.5 py-0.2 shrink-0'
@@ -490,7 +493,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   'group flex items-center rounded-lg font-medium transition-all duration-150',
                   isCompact ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2',
                   isActive
-                    ? 'bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.35)]'
+                    ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 )
               }
@@ -500,7 +503,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Settings
                     className={cn(
                       'w-4 h-4 shrink-0 transition-colors',
-                      isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                      isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-white'
                     )}
                   />
                   {!isCompact && <span className="font-semibold truncate">Settings</span>}
