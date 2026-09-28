@@ -242,7 +242,7 @@ export const Home: React.FC = () => {
   }, [user]);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 transition-colors">
+    <div className="min-h-screen bg-[#090D16] text-slate-100 transition-colors">
       {/* Top Navigation Header - Single Breadcrumb */}
       <Header
         breadcrumbs={[{ label: 'Home' }]}
@@ -254,8 +254,8 @@ export const Home: React.FC = () => {
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/90 dark:bg-slate-800/95 text-white border border-blue-500/40 px-4 py-2.5 rounded-xl shadow-lg text-sm flex items-center gap-2 backdrop-blur">
-          <Sparkles className="w-4 h-4 text-blue-400" />
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 text-white border border-amber-500/40 px-4 py-2.5 rounded-xl shadow-lg text-sm flex items-center gap-2 backdrop-blur">
+          <Sparkles className="w-4 h-4 text-amber-400" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -265,27 +265,27 @@ export const Home: React.FC = () => {
         {/* Welcome Banner Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
               {displayName ? `${greeting}, ${displayName}` : greeting}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-xs sm:text-sm text-slate-400 mt-1">
               Here's what's happening across your construction portfolio today.
             </p>
           </div>
 
           <div className="flex items-center gap-4 self-start sm:self-auto">
             <div className="text-right hidden sm:block">
-              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <p className="text-xs font-semibold text-slate-300">
                 {todayFormatted}
               </p>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+              <p className="text-[11px] text-slate-500">
                 Build today for a better tomorrow.
               </p>
             </div>
 
             <button
               onClick={handleOpenCreateModal}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-all hover:shadow"
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-all hover:shadow"
             >
               <Plus className="w-4 h-4" />
               <span>New project</span>
@@ -296,18 +296,18 @@ export const Home: React.FC = () => {
         {/* 4 Top KPI Cards - 100% Dynamic */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Portfolio budget */}
-          <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
-            <div className="w-11 h-11 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+          <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
+            <div className="w-11 h-11 rounded-xl bg-amber-950/60 border border-amber-900/40 flex items-center justify-center text-amber-400 shrink-0">
               <Wallet className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-semibold text-slate-400">
                 Portfolio budget
               </p>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-0.5 tracking-tight truncate">
+              <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
                 {portfolioBudgetText}
               </h2>
-              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1">
+              <p className="text-xs font-medium text-emerald-400 flex items-center gap-1 mt-1">
                 <TrendingUp className="w-3.5 h-3.5" />
                 <span>{totalValueNum > 0 ? '+0% vs last baseline' : 'Active portfolio'}</span>
               </p>
@@ -315,36 +315,36 @@ export const Home: React.FC = () => {
           </div>
 
           {/* Card 2: Committed cost */}
-          <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
-            <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+          <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
+            <div className="w-11 h-11 rounded-xl bg-emerald-950/60 border border-emerald-900/40 flex items-center justify-center text-emerald-400 shrink-0">
               <Coins className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-semibold text-slate-400">
                 Committed cost
               </p>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-0.5 tracking-tight truncate">
+              <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
                 {committedCostText}
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              <p className="text-xs text-slate-400 mt-1">
                 {committedPctText}
               </p>
             </div>
           </div>
 
           {/* Card 3: Forecast variance */}
-          <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
-            <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-100 dark:border-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+          <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
+            <div className="w-11 h-11 rounded-xl bg-amber-950/60 border border-amber-900/40 flex items-center justify-center text-amber-400 shrink-0">
               <BarChart3 className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-semibold text-slate-400">
                 Forecast variance
               </p>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-0.5 tracking-tight truncate">
+              <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
                 {forecastVarianceText}
               </h2>
-              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1">
+              <p className="text-xs font-medium text-emerald-400 flex items-center gap-1 mt-1">
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span>On target with estimate</span>
               </p>
@@ -352,18 +352,18 @@ export const Home: React.FC = () => {
           </div>
 
           {/* Card 4: Projects at risk */}
-          <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
-            <div className="w-11 h-11 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-100 dark:border-rose-900/40 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+          <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
+            <div className="w-11 h-11 rounded-xl bg-rose-950/60 border border-rose-900/40 flex items-center justify-center text-rose-400 shrink-0">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-semibold text-slate-400">
                 Projects at risk
               </p>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-0.5 tracking-tight truncate">
+              <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
                 {atRiskCount} of {totalMainCount}
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              <p className="text-xs text-slate-400 mt-1">
                 {onTrackCount} on track <span className="mx-1">|</span> {atRiskCount} at risk
               </p>
             </div>

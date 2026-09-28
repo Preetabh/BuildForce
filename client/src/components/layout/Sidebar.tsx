@@ -14,8 +14,6 @@ import {
   Layers,
   Wrench,
   TrendingUp,
-  Sun,
-  Moon,
   LogOut,
   X,
   ChevronDown,
@@ -31,7 +29,6 @@ import {
   HardHat,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
 import { cn } from '../../utils/cn';
 
 export interface SidebarProps {
@@ -69,7 +66,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const { isDark, toggleTheme } = useTheme();
 
   // Resize drag state
   const [isDragging, setIsDragging] = useState(false);
@@ -217,7 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }}
         className={cn(
           'fixed top-0 bottom-0 left-0 z-50 bg-[#0A0D14] border-r border-[#161D2E] flex flex-col md:translate-x-0 select-none shadow-2xl',
-          isMinimized && isHovered && 'shadow-[0_0_35px_rgba(0,0,0,0.85)] border-r-blue-500/40 z-50',
+          isMinimized && isHovered && 'shadow-[0_0_35px_rgba(0,0,0,0.85)] border-r-amber-500/40 z-50',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -235,7 +231,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={onToggleMinimize}
                 title="BudgetPilot (Click or hover to expand sidebar)"
-                className="w-11 h-11 rounded-xl overflow-hidden shadow-lg shadow-blue-500/30 border border-cyan-500/50 bg-gradient-to-br from-[#0c1426] via-[#080d19] to-black p-1 flex items-center justify-center hover:scale-105 hover:border-cyan-400 transition-all cursor-pointer group"
+                className="w-11 h-11 rounded-xl overflow-hidden shadow-lg shadow-amber-500/20 border border-amber-500/40 bg-gradient-to-br from-[#0c1426] via-[#080d19] to-black p-1 flex items-center justify-center hover:scale-105 hover:border-amber-400 transition-all cursor-pointer group"
               >
                 <img
                   src="/logo-dark.png"
@@ -364,9 +360,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       'w-full flex items-center rounded-lg font-semibold tracking-wider text-[11px] transition-all duration-150',
                       isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
                       isOpenGroup && !isCompact
-                        ? 'text-blue-400 bg-blue-500/10'
+                        ? 'text-amber-400 bg-amber-500/10'
                         : hasActiveChild
-                        ? 'text-cyan-300 bg-slate-800/50'
+                        ? 'text-amber-300 bg-slate-800/50'
                         : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
                     )}
                   >
@@ -374,14 +370,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <group.icon
                         className={cn(
                           'w-4 h-4 shrink-0 transition-colors',
-                          isOpenGroup || hasActiveChild ? 'text-cyan-400' : 'text-slate-400'
+                          isOpenGroup || hasActiveChild ? 'text-amber-400' : 'text-slate-400'
                         )}
                       />
                       {!isCompact && <span className="truncate">{group.label}</span>}
                     </div>
                     {!isCompact && (
                       isOpenGroup ? (
-                        <ChevronDown className="w-3.5 h-3.5 text-blue-400 transition-transform shrink-0 ml-1" />
+                        <ChevronDown className="w-3.5 h-3.5 text-amber-400 transition-transform shrink-0 ml-1" />
                       ) : (
                         <ChevronRight className="w-3.5 h-3.5 text-slate-500 transition-transform shrink-0 ml-1" />
                       )
@@ -390,7 +386,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                   {/* Group Sub-Items (Single accordion active) */}
                   {!isCompact && isOpenGroup && (
-                    <div className="pl-4 pr-1 py-1 space-y-0.5 border-l border-blue-500/30 ml-4 my-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="pl-4 pr-1 py-1 space-y-0.5 border-l border-amber-500/30 ml-4 my-1 animate-in fade-in slide-in-from-top-1 duration-150">
                       {group.items.map((subItem) => {
                         const SubIcon = subItem.icon || FileSpreadsheet;
                         return (
@@ -402,7 +398,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               cn(
                                 'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
                                 isActive
-                                  ? 'bg-blue-600/90 text-white shadow-sm'
+                                  ? 'bg-amber-600 text-white shadow-sm'
                                   : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                               )
                             }
@@ -521,18 +517,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex flex-col items-center gap-2">
               <div
                 title={user?.name || user?.email || 'User'}
-                className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-md cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
+                className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-md cursor-pointer hover:ring-2 hover:ring-amber-400 transition-all"
               >
                 {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="flex flex-col items-center gap-1">
-                <button
-                  onClick={toggleTheme}
-                  title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                  className="p-1.5 rounded-lg bg-slate-800/80 text-amber-300 hover:bg-slate-700 transition-colors"
-                >
-                  {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-                </button>
                 <button
                   onClick={logout}
                   title="Log Out"
@@ -546,7 +535,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             /* Full Profile Footer (also shown on hover!) */
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-md">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-500 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-md">
                   {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -564,21 +553,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               </div>
 
-              {/* Theme Toggle & Logout */}
+              {/* Logout Button */}
               <div className="flex items-center gap-1 shrink-0">
-                <button
-                  onClick={toggleTheme}
-                  title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                  className="p-1.5 rounded-lg bg-slate-800/80 text-amber-300 hover:bg-slate-700 transition-colors"
-                >
-                  {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-                </button>
                 <button
                   onClick={logout}
                   title="Log Out"
                   className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -593,7 +575,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title="Drag to resize sidebar width | Double-click to reset (260px)"
             className={cn(
               'hidden md:flex absolute top-0 bottom-0 -right-1.5 w-3 cursor-col-resize z-50 items-center justify-center group touch-none select-none transition-colors',
-              isDragging && 'bg-blue-600/20'
+              isDragging && 'bg-amber-600/20'
             )}
           >
             {/* Subtle vertical accent indicator */}
@@ -601,8 +583,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={cn(
                 'w-0.5 h-full transition-colors duration-150',
                 isDragging
-                  ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]'
-                  : 'bg-transparent group-hover:bg-blue-500/40'
+                  ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
+                  : 'bg-transparent group-hover:bg-amber-500/40'
               )}
             />
 
@@ -611,7 +593,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={cn(
                 'absolute top-1/2 -translate-y-1/2 flex items-center justify-center p-0.5 rounded-md transition-all duration-150',
                 isDragging
-                  ? 'bg-blue-600 text-white opacity-100 shadow-md scale-110'
+                  ? 'bg-amber-600 text-white opacity-100 shadow-md scale-110'
                   : 'bg-slate-800 text-slate-400 opacity-0 group-hover:opacity-100 group-hover:bg-slate-700'
               )}
             >

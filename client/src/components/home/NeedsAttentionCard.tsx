@@ -85,14 +85,14 @@ export const NeedsAttentionCard: React.FC<NeedsAttentionProps> = ({ projects }) 
   }, [projects]);
 
   return (
-    <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm transition-colors">
+    <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-amber-500" />
-          <h3 className="font-bold text-base text-slate-900 dark:text-white">Needs your attention</h3>
+          <h3 className="font-bold text-base text-white">Needs your attention</h3>
         </div>
-        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+        <span className="text-[11px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
           {items.length} {items.length === 1 ? 'item' : 'items'}
         </span>
       </div>
@@ -101,20 +101,20 @@ export const NeedsAttentionCard: React.FC<NeedsAttentionProps> = ({ projects }) 
       {items.length === 0 ? (
         <div className="py-8 text-center text-slate-400 text-xs">
           <CheckCircle2 className="w-7 h-7 text-emerald-500 mx-auto mb-2" />
-          <p className="font-semibold text-slate-700 dark:text-slate-300">All projects on track</p>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="font-semibold text-slate-300">All projects on track</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">
             No critical warnings or pending actions found
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+        <div className="divide-y divide-slate-800/80">
           {items.slice(0, 4).map((item) => {
             const Icon = item.icon;
             return (
               <div
                 key={item.id}
                 onClick={() => item.projectId && navigate(`/projects/${item.projectId}`)}
-                className="py-3 flex items-start gap-3 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 px-2 rounded-lg transition-colors cursor-pointer"
+                className="py-3 flex items-start gap-3 hover:bg-slate-800/40 px-2 rounded-lg transition-colors cursor-pointer"
               >
                 <div
                   className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 mt-0.5 ${item.iconBg}`}

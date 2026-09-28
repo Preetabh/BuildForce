@@ -54,16 +54,16 @@ export const Register: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 py-12 relative overflow-hidden">
+    <div className="min-h-screen bg-[#090D16] flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 py-12 relative overflow-hidden">
       {/* Background Lighting Gradients */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Main Container */}
       <div className="w-full max-w-md relative z-10">
         {/* Header Branding */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#0c1426] via-[#080d19] to-black border border-cyan-500/40 shadow-2xl shadow-blue-500/30 mb-3 p-2.5">
-            <img src="/logo-dark.png" alt="BudgetPilot Logo" className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#161F30] via-[#0E1528] to-black border border-amber-500/40 shadow-2xl shadow-amber-500/20 mb-3 p-2.5">
+            <img src="/logo-dark.png" alt="BudgetPilot Logo" className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
           </div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight">
             Register Construction Company
@@ -95,7 +95,7 @@ export const Register: React.FC = () => {
                   onChange={(e) => setCompanyName(e.target.value)}
                   placeholder="e.g. Digi Epitome Technology"
                   required
-                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-erp-border rounded-lg text-sm text-erp-text placeholder:text-erp-text-subtle focus:outline-none focus:border-blue-500"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-erp-border rounded-lg text-sm text-erp-text placeholder:text-erp-text-subtle focus:outline-none focus:border-amber-500"
                 />
               </div>
             </div>
@@ -109,7 +109,7 @@ export const Register: React.FC = () => {
                 value={companyCode}
                 onChange={(e) => setCompanyCode(e.target.value.toUpperCase())}
                 placeholder="e.g. APEX-INFR"
-                className="w-full px-3 py-2 bg-slate-900 border border-erp-border rounded-lg text-sm text-erp-text uppercase font-mono placeholder:text-erp-text-subtle focus:outline-none focus:border-blue-500"
+                className="w-full px-3 py-2 bg-slate-900 border border-erp-border rounded-lg text-sm text-erp-text uppercase font-mono placeholder:text-erp-text-subtle focus:outline-none focus:border-amber-500"
               />
             </div>
 
@@ -125,7 +125,7 @@ export const Register: React.FC = () => {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Er. Rajesh Sharma"
                   required
-                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-erp-border rounded-lg text-sm text-erp-text placeholder:text-erp-text-subtle focus:outline-none focus:border-blue-500"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-erp-border rounded-lg text-sm text-erp-text placeholder:text-erp-text-subtle focus:outline-none focus:border-amber-500"
                 />
               </div>
             </div>
@@ -142,7 +142,7 @@ export const Register: React.FC = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@company.com"
                   required
-                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-erp-border rounded-lg text-sm text-erp-text placeholder:text-erp-text-subtle focus:outline-none focus:border-blue-500"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-erp-border rounded-lg text-sm text-erp-text placeholder:text-erp-text-subtle focus:outline-none focus:border-amber-500"
                 />
               </div>
             </div>
@@ -159,7 +159,7 @@ export const Register: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 6 characters"
                   required
-                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-erp-border rounded-lg text-sm text-erp-text placeholder:text-erp-text-subtle focus:outline-none focus:border-blue-500"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-erp-border rounded-lg text-sm text-erp-text placeholder:text-erp-text-subtle focus:outline-none focus:border-amber-500"
                 />
               </div>
             </div>
@@ -176,7 +176,7 @@ export const Register: React.FC = () => {
 
           <div className="mt-5 text-center text-xs text-erp-text-muted">
             Already registered?{' '}
-            <Link to="/login" className="text-blue-400 hover:underline font-medium">
+            <Link to="/login" className="text-amber-400 hover:underline font-medium">
               Sign in here
             </Link>
           </div>

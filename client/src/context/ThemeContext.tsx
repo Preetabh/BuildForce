@@ -12,39 +12,29 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    const saved = localStorage.getItem('budgetpilot-theme') as Theme | null;
-    if (saved === 'light' || saved === 'dark') return saved;
-    // Default to light mode matching reference design, while honoring system preference if needed
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-    return 'light';
-  });
+  const [theme] = useState<Theme>('dark');
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      root.setAttribute('data-theme', 'dark');
-      root.style.colorScheme = 'dark';
-    } else {
-      root.classList.remove('dark');
-      root.setAttribute('data-theme', 'light');
-      root.style.colorScheme = 'light';
+    root.classList.add('dark');
+    root.setAttribute('data-theme', 'dark');
+    root.style.colorScheme = 'dark';
+    try {
+      localStorage.setItem('budgetpilot-theme', 'dark');
+    } catch {
+      // ignore
     }
-    localStorage.setItem('budgetpilot-theme', theme);
-  }, [theme]);
+  }, []);
 
   const toggleTheme = () => {
-    setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
+    // Theme is locked to dark black & gray
   };
 
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
+  const setTheme = () => {
+    // Theme is locked to dark black & gray
   };
 
-  const isDark = theme === 'dark';
+  const isDark = true;
 
   return (
     <ThemeContext.Provider value={{ theme, isDark, toggleTheme, setTheme }}>

@@ -21,10 +21,10 @@ export const StatCard: React.FC<StatCardProps> = ({
 }) => {
   const colorMap = {
     blue: {
-      border: 'border-blue-500/20 hover:border-blue-500/40',
-      iconBg: 'bg-blue-500/10 text-blue-400',
-      glow: 'shadow-[0_0_20px_-5px_rgba(37,99,235,0.15)]',
-      valueColor: 'text-blue-400',
+      border: 'border-amber-500/20 hover:border-amber-500/40',
+      iconBg: 'bg-amber-500/10 text-amber-400',
+      glow: 'shadow-[0_0_20px_-5px_rgba(245,158,11,0.2)]',
+      valueColor: 'text-amber-400',
     },
     emerald: {
       border: 'border-emerald-500/20 hover:border-emerald-500/40',

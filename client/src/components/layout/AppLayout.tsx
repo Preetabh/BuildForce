@@ -93,7 +93,7 @@ export const AppLayout: React.FC = () => {
   const deletedCount = Array.isArray(recycleBinData) ? recycleBinData.length : 0;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 flex relative">
+    <div className="min-h-screen bg-[#090D16] text-slate-100 flex relative">
       {/* Sidebar Navigation */}
       <Sidebar
         isOpen={sidebarOpen}

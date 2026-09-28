@@ -150,29 +150,29 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
   };
 
   return (
-    <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 shadow-sm transition-colors">
+    <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 sm:p-6 shadow-sm transition-colors">
       {/* Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <BarChart2 className="w-4 h-4 text-blue-500" />
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">Portfolio health</h3>
+            <BarChart2 className="w-4 h-4 text-amber-400" />
+            <h3 className="font-bold text-base text-white">Portfolio health</h3>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-400 mt-0.5">
             Planned vs actual spend with forecast (Live DB sync)
           </p>
         </div>
 
         {/* Time range buttons */}
-        <div className="flex items-center gap-1 p-0.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg self-start sm:self-auto">
+        <div className="flex items-center gap-1 p-0.5 bg-slate-900 border border-slate-800 rounded-lg self-start sm:self-auto">
           {(['6M', '12M', '24M', 'All'] as const).map((range) => (
             <button
               key={range}
               onClick={() => setTimeRange(range)}
               className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
                 timeRange === range
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               {range}
@@ -264,8 +264,8 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
 
             {/* Forecast Callout Tag */}
             {totalBudgetValue > 0 && (
-              <div className="absolute top-10 right-28 sm:right-36 z-20 pointer-events-none hidden sm:flex items-center text-[10px] font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 px-2 py-0.5 rounded shadow-sm border border-slate-200 dark:border-slate-700">
-                Forecast <ChevronRight className="w-3 h-3 ml-0.5 inline text-blue-500" />
+              <div className="absolute top-10 right-28 sm:right-36 z-20 pointer-events-none hidden sm:flex items-center text-[10px] font-semibold text-slate-300 bg-slate-800 px-2 py-0.5 rounded shadow-sm border border-slate-700">
+                Forecast <ChevronRight className="w-3 h-3 ml-0.5 inline text-amber-400" />
               </div>
             )}
 
@@ -287,10 +287,10 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
                     className="flex-1 flex flex-col items-center h-full justify-end group cursor-pointer px-0.5 sm:px-1"
                   >
                     <div className="w-full flex items-end justify-center gap-1 sm:gap-1.5 h-full">
-                      {/* Planned Bar (Blue) */}
+                      {/* Planned Bar (Golden Amber) */}
                       <div
                         style={{ height: plannedH }}
-                        className="w-2 sm:w-2.5 bg-blue-600/80 hover:bg-blue-600 rounded-t-sm transition-all duration-300 group-hover:brightness-110 shadow-sm"
+                        className="w-2 sm:w-2.5 bg-amber-500/80 hover:bg-amber-400 rounded-t-sm transition-all duration-300 group-hover:brightness-110 shadow-sm"
                         title={`Planned: ${formatTooltipVal(item.planned)}`}
                       />
 
@@ -324,9 +324,9 @@ export const PortfolioHealthChart: React.FC<PortfolioHealthChartProps> = ({ proj
       </div>
 
       {/* Legend Footer */}
-      <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 text-xs text-slate-600 dark:text-slate-400 font-medium">
+      <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 pt-4 border-t border-slate-800/80 text-xs text-slate-400 font-medium">
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" />
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
           <span>Planned Spend</span>
         </div>
         <div className="flex items-center gap-2">

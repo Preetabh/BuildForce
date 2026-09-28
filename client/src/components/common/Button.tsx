@@ -26,7 +26,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   const variants = {
     primary:
-      'bg-erp-primary hover:bg-erp-primary-hover text-white shadow-glow-sm hover:shadow-glow focus:ring-erp-primary border border-blue-500/30 active:scale-[0.98]',
+      'bg-erp-primary hover:bg-erp-primary-hover text-white shadow-glow-sm hover:shadow-glow focus:ring-erp-primary border border-amber-500/30 active:scale-[0.98]',
     secondary:
       'bg-erp-surface hover:bg-erp-surface-hover text-erp-text border border-erp-border focus:ring-slate-400 active:scale-[0.98]',
     outline:
