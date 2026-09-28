@@ -95,25 +95,25 @@ export const ClassyAppLoader: React.FC<ClassyAppLoaderProps> = ({
             className="absolute -inset-3 rounded-full p-[2px] animate-spin"
             style={{
               animationDuration: '3.5s',
-              background: 'conic-gradient(from 0deg, transparent, #0284c7, #38bdf8, #f59e0b, transparent)',
+              background: 'conic-gradient(from 0deg, transparent, #b45309, #f59e0b, #fbbf24, transparent)',
             }}
           />
 
           {/* Secondary Counter-rotating subtle ring */}
           <div
-            className="absolute -inset-2 rounded-full border border-dashed border-cyan-500/30 animate-spin"
+            className="absolute -inset-2 rounded-full border border-dashed border-amber-500/30 animate-spin"
             style={{ animationDuration: '8s', animationDirection: 'reverse' }}
           />
 
           {/* Logo Glass Pod */}
-          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-[#0c1220]/90 border border-cyan-500/40 p-3 shadow-2xl shadow-blue-500/30 backdrop-blur-xl flex items-center justify-center overflow-hidden group">
+          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-[#0c1220]/90 border border-amber-500/40 p-3 shadow-2xl shadow-amber-500/25 backdrop-blur-xl flex items-center justify-center overflow-hidden group">
             {/* Shimmer Light Flare */}
             <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/10 to-white/0 animate-pulse pointer-events-none" />
 
             <img
               src="/logo-dark.png"
               alt="BudgetPilot Logo"
-              className="w-full h-full object-contain filter drop-shadow-[0_0_12px_rgba(56,189,248,0.65)] transform hover:scale-105 transition-transform"
+              className="w-full h-full object-contain filter drop-shadow-[0_0_12px_rgba(245,158,11,0.7)] transform hover:scale-105 transition-transform"
             />
           </div>
 
@@ -123,19 +123,19 @@ export const ClassyAppLoader: React.FC<ClassyAppLoaderProps> = ({
 
         {/* Brand Title with High-End Tracking */}
         <h1 className="text-xl sm:text-2xl font-black tracking-[0.25em] text-white uppercase flex items-center justify-center gap-1 font-mono">
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-300 to-amber-300">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-500">
             BUDGETPILOT
           </span>
         </h1>
 
-        <p className="text-[10px] tracking-[0.3em] uppercase text-cyan-400/80 font-semibold mt-1">
+        <p className="text-[10px] tracking-[0.3em] uppercase text-amber-400/90 font-semibold mt-1">
           Precision Construction ERP
         </p>
 
         {/* Minimalist Futuristic Progress Bar */}
         <div className="w-56 sm:w-64 h-1.5 bg-slate-900 border border-slate-800 rounded-full mt-7 overflow-hidden relative shadow-inner">
           <div
-            className="h-full bg-gradient-to-r from-blue-600 via-cyan-400 to-amber-400 rounded-full transition-all duration-300 relative"
+            className="h-full bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-300 rounded-full transition-all duration-300 relative"
             style={{ width: `${progress}%` }}
           >
             {/* High-speed white flare */}
@@ -148,7 +148,7 @@ export const ClassyAppLoader: React.FC<ClassyAppLoaderProps> = ({
           <span className="truncate pr-2 text-slate-300 animate-pulse">
             {message || DEFAULT_MESSAGES[statusIdx]}
           </span>
-          <span className="text-cyan-400 font-bold shrink-0">{progress}%</span>
+          <span className="text-amber-400 font-bold shrink-0">{progress}%</span>
         </div>
       </div>
     </div>

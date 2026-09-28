@@ -231,7 +231,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={onToggleMinimize}
                 title="BudgetPilot (Click or hover to expand sidebar)"
-                className="w-11 h-11 rounded-xl overflow-hidden shadow-lg shadow-amber-500/20 border border-amber-500/40 bg-gradient-to-br from-[#0c1426] via-[#080d19] to-black p-1 flex items-center justify-center hover:scale-105 hover:border-amber-400 transition-all cursor-pointer group"
+                className="w-11 h-11 rounded-xl overflow-hidden shadow-lg shadow-amber-500/25 border border-amber-500/40 bg-gradient-to-br from-[#161F30] via-[#0E1528] to-black p-1 flex items-center justify-center hover:scale-105 hover:border-amber-400 transition-all cursor-pointer group"
               >
                 <img
                   src="/logo-dark.png"
@@ -240,7 +240,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     if (!target.src.includes('logo.png')) target.src = '/logo.png';
                   }}
                   alt="BudgetPilot Logo"
-                  className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(56,189,248,0.7)] group-hover:drop-shadow-[0_0_12px_rgba(56,189,248,1)] transition-all"
+                  className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(245,158,11,0.7)] group-hover:drop-shadow-[0_0_12px_rgba(245,158,11,1)] transition-all"
                 />
               </button>
 
@@ -248,7 +248,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={onToggleMinimize}
                 title="Expand Sidebar"
-                className="w-8 h-6 rounded-md flex items-center justify-center text-slate-400 hover:text-cyan-300 hover:bg-slate-800/80 transition-all border border-transparent hover:border-slate-700/60"
+                className="w-8 h-6 rounded-md flex items-center justify-center text-slate-400 hover:text-amber-300 hover:bg-slate-800/80 transition-all border border-transparent hover:border-slate-700/60"
               >
                 <PanelLeftOpen className="w-4 h-4" />
               </button>
@@ -257,7 +257,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             /* Full Expanded Brand Header (also shown when hovered!) */
             <>
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-blue-500/25 shrink-0 border border-cyan-500/50 bg-gradient-to-br from-[#0c1426] via-[#080d19] to-black p-1 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-amber-500/25 shrink-0 border border-amber-500/40 bg-gradient-to-br from-[#161F30] via-[#0E1528] to-black p-1 flex items-center justify-center">
                   <img
                     src="/logo-dark.png"
                     onError={(e) => {
@@ -265,16 +265,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       if (!target.src.includes('logo.png')) target.src = '/logo.png';
                     }}
                     alt="BudgetPilot Logo"
-                    className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(56,189,248,0.6)]"
+                    className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]"
                   />
                 </div>
                 <div className="min-w-0">
                   <h1 className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5 font-mono truncate">
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-cyan-300">
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-amber-100 to-amber-300">
                       BudgetPilot
                     </span>
                   </h1>
-                  <p className="text-[10px] font-medium tracking-wider uppercase text-cyan-400/80 truncate">
+                  <p className="text-[10px] font-medium tracking-wider uppercase text-amber-400/90 truncate">
                     Plan • Build • Control
                   </p>
                 </div>
