@@ -224,6 +224,11 @@ export const leadService = {
     return res.data.data;
   },
 
+  updatePartner: async (partnerId: string, partnerData: Partial<PartnerItem>): Promise<PartnerItem> => {
+    const res = await api.put(`/leads/partners/${partnerId}`, partnerData);
+    return res.data.data;
+  },
+
   deletePartner: async (partnerId: string): Promise<void> => {
     await api.delete(`/leads/partners/${partnerId}`);
   },

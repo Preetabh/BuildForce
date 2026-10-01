@@ -52,6 +52,7 @@ router.post('/payouts/pay', LeadController.processPayout);
 // Reference Partners
 router.get('/partners/all', LeadController.getPartners);
 router.post('/partners/create', LeadController.createPartner);
+router.put('/partners/:id', LeadController.updatePartner);
 router.delete('/partners/all', LeadController.deleteAllPartners);
 router.delete('/partners/:id', LeadController.deletePartner);
 

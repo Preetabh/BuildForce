@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   RotateCcw,
@@ -25,6 +26,7 @@ import { MarkDeadModal } from '../../components/leads/MarkDeadModal';
 import { useAuth } from '../../context/AuthContext';
 
 export const LeadManagement: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   // Active view: 'list' | 'today-due' | 'process'
@@ -191,6 +193,21 @@ export const LeadManagement: React.FC = () => {
 
       {/* Main Container */}
       <div className="p-4 sm:p-6 space-y-4">
+        {/* Navigation Tabs (Leads / Associate Partners) */}
+        <div className="flex items-center gap-2 border-b border-[#1A2234] pb-3">
+          <button
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-[#EAB308] text-slate-950 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+          >
+            Leads
+          </button>
+          <button
+            onClick={() => navigate('/leads/partners')}
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-[#161D2B] transition-all cursor-pointer"
+          >
+            Associate Partners
+          </button>
+        </div>
+
         {/* 2. Subheader & Action Bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>

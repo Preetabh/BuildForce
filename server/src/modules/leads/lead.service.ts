@@ -1710,6 +1710,22 @@ export class LeadService {
   }
 
   /**
+   * Update Partner
+   */
+  static async updatePartner(companyId: string, partnerId: string, updateData: any) {
+    const partner = await Partner.findOneAndUpdate(
+      {
+        _id: new mongoose.Types.ObjectId(partnerId),
+        companyId: new mongoose.Types.ObjectId(companyId),
+      },
+      { $set: updateData },
+      { new: true }
+    );
+    if (!partner) throw new Error('Partner not found');
+    return partner;
+  }
+
+  /**
    * Get Unified Commission Reports
    */
   static async getCommissionReports(companyId: string, partnerId?: string) {

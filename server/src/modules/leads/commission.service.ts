@@ -352,7 +352,7 @@ export class CommissionService {
       .lean();
 
     const summary = reports.reduce(
-      (acc, curr) => {
+      (acc, curr) => {  
         acc.totalCommission += curr.commissionAmount || 0;
         acc.paidCommission += curr.paidAmount || (curr.status === 'Paid' ? curr.commissionAmount : 0);
         acc.pendingCommission +=

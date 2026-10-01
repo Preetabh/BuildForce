@@ -767,6 +767,11 @@ export interface PartnerItem {
   phone: string;
   email?: string;
   partnerType: string;
+  interestLevel?: string;
+  priority?: string;
+  dueDate?: string;
+  city?: string;
+  lastRemark?: string;
   commissionRatePercent: number;
   totalLeadsReferred: number;
   totalConverted: number;

@@ -5,7 +5,12 @@ export interface IPartner extends Document {
   name: string;
   phone: string;
   email?: string;
-  partnerType: 'Associate' | 'Channel Partner' | 'Broker' | 'Social Media Influencer';
+  partnerType: string;
+  interestLevel?: string;
+  priority?: string;
+  dueDate?: string;
+  city?: string;
+  lastRemark?: string;
   commissionRatePercent: number; // e.g. 2, 3, 5%
   totalLeadsReferred: number;
   totalConverted: number;
@@ -50,8 +55,27 @@ const partnerSchema = new Schema<IPartner>(
     },
     partnerType: {
       type: String,
-      enum: ['Associate', 'Channel Partner', 'Broker', 'Social Media Influencer'],
       default: 'Associate',
+    },
+    interestLevel: {
+      type: String,
+      default: '',
+    },
+    priority: {
+      type: String,
+      default: 'High',
+    },
+    dueDate: {
+      type: String,
+      default: '',
+    },
+    city: {
+      type: String,
+      default: '',
+    },
+    lastRemark: {
+      type: String,
+      default: '',
     },
     commissionRatePercent: {
       type: Number,

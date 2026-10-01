@@ -346,6 +346,16 @@ export class LeadController {
     }
   }
 
+  static async updatePartner(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const partner = await LeadService.updatePartner(companyId, req.params.id, req.body);
+      res.status(200).json({ success: true, message: 'Partner updated successfully', data: partner });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async deletePartner(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
