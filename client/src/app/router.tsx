@@ -13,6 +13,12 @@ import { ComingSoonModule } from '../pages/ComingSoonModule';
 import { Help } from '../pages/Help';
 import { Settings } from '../pages/Settings';
 import { ClassyAppLoader } from '../components/common/ClassyAppLoader';
+import { LeadManagement } from '../pages/leads/LeadManagement';
+import { ClientManagement } from '../pages/leads/ClientManagement';
+import { PaymentManagement } from '../pages/leads/PaymentManagement';
+import { PayAmountPage } from '../pages/leads/PayAmountPage';
+import { ReferencePartners } from '../pages/leads/ReferencePartners';
+import { CommissionReport } from '../pages/leads/CommissionReport';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -106,12 +112,13 @@ export const AppRouter: React.FC = () => {
           <Route path="/billing/escalation" element={<ComingSoonModule />} />
 
           {/* LEAD MANAGEMENT */}
-          <Route path="/leads" element={<ComingSoonModule />} />
-          <Route path="/lead-management" element={<ComingSoonModule />} />
-          <Route path="/leads/clients" element={<ComingSoonModule />} />
-          <Route path="/leads/payments" element={<ComingSoonModule />} />
-          <Route path="/leads/partners" element={<ComingSoonModule />} />
-          <Route path="/leads/commission-reports" element={<ComingSoonModule />} />
+          <Route path="/leads" element={<LeadManagement />} />
+          <Route path="/lead-management" element={<LeadManagement />} />
+          <Route path="/leads/clients" element={<ClientManagement />} />
+          <Route path="/leads/payments" element={<PaymentManagement />} />
+          <Route path="/leads/pay-amount" element={<PayAmountPage />} />
+          <Route path="/leads/partners" element={<ReferencePartners />} />
+          <Route path="/leads/commission-reports" element={<CommissionReport />} />
 
           {/* VENDOR MANAGEMENT */}
           <Route path="/vendors" element={<ComingSoonModule />} />

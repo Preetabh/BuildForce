@@ -7,6 +7,7 @@ import measurementRoutes from '../modules/measurements/measurement.routes';
 import resourcesRoutes from '../modules/resources/resources.routes';
 import billingRoutes from '../modules/billing/billing.routes';
 import quantityMasterRoutes from '../modules/quantityMaster/quantityMaster.routes';
+import leadRoutes from '../modules/leads/lead.routes';
 import { authenticate } from '../middleware/auth.middleware';
 import { AuditService } from '../modules/audit/audit.service';
 
@@ -39,6 +40,9 @@ router.use('/projects/:projectId/boq', boqRoutes);
 router.use('/projects/:projectId/measurements', measurementRoutes);
 router.use('/projects/:projectId/resources', resourcesRoutes);
 router.use('/projects/:projectId/billing', billingRoutes);
+
+// Lead Management Routes
+router.use('/leads', leadRoutes);
 
 // Audit Trail Routes
 router.get('/audit/recent', authenticate, async (req, res, next) => {

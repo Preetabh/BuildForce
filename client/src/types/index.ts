@@ -678,3 +678,171 @@ export interface MasterRateList {
   updatedAt: string;
 }
 
+/* ======================================================================
+   Lead Management Types
+   ====================================================================== */
+export type LeadStage = 'Lead' | 'Meeting' | 'Site Visit' | 'Quotation' | 'Negotiation' | 'Client' | 'Dead';
+export type LeadPriority = 'Normal' | 'High' | 'Urgent' | 'Low';
+export type ReferenceType = 'Associate' | 'Social Media' | 'Employee' | 'Direct';
+
+export interface FollowUpItem {
+  _id?: string;
+  date: string;
+  remarks: string;
+  status?: string;
+  createdAt?: string;
+  createdByName?: string;
+}
+
+export interface LeadItem {
+  _id: string;
+  companyId: string;
+  leadCode: string;
+  leadDate: string;
+  clientName: string;
+  targetCompanyCode: string; // 'LB' | 'LD' etc.
+  targetCompanyName?: string;
+  occupation?: string;
+  businessName?: string;
+  gender?: string;
+  mobile1: string;
+  mobile2?: string;
+  email?: string;
+  permanentAddress?: string;
+  siteLocation: string;
+  requirements: string[];
+  serviceItems?: Array<{ service: string; specificItems?: string[] }>;
+  propertyType: 'Resi.' | 'Comm.' | 'Residential' | 'Commercial' | string;
+  propertyTypeDetail?: string;
+  landArea?: string;
+  buildupArea?: string;
+  dimensional?: string;
+  facing?: string;
+  level?: string;
+  requirementType?: string;
+  projectDuration?: string;
+  meetingDateTime?: string;
+  finances?: {
+    budget?: number;
+    estimatedCost?: number;
+  };
+  sitePictures?: string[];
+  referenceType: ReferenceType;
+  referenceDetails?: {
+    partnerId?: string;
+    partnerName?: string;
+    channel?: string;
+    employeeName?: string;
+    notes?: string;
+  };
+  stage: LeadStage;
+  priority: LeadPriority;
+  followUps?: FollowUpItem[];
+  latestFollowUp?: {
+    date?: string;
+    remarks?: string;
+  };
+  isDead: boolean;
+  deadReason?: string;
+  deadAt?: string;
+  isRegisteredClient?: boolean;
+  convertedClientId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeadStats {
+  totalActive: number;
+  totalDead: number;
+  totalClients: number;
+  todayDueCount: number;
+  totalAll: number;
+}
+
+export interface PartnerItem {
+  _id: string;
+  companyId: string;
+  name: string;
+  phone: string;
+  email?: string;
+  partnerType: string;
+  commissionRatePercent: number;
+  totalLeadsReferred: number;
+  totalConverted: number;
+  totalCommissionEarned: number;
+  totalCommissionPaid: number;
+  status: 'ACTIVE' | 'INACTIVE';
+  bankDetails?: {
+    accountName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    upiId?: string;
+  };
+  address?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClientRecord {
+  _id: string;
+  companyId: string;
+  leadId?: string;
+  clientCode: string;
+  name: string;
+  phone: string;
+  secondaryPhone?: string;
+  email?: string;
+  address?: string;
+  siteLocation: string;
+  companyName: string;
+  projectType: string;
+  agreedAmount: number;
+  paidAmount: number;
+  balanceAmount: number;
+  registrationDate: string;
+  status: 'Active' | 'Under Construction' | 'Handover' | 'Archived';
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentItem {
+  _id: string;
+  companyId: string;
+  clientId?: string;
+  leadId?: string;
+  clientName: string;
+  receiptNo: string;
+  amount: number;
+  paymentDate: string;
+  paymentMode: 'Cash' | 'Cheque' | 'UPI' | 'NEFT/RTGS' | 'Bank Transfer';
+  transactionRef?: string;
+  purpose: string;
+  notes?: string;
+  receivedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommissionItem {
+  _id: string;
+  companyId: string;
+  partnerId: string;
+  partnerName: string;
+  leadId?: string;
+  leadCode?: string;
+  clientName: string;
+  projectValue: number;
+  commissionPercent: number;
+  commissionAmount: number;
+  status: 'Pending' | 'Approved' | 'Paid';
+  paymentDate?: string;
+  paymentRef?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+

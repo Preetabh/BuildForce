@@ -27,6 +27,10 @@ import {
   CreditCard,
   Handshake,
   HardHat,
+  UserPlus,
+  Contact,
+  Coins,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils/cn';
@@ -100,13 +104,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'lead_management',
       label: 'LEAD MANAGEMENT',
-      icon: Target,
+      icon: Users,
       items: [
-        { label: 'Leads', path: '/leads', icon: Target, isComingSoon: true },
-        { label: 'Client', path: '/leads/clients', icon: Building2, isComingSoon: true },
-        { label: 'Payment', path: '/leads/payments', icon: CreditCard, isComingSoon: true },
-        { label: 'Reference Partners', path: '/leads/partners', icon: Handshake, isComingSoon: true },
-        { label: 'Commission Report', path: '/leads/commission-reports', icon: FileSpreadsheet, isComingSoon: true },
+        { label: 'Leads', path: '/leads', icon: UserPlus, isComingSoon: false },
+        { label: 'Client', path: '/leads/clients', icon: Contact, isComingSoon: false },
+        { label: 'Payment', path: '/leads/payments', icon: CreditCard, isComingSoon: false },
+        { label: 'Pay Amount', path: '/leads/pay-amount', icon: Coins, isComingSoon: false },
+        { label: 'Reference Partners', path: '/leads/partners', icon: Handshake, isComingSoon: false },
+        { label: 'Commission Report', path: '/leads/commission-reports', icon: FileSpreadsheet, isComingSoon: false },
       ],
     },
     {
@@ -393,6 +398,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <NavLink
                             key={subItem.path}
                             to={subItem.path}
+                            end
                             onClick={() => onClose()}
                             className={({ isActive }) =>
                               cn(
