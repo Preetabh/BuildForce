@@ -285,7 +285,7 @@ export const LeadManagement: React.FC = () => {
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#9333ea] to-[#a855f7] hover:from-[#8b24e6] hover:to-[#9f45f0] text-white font-bold text-xs shadow-lg shadow-purple-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
-              <span>+ New Lead</span>
+              <span>New Lead</span>
             </button>
           </div>
         </div>
@@ -557,7 +557,7 @@ export const LeadManagement: React.FC = () => {
                             }}
                             className="mt-2 px-4 py-1.5 bg-[#EAB308] hover:bg-yellow-400 text-slate-950 font-bold text-xs rounded-xl shadow"
                           >
-                            + Add New Lead
+                            Add New Lead
                           </button>
                         </div>
                       </td>

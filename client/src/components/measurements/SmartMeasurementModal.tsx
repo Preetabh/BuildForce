@@ -3453,7 +3453,7 @@ export const SmartMeasurementModal: React.FC<SmartMeasurementModalProps> = ({
                     type="submit"
                     className="w-full px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors"
                   >
-                    + Save Formula
+                    Save Formula
                   </button>
                 </div>
               </form>

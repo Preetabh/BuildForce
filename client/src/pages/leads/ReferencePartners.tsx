@@ -181,9 +181,10 @@ export const ReferencePartners: React.FC = () => {
           </p>
           <button
             onClick={handleOpenAddModal}
-            className="mt-2 px-4 py-2 bg-[#EAB308] hover:bg-yellow-400 text-slate-950 font-bold text-xs rounded-xl shadow transition-all cursor-pointer"
+            className="mt-2 px-4 py-2 bg-[#EAB308] hover:bg-yellow-400 text-slate-950 font-bold text-xs rounded-xl shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
           >
-            + Add Associate Partner
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Add Associate Partner</span>
           </button>
         </div>
       ) : viewMode === 'table' ? (

@@ -808,7 +808,7 @@ export const ProjectWorkspace: React.FC = () => {
                     className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>+ Add Sub-Project</span>
+                    <span>Add Sub-Project</span>
                   </button>
                 ) : (
                   <button
@@ -821,7 +821,7 @@ export const ProjectWorkspace: React.FC = () => {
                     className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>+ New Item</span>
+                    <span>New Item</span>
                   </button>
                 )}
               </div>
@@ -1133,7 +1133,7 @@ export const ProjectWorkspace: React.FC = () => {
                 Go to Sub-Projects
               </Button>
               <Button onClick={() => openCreateSubProjectModal()} variant="outline" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
-                + Add Sub-Project
+                Add Sub-Project
               </Button>
             </div>
           </div>
@@ -1160,7 +1160,7 @@ export const ProjectWorkspace: React.FC = () => {
                   }}
                   leftIcon={<Plus className="w-4 h-4" />}
                 >
-                  + Record Measurement
+                  Record Measurement
                 </Button>
               </div>
             </div>
@@ -1215,7 +1215,7 @@ export const ProjectWorkspace: React.FC = () => {
                     {safeBoqItems.length === 0 ? (
                       <tr>
                         <td colSpan={10} className="py-12 text-center text-erp-text-muted">
-                          No abstract items generated yet. Click "+ Record Measurement" above to enter dimensions and auto-generate this BOQ.
+                          No abstract items generated yet. Click "Record Measurement" above to enter dimensions and auto-generate this BOQ.
                         </td>
                       </tr>
                     ) : (
@@ -1401,7 +1401,7 @@ export const ProjectWorkspace: React.FC = () => {
                   className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-xs font-semibold text-white flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ New Item</span>
+                  <span>New Item</span>
                 </button>
               </div>
             </div>
@@ -1501,7 +1501,7 @@ export const ProjectWorkspace: React.FC = () => {
                 <div className="py-16 text-center text-slate-400 space-y-3">
                   <Ruler className="w-8 h-8 text-slate-600 mx-auto" />
                   <p className="text-sm font-medium">No measurement items recorded yet.</p>
-                  <p className="text-xs text-slate-500">Click "+ New Item" above to record dimensions and calculate quantities.</p>
+                  <p className="text-xs text-slate-500">Click "New Item" above to record dimensions and calculate quantities.</p>
                 </div>
               ) : (
                 Object.entries(groupedMeasurements).map(([groupName, groupItems]: [string, Measurement[]]) => {
