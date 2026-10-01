@@ -227,6 +227,22 @@ export const ClientManagement: React.FC = () => {
         </div>
       </div>
 
+      {/* Mobile Stats Summary (< lg screens) */}
+      <div className="grid grid-cols-3 gap-2 lg:hidden w-full bg-[#111622] border border-[#1E2638] p-2.5 rounded-xl text-center">
+        <div>
+          <span className="text-[9.5px] text-slate-400 uppercase font-semibold block">Total</span>
+          <span className="font-mono font-bold text-white text-xs">₹{totalAgreed.toLocaleString()}</span>
+        </div>
+        <div>
+          <span className="text-[9.5px] text-emerald-400 uppercase font-semibold block">Paid</span>
+          <span className="font-mono font-bold text-emerald-400 text-xs">₹{totalPaid.toLocaleString()}</span>
+        </div>
+        <div>
+          <span className="text-[9.5px] text-amber-400 uppercase font-semibold block">Due</span>
+          <span className="font-mono font-bold text-amber-400 text-xs">₹{totalDue.toLocaleString()}</span>
+        </div>
+      </div>
+
       {/* Filter Toolbar */}
       <div className="bg-[#111622] border border-[#1E2638] rounded-xl p-3 shadow-md">
         <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-center gap-2.5 text-xs">
@@ -432,7 +448,7 @@ export const ClientManagement: React.FC = () => {
       {/* Main Clients Table */}
       <div className="bg-[#10141F] border border-[#1E2638] rounded-xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-collapse text-[11px]">
+          <table className="w-full text-left border-collapse text-[11px] min-w-[900px]">
             <thead>
               <tr className="bg-[#141A28] border-b border-[#232D42] text-[10px] font-bold tracking-wider text-amber-400 uppercase select-none whitespace-nowrap">
                 <th className="py-2.5 px-2.5 text-center w-10">S.N.</th>

@@ -150,8 +150,8 @@ export const LeadManagement: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0D1017] text-slate-200">
-      {/* 1. Portal Brand Top Bar */}
-      <div className="bg-[#0A0D14] border-b border-[#1A2234] px-4 sm:px-6 py-2.5 flex items-center justify-between">
+      {/* 1. Portal Brand Top Bar (Desktop only, AppLayout provides mobile bar) */}
+      <div className="hidden md:flex bg-[#0A0D14] border-b border-[#1A2234] px-4 sm:px-6 py-2.5 items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-pulse" />
@@ -225,7 +225,7 @@ export const LeadManagement: React.FC = () => {
           </div>
 
           {/* Views Toggles & New Lead Button */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             <div className="flex bg-[#121724] border border-[#20293D] rounded-xl p-1 gap-1">
               {/* List View */}
               <button
@@ -445,7 +445,11 @@ export const LeadManagement: React.FC = () => {
                                 lead.priority
                               )}`}
                             >
-                              {lead.priority}
+                              {lead.priority === 'High'
+                                ? '🔥 High'
+                                : lead.priority === 'Urgent'
+                                ? '🚨 Urgent'
+                                : lead.priority}
                             </span>
                           </div>
 
@@ -508,7 +512,7 @@ export const LeadManagement: React.FC = () => {
           /* TABULAR LIST VIEW (Matching Image 2 exactly!) */
           <div className="bg-[#10141F] border border-[#1E2638] rounded-2xl overflow-hidden shadow-2xl">
             <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse text-[11.5px]">
+              <table className="w-full text-left border-collapse text-[11.5px] min-w-[950px]">
                 <thead>
                   <tr className="bg-[#131825] border-b border-[#1E2638] text-[10px] font-bold tracking-wider text-amber-400/90 uppercase select-none">
                     <th className="py-3 px-3 w-10 text-center">S.N</th>
@@ -652,7 +656,11 @@ export const LeadManagement: React.FC = () => {
                                 lead.priority
                               )}`}
                             >
-                              {lead.priority}
+                              {lead.priority === 'High'
+                                ? '🔥 High'
+                                : lead.priority === 'Urgent'
+                                ? '🚨 Urgent'
+                                : lead.priority}
                             </span>
                           </td>
 

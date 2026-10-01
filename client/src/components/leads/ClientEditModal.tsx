@@ -532,9 +532,9 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
                   onChange={(e) => setPriority(e.target.value)}
                   className="w-full bg-[#10141D] border border-[#2B3346] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
                 >
-                  <option value="High">High</option>
+                  <option value="High">🔥 High</option>
+                  <option value="Urgent">🚨 Urgent</option>
                   <option value="Normal">Normal</option>
-                  <option value="Urgent">Urgent</option>
                   <option value="Low">Low</option>
                 </select>
               </div>

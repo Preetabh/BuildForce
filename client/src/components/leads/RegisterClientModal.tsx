@@ -717,9 +717,9 @@ export const RegisterClientModal: React.FC<RegisterClientModalProps> = ({
                     onChange={(e) => setPriority(e.target.value as any)}
                     className="w-full bg-[#101114] border border-[#2b2c35] focus:border-[#e5a919] rounded-lg px-3 py-2 text-xs text-white focus:outline-none appearance-none cursor-pointer transition-colors pr-8"
                   >
-                    <option value="High">High</option>
+                    <option value="High">🔥 High</option>
+                    <option value="Urgent">🚨 Urgent</option>
                     <option value="Normal">Normal</option>
-                    <option value="Urgent">Urgent</option>
                     <option value="Low">Low</option>
                   </select>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />

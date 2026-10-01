@@ -110,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { label: 'Client', path: '/leads/clients', icon: Contact, isComingSoon: false },
         { label: 'Payment', path: '/leads/payments', icon: CreditCard, isComingSoon: false },
         { label: 'Pay Amount', path: '/leads/pay-amount', icon: Coins, isComingSoon: false },
-        { label: 'Reference Partners', path: '/leads/partners', icon: Handshake, isComingSoon: false },
+        { label: 'Associate Partners', path: '/leads/partners', icon: Handshake, isComingSoon: false },
         { label: 'Commission Report', path: '/leads/commission-reports', icon: FileSpreadsheet, isComingSoon: false },
       ],
     },

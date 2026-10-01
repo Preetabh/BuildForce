@@ -111,13 +111,13 @@ export const ReferencePartners: React.FC = () => {
         {/* Right Search Bar & Actions */}
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* Search Box */}
-          <div className="relative">
+          <div className="relative flex-1 sm:flex-initial min-w-[140px]">
             <input
               type="text"
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-[#121622] border border-[#232D42] focus:border-amber-400 rounded-xl pl-3.5 pr-9 py-2 text-xs text-white placeholder-slate-500 outline-none w-48 sm:w-60 transition-all"
+              className="bg-[#121622] border border-[#232D42] focus:border-amber-400 rounded-xl pl-3.5 pr-9 py-2 text-xs text-white placeholder-slate-500 outline-none w-full sm:w-60 transition-all"
             />
             <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -190,7 +190,7 @@ export const ReferencePartners: React.FC = () => {
         /* Table View Matching User Screenshot */
         <div className="bg-[#10141F] border border-[#1D2536] rounded-2xl overflow-hidden shadow-2xl">
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[760px]">
               <thead>
                 <tr className="border-b border-[#1D2536] text-[10.5px] uppercase tracking-wider text-slate-400 font-bold select-none whitespace-nowrap bg-[#0D1017]">
                   <th className="py-3 px-4">PARTNER NAME</th>
@@ -252,18 +252,24 @@ export const ReferencePartners: React.FC = () => {
                       )}
                     </td>
 
-                    {/* PRIORITY (Matching screenshot with red 'High') */}
+                    {/* PRIORITY (Render 🔥 High or 🚨 Urgent) */}
                     <td className="py-3.5 px-4 text-center">
                       <span
-                        className={`text-xs font-bold ${
-                          partner.priority === 'High' || partner.priority === 'Urgent'
+                        className={`text-xs font-bold inline-flex items-center justify-center gap-1 ${
+                          partner.priority === 'Urgent'
+                            ? 'text-rose-500 font-black'
+                            : partner.priority === 'High' || !partner.priority
                             ? 'text-rose-400'
                             : partner.priority === 'Medium'
                             ? 'text-amber-400'
                             : 'text-slate-400'
                         }`}
                       >
-                        {partner.priority || 'High'}
+                        {partner.priority === 'Urgent'
+                          ? '🚨 Urgent'
+                          : partner.priority === 'High' || !partner.priority
+                          ? '🔥 High'
+                          : partner.priority}
                       </span>
                     </td>
 
@@ -334,7 +340,11 @@ export const ReferencePartners: React.FC = () => {
                       {p.partnerType || 'Associate'}
                     </span>
                     <span className="text-[10px] font-bold text-rose-400">
-                      {p.priority || 'High'}
+                      {p.priority === 'Urgent'
+                        ? '🚨 Urgent'
+                        : p.priority === 'High' || !p.priority
+                        ? '🔥 High'
+                        : p.priority}
                     </span>
                   </div>
                 </div>

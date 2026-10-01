@@ -869,8 +869,8 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
                     className="w-full bg-[#121622] border border-[#2B354C] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#EAB308]"
                   >
                     <option value="Normal">Normal</option>
-                    <option value="High">High</option>
-                    <option value="Urgent">Urgent</option>
+                    <option value="High">🔥 High</option>
+                    <option value="Urgent">🚨 Urgent</option>
                     <option value="Low">Low</option>
                   </select>
                 </div>

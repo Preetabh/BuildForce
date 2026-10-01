@@ -125,7 +125,7 @@ export const CommissionReport: React.FC = () => {
       {/* Report Table */}
       <div className="bg-[#10141F] border border-[#1E2638] rounded-2xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-collapse text-[11px]">
+          <table className="w-full text-left border-collapse text-[11px] min-w-[850px]">
             <thead>
               <tr className="bg-[#131825] border-b border-[#1E2638] text-[10px] font-bold tracking-wider text-amber-400/90 uppercase select-none">
                 <th className="py-3 px-3">DATE</th>

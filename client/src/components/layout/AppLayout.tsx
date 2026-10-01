@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { AiAssistantWidget } from '../common/AiAssistantWidget';
 import api from '../../services/api';
@@ -110,6 +111,32 @@ export const AppLayout: React.FC = () => {
         className="flex-1 flex flex-col min-w-0 transition-all duration-200"
         style={{ paddingLeft: isDesktop ? `${effectiveWidth}px` : undefined }}
       >
+        {/* Mobile Sticky Header (< md screens) */}
+        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between px-3.5 py-2.5 bg-[#0A0D14]/95 backdrop-blur-md border-b border-[#1A2234]">
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-xl bg-[#141B2D] border border-[#222E48] text-amber-400 hover:text-white transition-colors cursor-pointer"
+              aria-label="Open Navigation Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-pulse" />
+              <span className="text-xs font-black tracking-widest uppercase font-mono text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400">
+                BUILDFORCE 360
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 text-slate-950 font-black text-xs flex items-center justify-center shadow-md">
+              A
+            </div>
+          </div>
+        </header>
+
         <main className="flex-1 pb-16">
           <Outlet context={{ setSidebarOpen, deletedCount }} />
         </main>

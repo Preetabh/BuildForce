@@ -103,9 +103,9 @@ export const AssociatePartnerModal: React.FC<AssociatePartnerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-[#14171F] border border-[#232836] rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-7 text-slate-200">
+      <div className="relative w-full max-w-lg bg-[#14171F] border border-[#232836] rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden p-5 sm:p-7 text-slate-200 max-h-[94vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4">
+        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-[#232836] shrink-0">
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
             {partnerToEdit ? 'Edit Associate Partner' : 'Add Associate Partner'}
           </h2>
@@ -124,7 +124,7 @@ export const AssociatePartnerModal: React.FC<AssociatePartnerModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto custom-scrollbar pr-1 flex-1 py-3">
           {/* Full Name */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">
@@ -237,10 +237,10 @@ export const AssociatePartnerModal: React.FC<AssociatePartnerModalProps> = ({
                   className="w-full bg-[#1B1F2A] border border-[#2B3242] focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition-all appearance-none cursor-pointer"
                 >
                   <option value="">-- Select --</option>
-                  <option value="High">High</option>
+                  <option value="High">🔥 High</option>
+                  <option value="Urgent">🚨 Urgent</option>
                   <option value="Medium">Medium</option>
                   <option value="Low">Low</option>
-                  <option value="Urgent">Urgent</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
                   <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
@@ -296,7 +296,7 @@ export const AssociatePartnerModal: React.FC<AssociatePartnerModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-3">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#232836] shrink-0">
             <button
               type="button"
               onClick={onClose}

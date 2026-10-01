@@ -212,7 +212,7 @@ export const PaymentManagement: React.FC = () => {
       {/* Main Payment History Table */}
       <div className="bg-[#12141a] border border-[#202534] rounded-2xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-xs min-w-[700px]">
             <thead>
               <tr className="border-b border-[#202534] bg-[#0e1015] text-[11px] font-bold tracking-wider text-slate-400 uppercase select-none">
                 <th className="py-3.5 px-4 w-32">DATE</th>

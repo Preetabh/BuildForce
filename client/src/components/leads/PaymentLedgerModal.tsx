@@ -417,7 +417,7 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
               {/* Table Container (Matches User Screenshot) */}
               <div className="bg-[#10141D] border border-[#1E2532] rounded-xl overflow-hidden shadow-2xl">
                 <div className="overflow-x-auto custom-scrollbar">
-                  <table className="w-full text-left border-collapse text-[11px]">
+                  <table className="w-full text-left border-collapse text-[11px] min-w-[650px]">
                     <thead>
                       <tr className="bg-white text-slate-800 text-[10px] font-black uppercase tracking-wider select-none whitespace-nowrap">
                         <th className="py-2.5 px-3 text-center w-8">S.N.</th>

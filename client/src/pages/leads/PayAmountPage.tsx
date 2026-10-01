@@ -213,7 +213,7 @@ export const PayAmountPage: React.FC = () => {
       </div>
 
       {/* KPI Stats Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
         <div className="p-4 bg-[#10141F] border border-[#1E2638] rounded-2xl">
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
             Total Paid Out
@@ -461,7 +461,7 @@ export const PayAmountPage: React.FC = () => {
         {/* Right Section: Pending Commissions & Disbursed Payouts Tabs */}
         <div className="lg:col-span-7 space-y-4">
           {/* Tab Navigation */}
-          <div className="flex items-center gap-2 border-b border-[#1E2638] pb-2">
+          <div className="flex items-center gap-2 border-b border-[#1E2638] pb-2 overflow-x-auto custom-scrollbar whitespace-nowrap">
             <button
               onClick={() => setActiveTab('pending')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -488,7 +488,7 @@ export const PayAmountPage: React.FC = () => {
           {activeTab === 'pending' && (
             <div className="bg-[#10141F] border border-[#1E2638] rounded-2xl overflow-hidden shadow-2xl">
               <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left border-collapse text-[11px]">
+                <table className="w-full text-left border-collapse text-[11px] min-w-[580px]">
                   <thead>
                     <tr className="bg-[#131825] border-b border-[#1E2638] text-[10px] font-bold text-amber-400 uppercase">
                       <th className="py-3 px-3">PARTNER</th>
@@ -580,7 +580,7 @@ export const PayAmountPage: React.FC = () => {
           {activeTab === 'history' && (
             <div className="bg-[#10141F] border border-[#1E2638] rounded-2xl overflow-hidden shadow-2xl">
               <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left border-collapse text-[11px]">
+                <table className="w-full text-left border-collapse text-[11px] min-w-[620px]">
                   <thead>
                     <tr className="bg-[#131825] border-b border-[#1E2638] text-[10px] font-bold text-amber-400 uppercase">
                       <th className="py-3 px-3">PAYOUT NO</th>
