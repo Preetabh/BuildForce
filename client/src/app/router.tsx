@@ -111,10 +111,12 @@ export const AppRouter: React.FC = () => {
           <Route path="/billing/subcontractor-bills" element={<ComingSoonModule />} />
           <Route path="/billing/escalation" element={<ComingSoonModule />} />
 
-          {/* LEAD MANAGEMENT */}
+          {/* LEAD MANAGEMENT & CLIENT PORTAL */}
           <Route path="/leads" element={<LeadManagement />} />
           <Route path="/lead-management" element={<LeadManagement />} />
           <Route path="/leads/clients" element={<ClientManagement />} />
+          <Route path="/admin/clients" element={<ClientManagement />} />
+          <Route path="/Admin/Clients" element={<ClientManagement />} />
           <Route path="/leads/payments" element={<PaymentManagement />} />
           <Route path="/leads/pay-amount" element={<PayAmountPage />} />
           <Route path="/leads/partners" element={<ReferencePartners />} />

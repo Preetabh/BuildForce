@@ -4,11 +4,13 @@ import { Partner } from '../../models/Partner';
 import { ClientAccount } from '../../models/ClientAccount';
 import { PaymentRecord } from '../../models/PaymentRecord';
 import { CommissionRecord } from '../../models/CommissionRecord';
+import { PartnerPayout } from '../../models/PartnerPayout';
 import { Company } from '../../models/Company';
+import { CommissionService } from './commission.service';
 
 export interface LeadFilterParams {
   search?: string;
-  statusMode?: 'NonDead' | 'Dead' | 'All';
+  statusMode?: 'NonDead' | 'Dead' | 'Converted' | 'Client' | 'All';
   companyCode?: string;
   service?: string;
   startDate?: string;
@@ -27,14 +29,19 @@ export class LeadService {
   static async getLeads(companyId: string, params: LeadFilterParams) {
     const query: any = { companyId: new mongoose.Types.ObjectId(companyId) };
 
-    // 1. Status mode (NonDead / Dead / All)
+    // 1. Status mode (NonDead / Dead / Converted / All)
     if (params.statusMode === 'Dead') {
       query.isDead = true;
-    } else if (params.statusMode === 'All') {
-      // Don't filter by isDead
+    } else if (params.statusMode === 'Converted' || (params.statusMode as any) === 'Client') {
+      query.$or = [{ isRegisteredClient: true }, { stage: 'Client' }];
+    } else if (params.statusMode === 'All' || params.view === 'process') {
+      // In All mode or process view, include all leads
     } else {
-      // Default: NonDead
+      // Default: NonDead (Active Leads only in pipeline)
+      // Confirmed clients are moved to Client section, so they do NOT remain in active leads
       query.isDead = false;
+      query.isRegisteredClient = { $ne: true };
+      query.stage = { $ne: 'Client' };
     }
 
     // 2. Search
@@ -132,12 +139,22 @@ export class LeadService {
     endOfDay.setHours(23, 59, 59, 999);
 
     const [totalActive, totalDead, totalClients, todayDueCount] = await Promise.all([
-      Lead.countDocuments({ companyId: compId, isDead: false }),
-      Lead.countDocuments({ companyId: compId, isDead: true }),
-      Lead.countDocuments({ companyId: compId, stage: 'Client' }),
       Lead.countDocuments({
         companyId: compId,
         isDead: false,
+        isRegisteredClient: { $ne: true },
+        stage: { $ne: 'Client' },
+      }),
+      Lead.countDocuments({ companyId: compId, isDead: true }),
+      Lead.countDocuments({
+        companyId: compId,
+        $or: [{ stage: 'Client' }, { isRegisteredClient: true }],
+      }),
+      Lead.countDocuments({
+        companyId: compId,
+        isDead: false,
+        isRegisteredClient: { $ne: true },
+        stage: { $ne: 'Client' },
         'latestFollowUp.date': { $lte: endOfDay },
       }),
     ]);
@@ -147,7 +164,7 @@ export class LeadService {
       totalDead,
       totalClients,
       todayDueCount,
-      totalAll: totalActive + totalDead,
+      totalAll: totalActive + totalDead + totalClients,
     };
   }
 
@@ -259,7 +276,11 @@ export class LeadService {
       lead.targetCompanyName = 'Lucknow Builders';
     }
 
-    await lead.save();
+    if (lead.stage === 'Client' && !lead.isRegisteredClient) {
+      await LeadService.ensureClientAccount(companyId, lead);
+    } else {
+      await lead.save();
+    }
     return lead;
   }
 
@@ -282,6 +303,43 @@ export class LeadService {
       companyId: new mongoose.Types.ObjectId(companyId),
     });
     return res;
+  }
+
+  /**
+   * Delete all clients for company
+   */
+  static async deleteAllClients(companyId: string) {
+    const res = await ClientAccount.deleteMany({
+      companyId: new mongoose.Types.ObjectId(companyId),
+    });
+    return res;
+  }
+
+  /**
+   * Remove ALL data across the entire Lead/Client/Payment/Partner/Commission/Payout system
+   */
+  static async removeAllData(companyId: string) {
+    const compId = new mongoose.Types.ObjectId(companyId);
+    const [leads, clients, payments, commissions, payouts, partners] = await Promise.all([
+      Lead.deleteMany({ companyId: compId }),
+      ClientAccount.deleteMany({ companyId: compId }),
+      PaymentRecord.deleteMany({ companyId: compId }),
+      CommissionRecord.deleteMany({ companyId: compId }),
+      PartnerPayout.deleteMany({ companyId: compId }),
+      Partner.deleteMany({ companyId: compId }),
+    ]);
+
+    return {
+      success: true,
+      deleted: {
+        leads: leads.deletedCount,
+        clients: clients.deletedCount,
+        payments: payments.deletedCount,
+        commissions: commissions.deletedCount,
+        payouts: payouts.deletedCount,
+        partners: partners.deletedCount,
+      },
+    };
   }
 
   /**
@@ -336,7 +394,11 @@ export class LeadService {
       }
     }
 
-    await lead.save();
+    if (lead.stage === 'Client' && !lead.isDead && !lead.isRegisteredClient) {
+      await LeadService.ensureClientAccount(companyId, lead, { notes: followUp.remarks });
+    } else {
+      await lead.save();
+    }
     return lead;
   }
 
@@ -465,16 +527,34 @@ export class LeadService {
 
     const clientCode = `CL-${lead.leadCode}`;
 
+    // Find linked reference partner if any
+    let partner = null;
+    if (lead.referenceDetails?.partnerId) {
+      partner = await Partner.findOne({
+        _id: lead.referenceDetails.partnerId,
+        companyId: new mongoose.Types.ObjectId(companyId),
+      });
+    } else if (lead.referenceDetails?.partnerName) {
+      partner = await Partner.findOne({
+        companyId: new mongoose.Types.ObjectId(companyId),
+        name: new RegExp(`^${lead.referenceDetails.partnerName.trim()}$`, 'i'),
+      });
+    }
+
+    const isFirstConversion = !lead.isRegisteredClient && !lead.convertedClientId;
+
     // Create or find client account
     let client = await ClientAccount.findOne({
       companyId: new mongoose.Types.ObjectId(companyId),
-      clientCode,
+      $or: [{ clientCode }, { leadId: lead._id }],
     });
 
     if (!client) {
       client = new ClientAccount({
         companyId: new mongoose.Types.ObjectId(companyId),
         leadId: lead._id,
+        partnerId: partner?._id,
+        partnerName: partner?.name || '',
         clientCode,
         name: lead.clientName,
         phone: lead.mobile1,
@@ -485,8 +565,8 @@ export class LeadService {
         companyName: lead.targetCompanyName || 'Lucknow Builders',
         projectType: lead.propertyType === 'Comm.' ? 'Commercial' : (lead.propertyType || 'Residential'),
         agreedAmount,
-        paidAmount,
-        balanceAmount,
+        paidAmount: 0,
+        balanceAmount: agreedAmount,
         registrationDate: new Date(),
         status: 'Active',
         notes: clientData.notes || '',
@@ -500,8 +580,10 @@ export class LeadService {
       client.address = lead.permanentAddress;
       client.siteLocation = lead.siteLocation;
       client.agreedAmount = agreedAmount;
-      client.paidAmount = paidAmount;
-      client.balanceAmount = balanceAmount;
+      if (partner) {
+        client.partnerId = partner._id as any;
+        client.partnerName = partner.name;
+      }
       if (clientData.notes) client.notes = clientData.notes;
       await client.save();
     }
@@ -513,84 +595,1036 @@ export class LeadService {
     lead.isDead = false;
     await lead.save();
 
-    // If partner was referred, update partner converted count and commission
-    if (lead.referenceType === 'Associate' && lead.referenceDetails?.partnerName) {
-      const partner = await Partner.findOne({
-        companyId: new mongoose.Types.ObjectId(companyId),
-        name: lead.referenceDetails.partnerName,
-      });
-
-      if (partner) {
-        partner.totalConverted += 1;
-        const commissionAmount = (agreedAmount * (partner.commissionRatePercent || 2)) / 100;
-        partner.totalCommissionEarned += commissionAmount;
-        await partner.save();
-
-        // Create commission record
-        await CommissionRecord.create({
-          companyId: new mongoose.Types.ObjectId(companyId),
-          partnerId: partner._id,
-          partnerName: partner.name,
-          leadId: lead._id,
-          leadCode: lead.leadCode,
-          clientName: lead.clientName,
-          projectValue: agreedAmount,
-          commissionPercent: partner.commissionRatePercent || 2,
-          commissionAmount,
-          status: 'Pending',
-        });
-      }
+    // If partner was referred and this is the first conversion, increment partner converted count
+    if (isFirstConversion && partner) {
+      partner.totalConverted = (partner.totalConverted || 0) + 1;
+      await partner.save();
     }
 
-    // If advance payment was made during registration, record it
+    // If advance payment was made during registration, record it through centralized payment service
     if (paidAmount > 0) {
-      await PaymentRecord.create({
-        companyId: new mongoose.Types.ObjectId(companyId),
+      await this.recordPayment(companyId, {
         clientId: client._id,
         leadId: lead._id,
         clientName: lead.clientName,
-        receiptNo: `RCP-${Date.now().toString().slice(-6)}`,
         amount: paidAmount,
         paymentDate: new Date(),
         paymentMode: 'UPI',
+        modeBadge: 'Online',
         purpose: 'Advance Booking Payment',
         receivedBy: 'Admin',
       });
+      // Refresh client after payment
+      const refreshedClient = await ClientAccount.findById(client._id);
+      if (refreshedClient) client = refreshedClient;
     }
 
     return { lead, client };
   }
 
   /**
-   * Get all converted clients
+   * Helper to ensure client account exists for a lead transitioned to Client stage
    */
-  static async getClients(companyId: string, search?: string) {
-    const query: any = { companyId: new mongoose.Types.ObjectId(companyId) };
-    if (search && search.trim()) {
-      const regex = new RegExp(search.trim(), 'i');
-      query.$or = [{ name: regex }, { clientCode: regex }, { phone: regex }, { siteLocation: regex }];
+  static async ensureClientAccount(companyId: string, lead: any, extraData: any = {}) {
+    return await this.convertToClient(companyId, lead._id.toString(), {
+      agreedAmount: lead.finances?.budget || 0,
+      paidAmount: 0,
+      siteLocation: lead.siteLocation || 'Site',
+      notes: extraData.notes || lead.notes || '',
+    });
+  }
+
+  /**
+   * Get all clients with comprehensive filtering
+   */
+  static async getClients(
+    companyId: string,
+    query: {
+      search?: string;
+      statusMode?: 'NonDead' | 'Dead' | 'All';
+      feeStatus?: 'All' | 'Paid' | 'Pending';
+      company?: string;
+      service?: string;
+      startDate?: string;
+      endDate?: string;
+    } = {}
+  ) {
+    const compId = new mongoose.Types.ObjectId(companyId);
+    const filter: any = { companyId: compId };
+
+    // Dead / NonDead filter
+    if (query.statusMode === 'Dead') {
+      filter.isDead = true;
+    } else if (query.statusMode === 'NonDead' || !query.statusMode) {
+      filter.isDead = { $ne: true };
     }
 
-    const clients = await ClientAccount.find(query).sort({ createdAt: -1 }).lean();
+    // Fee filter
+    if (query.feeStatus === 'Paid') {
+      filter.balanceAmount = { $lte: 0 };
+      filter.agreedAmount = { $gt: 0 };
+    } else if (query.feeStatus === 'Pending') {
+      filter.balanceAmount = { $gt: 0 };
+    }
+
+    // Company filter
+    if (query.company && query.company !== 'All Companies') {
+      filter.$or = [
+        { companyName: new RegExp(query.company, 'i') },
+        { subBadge: new RegExp(query.company, 'i') },
+      ];
+    }
+
+    // Service filter
+    if (query.service && query.service !== 'All Services') {
+      filter.services = new RegExp(query.service, 'i');
+    }
+
+    // Date range filter (Registration date)
+    if (query.startDate || query.endDate) {
+      filter.registrationDate = {};
+      if (query.startDate) {
+        filter.registrationDate.$gte = new Date(query.startDate);
+      }
+      if (query.endDate) {
+        const end = new Date(query.endDate);
+        end.setHours(23, 59, 59, 999);
+        filter.registrationDate.$lte = end;
+      }
+    }
+
+    // Free text search
+    if (query.search && query.search.trim()) {
+      const regex = new RegExp(query.search.trim(), 'i');
+      const searchConditions = [
+        { name: regex },
+        { clientCode: regex },
+        { phone: regex },
+        { siteLocation: regex },
+        { associate: regex },
+        { handlerName: regex },
+        { services: regex },
+        { companyName: regex },
+        { subBadge: regex },
+      ];
+
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: searchConditions }];
+        delete filter.$or;
+      } else {
+        filter.$or = searchConditions;
+      }
+    }
+
+    const clients = await ClientAccount.find(filter)
+      .sort({ registrationDate: -1, createdAt: -1 })
+      .lean();
     return clients;
   }
 
   /**
-   * Get all payments
+   * Get single client by ID
    */
-  static async getPayments(companyId: string, search?: string) {
-    const query: any = { companyId: new mongoose.Types.ObjectId(companyId) };
-    if (search && search.trim()) {
-      const regex = new RegExp(search.trim(), 'i');
-      query.$or = [{ clientName: regex }, { receiptNo: regex }, { transactionRef: regex }, { purpose: regex }];
+  static async getClientById(companyId: string, id: string) {
+    const client = await ClientAccount.findOne({
+      _id: new mongoose.Types.ObjectId(id),
+      companyId: new mongoose.Types.ObjectId(companyId),
+    }).lean();
+    return client;
+  }
+
+  /**
+   * Update client details
+   */
+  static async updateClient(companyId: string, id: string, data: any) {
+    const client = await ClientAccount.findOne({
+      _id: new mongoose.Types.ObjectId(id),
+      companyId: new mongoose.Types.ObjectId(companyId),
+    });
+    if (!client) throw new Error('Client not found');
+
+    if (data.name !== undefined) client.name = data.name;
+    if (data.businessName !== undefined) client.businessName = data.businessName;
+    if (data.contactPerson !== undefined) client.contactPerson = data.contactPerson;
+    if (data.phone !== undefined) client.phone = data.phone;
+    if (data.secondaryPhone !== undefined) client.secondaryPhone = data.secondaryPhone;
+    if (data.email !== undefined) client.email = data.email;
+    if (data.address !== undefined) client.address = data.address;
+    if (data.siteLocation !== undefined) client.siteLocation = data.siteLocation;
+    if (data.companyName !== undefined) client.companyName = data.companyName;
+    if (data.handlerName !== undefined) client.handlerName = data.handlerName;
+    if (data.subBadge !== undefined) client.subBadge = data.subBadge;
+    if (data.associate !== undefined) client.associate = data.associate;
+    if (data.associateType !== undefined) client.associateType = data.associateType;
+    if (data.area !== undefined) client.area = data.area;
+    if (data.services !== undefined) client.services = data.services;
+    if (data.status !== undefined) client.status = data.status;
+    if (data.notes !== undefined) client.notes = data.notes;
+
+    // Site & Project details from Edit popup
+    if (data.propertyType !== undefined) client.propertyType = data.propertyType;
+    if (data.propertySubtype !== undefined) client.propertySubtype = data.propertySubtype;
+    if (data.buildupArea !== undefined) client.buildupArea = data.buildupArea;
+    if (data.dimensional !== undefined) client.dimensional = data.dimensional;
+    if (data.facing !== undefined) client.facing = data.facing;
+    if (data.level !== undefined) client.level = data.level;
+    if (data.requirementType !== undefined) client.requirementType = data.requirementType;
+    if (data.projectDuration !== undefined) client.projectDuration = data.projectDuration;
+    if (data.meetingDate !== undefined) client.meetingDate = data.meetingDate;
+    if (data.gender !== undefined) client.gender = data.gender;
+    if (data.priority !== undefined) client.priority = data.priority;
+    if (data.referenceSource !== undefined) client.referenceSource = data.referenceSource;
+    if (data.servicesList !== undefined) client.servicesList = data.servicesList;
+    if (data.registrationDate !== undefined) client.registrationDate = new Date(data.registrationDate);
+
+    if (data.agreedAmount !== undefined) {
+      client.agreedAmount = Number(data.agreedAmount) || 0;
+      client.balanceAmount = Math.max(0, client.agreedAmount - (client.paidAmount || 0));
+    }
+    if (data.paidAmount !== undefined) {
+      client.paidAmount = Number(data.paidAmount) || 0;
+      client.balanceAmount = Math.max(0, (client.agreedAmount || 0) - client.paidAmount);
     }
 
-    const payments = await PaymentRecord.find(query).sort({ paymentDate: -1, createdAt: -1 }).lean();
+    await client.save();
+    return client;
+  }
+
+  /**
+   * Save Cost Estimator and Initialize/Save Ledger Schedule
+   */
+  static async saveLedgerSchedule(
+    companyId: string,
+    clientId: string,
+    estimatorData: {
+      areaSqft: number;
+      ratePerSqft: number;
+      discountPerSqft: number;
+      finalRate: number;
+      totalAmount: number;
+    },
+    customStages?: any[]
+  ) {
+    const client = await ClientAccount.findOne({
+      _id: new mongoose.Types.ObjectId(clientId),
+      companyId: new mongoose.Types.ObjectId(companyId),
+    });
+    if (!client) throw new Error('Client not found');
+
+    const total = estimatorData.totalAmount || 0;
+    client.projectEstimator = estimatorData;
+
+    if (customStages && customStages.length > 0) {
+      client.ledgerStages = customStages as any;
+    } else if (!client.ledgerStages || client.ledgerStages.length === 0) {
+      // 9 standard milestone stages breakdown matching user portal
+      const defaultMilestones = [
+        { stageName: 'Advance', percentage: 20 },
+        { stageName: 'Slab', percentage: 20 },
+        { stageName: 'Brick Work', percentage: 15 },
+        { stageName: 'Electrical Work', percentage: 10 },
+        { stageName: 'Plaster', percentage: 10 },
+        { stageName: 'Tile Work', percentage: 10 },
+        { stageName: 'Bathroom Fitting', percentage: 5 },
+        { stageName: 'Painting Work', percentage: 5 },
+        { stageName: 'Site Completion', percentage: 5 },
+      ];
+
+      const todayFormatted = new Date().toISOString().split('T')[0];
+      client.ledgerStages = defaultMilestones.map((m) => {
+        const stageAmount = Math.round((total * m.percentage) / 100);
+        return {
+          stageName: m.stageName,
+          percentage: m.percentage,
+          amount: stageAmount,
+          targetDate: todayFormatted,
+          paid: 0,
+          due: stageAmount,
+          status: 'Pending',
+        } as any;
+      });
+    } else {
+      // Re-scale existing stages to new total
+      client.ledgerStages = client.ledgerStages.map((stage) => {
+        const stageAmount = Math.round((total * (stage.percentage || 10)) / 100);
+        const stagePaid = stage.paid || 0;
+        return {
+          ...stage,
+          amount: stageAmount,
+          due: Math.max(0, stageAmount - stagePaid),
+          status: stagePaid >= stageAmount && stageAmount > 0 ? 'Paid' : stagePaid > 0 ? 'Partial' : 'Pending',
+        };
+      });
+    }
+
+    if (total > 0) {
+      client.agreedAmount = total;
+      const totalPaid = client.ledgerStages.reduce((sum, s) => sum + (s.paid || 0), 0);
+      client.paidAmount = totalPaid;
+      client.balanceAmount = Math.max(0, total - totalPaid);
+    }
+
+    await client.save();
+    return client;
+  }
+
+  /**
+   * Pay a specific ledger stage with cascading payments to next pending stages
+   */
+  static async payLedgerStage(
+    companyId: string,
+    clientId: string,
+    stageId: string,
+    amountToPay?: number,
+    paymentMode: string = 'UPI',
+    referenceNo?: string
+  ) {
+    const client = await ClientAccount.findOne({
+      _id: new mongoose.Types.ObjectId(clientId),
+      companyId: new mongoose.Types.ObjectId(companyId),
+    });
+    if (!client) throw new Error('Client not found');
+
+    // Auto-initialize 9 default stages if client has no schedule yet
+    if (!client.ledgerStages || client.ledgerStages.length === 0) {
+      const total = client.agreedAmount || 8000;
+      const todayFormatted = '01-10-2026';
+      const defaultStages = [
+        { stageName: 'Advance', percentage: 20 },
+        { stageName: 'Slab', percentage: 20 },
+        { stageName: 'Brick Work', percentage: 15 },
+        { stageName: 'Electrical Work', percentage: 10 },
+        { stageName: 'Plaster', percentage: 10 },
+        { stageName: 'Tile Work', percentage: 10 },
+        { stageName: 'Bathroom Fitting', percentage: 5 },
+        { stageName: 'Painting Work', percentage: 5 },
+        { stageName: 'Site Completion', percentage: 5 },
+      ];
+      client.ledgerStages = defaultStages.map((s) => {
+        const amt = Math.round((total * s.percentage) / 100);
+        return {
+          _id: new mongoose.Types.ObjectId(),
+          stageName: s.stageName,
+          percentage: s.percentage,
+          amount: amt,
+          targetDate: todayFormatted,
+          paid: 0,
+          due: amt,
+          status: 'Pending',
+        } as any;
+      });
+      await client.save();
+    }
+
+    // Safely find stage index by id, name, or index
+    let stageIndex = -1;
+    if (stageId) {
+      stageIndex = client.ledgerStages.findIndex(
+        (s: any) =>
+          s._id?.toString() === stageId ||
+          (s.stageName && s.stageName.toLowerCase() === stageId.toLowerCase())
+      );
+    }
+    if (stageIndex === -1 && !isNaN(Number(stageId))) {
+      const idx = Number(stageId);
+      if (idx >= 0 && idx < client.ledgerStages.length) {
+        stageIndex = idx;
+      }
+    }
+    if (stageIndex === -1) {
+      // Default to first pending stage
+      stageIndex = client.ledgerStages.findIndex((s: any) => s.due > 0);
+      if (stageIndex === -1) stageIndex = 0;
+    }
+
+    const requestedStage = client.ledgerStages[stageIndex];
+    let remainingPay = amountToPay !== undefined ? Number(amountToPay) : (requestedStage.due || 0);
+    const initialPay = remainingPay;
+
+    if (remainingPay <= 0) {
+      throw new Error('Payment amount must be greater than zero');
+    }
+
+    // "Payments cascade to next pending stage"
+    // Allocate payment starting from this stage and flowing to subsequent pending stages
+    for (let i = stageIndex; i < client.ledgerStages.length && remainingPay > 0; i++) {
+      const currentStage = client.ledgerStages[i];
+      if (currentStage.due > 0) {
+        const alloc = Math.min(remainingPay, currentStage.due);
+        currentStage.paid = (currentStage.paid || 0) + alloc;
+        currentStage.due = Math.max(0, (currentStage.amount || 0) - currentStage.paid);
+        currentStage.status = currentStage.due <= 0 ? 'Paid' : 'Partial';
+        remainingPay -= alloc;
+      }
+    }
+
+    // If remaining payment is still left, cascade to any earlier pending stages
+    if (remainingPay > 0) {
+      for (let i = 0; i < stageIndex && remainingPay > 0; i++) {
+        const currentStage = client.ledgerStages[i];
+        if (currentStage.due > 0) {
+          const alloc = Math.min(remainingPay, currentStage.due);
+          currentStage.paid = (currentStage.paid || 0) + alloc;
+          currentStage.due = Math.max(0, (currentStage.amount || 0) - currentStage.paid);
+          currentStage.status = currentStage.due <= 0 ? 'Paid' : 'Partial';
+          remainingPay -= alloc;
+        }
+      }
+    }
+
+    // Recalculate client totals
+    client.paidAmount = client.ledgerStages.reduce((sum, s) => sum + (s.paid || 0), 0);
+    client.balanceAmount = Math.max(0, (client.agreedAmount || 0) - client.paidAmount);
+
+    const actualRecorded = initialPay - remainingPay;
+
+    // Record in PaymentRecord & auto-generate commission
+    if (actualRecorded > 0) {
+      const payment = await PaymentRecord.create({
+        companyId: new mongoose.Types.ObjectId(companyId),
+        clientId: client._id,
+        clientName: client.name,
+        receiptNo: referenceNo || `RCP-${Date.now().toString().slice(-6)}`,
+        amount: actualRecorded,
+        paymentDate: new Date(),
+        paymentMode,
+        modeBadge: paymentMode === 'Cash' ? 'Cash' : 'Online',
+        purpose: `${requestedStage.stageName} (Cascaded)`,
+        receivedBy: 'Admin',
+      });
+
+      // Auto generate commission if client is referred by a partner
+      await CommissionService.generateCommissionForPayment({
+        companyId,
+        paymentId: payment._id,
+        clientId: client._id,
+        paymentAmount: actualRecorded,
+        receivedBy: 'Admin',
+      });
+    }
+
+    await client.save();
+    return client;
+  }
+
+  /**
+   * Submit Daily Progress Report (DPR)
+   */
+  static async submitDailyProgressReport(
+    companyId: string,
+    clientId: string,
+    dprData: {
+      workCompletedToday: string;
+      materialsUsed?: string;
+      nextDayPlan?: string;
+      siteKharcha?: { labourCost: number; materialCost: number };
+      sitePhotos?: string[];
+      reportedBy?: string;
+    }
+  ) {
+    const client = await ClientAccount.findOne({
+      _id: new mongoose.Types.ObjectId(clientId),
+      companyId: new mongoose.Types.ObjectId(companyId),
+    });
+    if (!client) throw new Error('Client not found');
+
+    const report = {
+      reportDate: new Date(),
+      workCompletedToday: dprData.workCompletedToday,
+      materialsUsed: dprData.materialsUsed || '',
+      nextDayPlan: dprData.nextDayPlan || '',
+      siteKharcha: dprData.siteKharcha || { labourCost: 0, materialCost: 0 },
+      sitePhotos: dprData.sitePhotos || [],
+      reportedBy: dprData.reportedBy || 'Admin',
+      createdAt: new Date(),
+    };
+
+    client.dailyProgressReports = client.dailyProgressReports || [];
+    client.dailyProgressReports.unshift(report as any);
+
+    await client.save();
+    return client;
+  }
+
+  /**
+   * Add Follow-up to Client
+   */
+  static async addClientFollowUp(
+    companyId: string,
+    id: string,
+    followUpData: {
+      date: string | Date;
+      remarks: string;
+      status?: string;
+      createdByName?: string;
+    }
+  ) {
+    const client = await ClientAccount.findOne({
+      _id: new mongoose.Types.ObjectId(id),
+      companyId: new mongoose.Types.ObjectId(companyId),
+    });
+    if (!client) throw new Error('Client not found');
+
+    const fDate = new Date(followUpData.date);
+    const followUp = {
+      date: fDate,
+      remarks: followUpData.remarks,
+      status: followUpData.status || 'Pending',
+      createdAt: new Date(),
+      createdByName: followUpData.createdByName || 'Admin',
+    };
+
+    client.followUps = client.followUps || [];
+    client.followUps.unshift(followUp as any);
+    client.latestFollowUp = {
+      date: fDate,
+      remarks: followUpData.remarks,
+    };
+
+    await client.save();
+    return client;
+  }
+
+  /**
+   * Mark Client as Dead
+   */
+  static async markClientDead(companyId: string, id: string, reason: string = '') {
+    const client = await ClientAccount.findOne({
+      _id: new mongoose.Types.ObjectId(id),
+      companyId: new mongoose.Types.ObjectId(companyId),
+    });
+    if (!client) throw new Error('Client not found');
+
+    client.isDead = true;
+    client.deadReason = reason;
+    client.deadAt = new Date();
+    client.status = 'Dead';
+
+    if (reason) {
+      client.followUps = client.followUps || [];
+      client.followUps.unshift({
+        date: new Date(),
+        remarks: `Marked Dead: ${reason}`,
+        status: 'Dead',
+        createdAt: new Date(),
+        createdByName: 'Admin',
+      } as any);
+      client.latestFollowUp = {
+        date: new Date(),
+        remarks: `Marked Dead: ${reason}`,
+      };
+    }
+
+    await client.save();
+    return client;
+  }
+
+  /**
+   * Restore Dead Client
+   */
+  static async restoreClientDead(companyId: string, id: string) {
+    const client = await ClientAccount.findOne({
+      _id: new mongoose.Types.ObjectId(id),
+      companyId: new mongoose.Types.ObjectId(companyId),
+    });
+    if (!client) throw new Error('Client not found');
+
+    client.isDead = false;
+    client.deadReason = '';
+    client.deadAt = undefined;
+    client.status = 'Active';
+
+    await client.save();
+    return client;
+  }
+
+  /**
+   * Delete Client
+   */
+  static async deleteClient(companyId: string, id: string) {
+    const res = await ClientAccount.deleteOne({
+      _id: new mongoose.Types.ObjectId(id),
+      companyId: new mongoose.Types.ObjectId(companyId),
+    });
+    return res;
+  }
+
+  /**
+   * Pre-seed 13 exact realistic clients from screenshot
+   */
+  static async seedRealisticClients(companyId: string) {
+    const compId = new mongoose.Types.ObjectId(companyId);
+    await ClientAccount.deleteMany({ companyId: compId });
+    await this.ensureInitialClients(companyId, true);
+    return await this.getClients(companyId);
+  }
+
+  /**
+   * Ensure Initial 13 Clients matching screenshot exist
+   */
+  static async ensureInitialClients(companyId: string, force: boolean = false) {
+    const compId = new mongoose.Types.ObjectId(companyId);
+    if (!force) {
+      const count = await ClientAccount.countDocuments({ companyId: compId });
+      if (count > 0) return;
+    }
+
+    const realClients = [
+      {
+        companyId: compId,
+        clientCode: '000018',
+        registrationDate: new Date('2026-09-29'),
+        name: 'Dummy',
+        subBadge: 'OLD INFRA',
+        siteLocation: 'Dummy',
+        associate: 'Social Media: Facebook',
+        associateType: 'SocialMedia',
+        area: '-',
+        phone: '8427215202',
+        services: 'Renovation',
+        agreedAmount: 8000,
+        paidAmount: 0,
+        balanceAmount: 8000,
+        status: 'Active',
+        isDead: false,
+        projectEstimator: {
+          areaSqft: 100,
+          ratePerSqft: 80,
+          discountPerSqft: 0,
+          finalRate: 80,
+          totalAmount: 8000,
+        },
+        ledgerStages: [
+          { stageName: 'Advance', percentage: 20, amount: 1600, targetDate: '01-10-2026', paid: 0, due: 1600, status: 'Pending' },
+          { stageName: 'Slab', percentage: 20, amount: 1600, targetDate: '01-10-2026', paid: 0, due: 1600, status: 'Pending' },
+          { stageName: 'Brick Work', percentage: 15, amount: 1200, targetDate: '01-10-2026', paid: 0, due: 1200, status: 'Pending' },
+          { stageName: 'Electrical Work', percentage: 10, amount: 800, targetDate: '01-10-2026', paid: 0, due: 800, status: 'Pending' },
+          { stageName: 'Plaster', percentage: 10, amount: 800, targetDate: '01-10-2026', paid: 0, due: 800, status: 'Pending' },
+          { stageName: 'Tile Work', percentage: 10, amount: 800, targetDate: '01-10-2026', paid: 0, due: 800, status: 'Pending' },
+          { stageName: 'Bathroom Fitting', percentage: 5, amount: 400, targetDate: '01-10-2026', paid: 0, due: 400, status: 'Pending' },
+          { stageName: 'Painting Work', percentage: 5, amount: 400, targetDate: '01-10-2026', paid: 0, due: 400, status: 'Pending' },
+          { stageName: 'Site Completion', percentage: 5, amount: 400, targetDate: '01-10-2026', paid: 0, due: 400, status: 'Pending' },
+        ],
+        followUps: [
+          {
+            date: new Date('2026-09-30'),
+            remarks: 'No Remark',
+            status: 'Pending',
+            createdAt: new Date('2026-09-29T10:00:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2026-09-30'),
+          remarks: 'No Remark',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000017',
+        registrationDate: new Date('2026-09-26'),
+        name: 'Sunil Kumar Singh',
+        siteLocation: 'Near PGI',
+        associate: 'Google',
+        associateType: 'Direct',
+        area: '-',
+        phone: '8427215202',
+        services: 'Construction Structure',
+        agreedAmount: 0,
+        paidAmount: 0,
+        balanceAmount: 0,
+        status: 'Active',
+        isDead: false,
+        followUps: [
+          {
+            date: new Date('2026-07-29'),
+            remarks: 'Meeting done and work start from august',
+            status: 'Pending',
+            createdAt: new Date('2026-09-26T11:00:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2026-07-29'),
+          remarks: 'Meeting done and work start from august',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000016',
+        registrationDate: new Date('2026-06-23'),
+        name: 'Harshit Sahu',
+        siteLocation: 'Barabanki Haidergarh',
+        associate: 'Social Media: Facebook',
+        associateType: 'SocialMedia',
+        area: '2,000',
+        phone: '8307442475',
+        services: 'Floor Plan Design',
+        agreedAmount: 0,
+        paidAmount: 0,
+        balanceAmount: 0,
+        status: 'Active',
+        isDead: false,
+        followUps: [
+          {
+            date: new Date('2026-06-09'),
+            remarks: 'he is saying that he will visit the office tuesday for meeting',
+            status: 'Pending',
+            createdAt: new Date('2026-06-23T12:00:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2026-06-09'),
+          remarks: 'he is saying that he will visit the office tuesday for meeting',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000015',
+        registrationDate: new Date('2026-06-23'),
+        name: 'Abhishek Shreeliya',
+        subBadge: 'LB',
+        handlerName: 'ER. Ankit Kumar Verma',
+        siteLocation: 'Khargapur',
+        associate: 'Direct',
+        associateType: 'SocialMedia',
+        area: '2,475',
+        phone: '70522 00007',
+        services: 'Construction Furnished',
+        agreedAmount: 0,
+        paidAmount: 0,
+        balanceAmount: 0,
+        status: 'Active',
+        isDead: false,
+        followUps: [
+          {
+            date: new Date('2026-07-01'),
+            remarks: 'Meeting done work start from after june',
+            status: 'Pending',
+            createdAt: new Date('2026-06-23T14:00:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2026-07-01'),
+          remarks: 'Meeting done work start from after june',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000014',
+        registrationDate: new Date('2026-04-01'),
+        name: 'Upendra Soni',
+        siteLocation: 'Rajajipuram, Near Balaji Mandir, Lucknow',
+        associate: 'PI ADS',
+        associateType: 'Direct',
+        area: '330',
+        phone: '6393916514',
+        services: 'Interior Full Design',
+        agreedAmount: 10000,
+        paidAmount: 5000,
+        balanceAmount: 5000,
+        status: 'Active',
+        isDead: false,
+        followUps: [
+          {
+            date: new Date('2026-02-17'),
+            remarks: 'The lead is being handled by satyapal',
+            status: 'Pending',
+            createdAt: new Date('2026-04-01T15:00:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2026-02-17'),
+          remarks: 'The lead is being handled by satyapal',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000013',
+        registrationDate: new Date('2026-03-20'),
+        name: 'Sandeep Singh Near amrity university 101',
+        siteLocation: 'Amity Green, Amity University, Lucknow',
+        associate: 'CNK ads 1.20/-',
+        associateType: 'Direct',
+        area: '200',
+        phone: '9305233132',
+        services: 'Renovation, Interior Work',
+        agreedAmount: 0,
+        paidAmount: 0,
+        balanceAmount: 0,
+        status: 'Active',
+        isDead: false,
+        followUps: [
+          {
+            date: new Date('2026-02-18'),
+            remarks: 'Friday visit office at 5:00 PM discussion with sir.',
+            status: 'Pending',
+            createdAt: new Date('2026-03-20T16:00:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2026-02-18'),
+          remarks: 'Friday visit office at 5:00 PM discussion with sir.',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000012',
+        registrationDate: new Date('2026-03-20'),
+        name: 'Suman Singh w/o Aditya Singh w/o Anil Singh',
+        siteLocation: 'Vishnupuri Colony, Neelmatha, Medanta Infra, Lucknow',
+        associate: 'LB Meta ads',
+        associateType: 'Direct',
+        area: '830',
+        phone: '8118899184',
+        services: 'Construction Furnished',
+        agreedAmount: 1411000,
+        paidAmount: 4100,
+        balanceAmount: 1406900,
+        status: 'Active',
+        isDead: false,
+        followUps: [
+          {
+            date: new Date('2026-02-10'),
+            remarks: 'They said they want to start the construction work from the 20th, will come to the office for meeting on Thursday',
+            status: 'Pending',
+            createdAt: new Date('2026-03-20T17:00:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2026-02-10'),
+          remarks: 'They said they want to start the construction work from the 20th, will come to the office for meeting on Thursday',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000011',
+        registrationDate: new Date('2026-03-20'),
+        name: 'Akash Gaikwad',
+        siteLocation: 'Maharashtra',
+        associate: 'PI Meta ads 1.5/-',
+        associateType: 'Direct',
+        area: '-',
+        phone: '8007675848',
+        services: 'Interior Full Design, Elevation Design',
+        agreedAmount: 0,
+        paidAmount: 0,
+        balanceAmount: 0,
+        status: 'Active',
+        isDead: false,
+        followUps: [],
+        latestFollowUp: {
+          remarks: 'No Remark',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000010',
+        registrationDate: new Date('2026-03-20'),
+        name: 'Santosh Kumar and Anuj Ji',
+        siteLocation: 'Sultanpur Road',
+        associate: 'NITCO Tiles',
+        associateType: 'Direct',
+        area: '12,000',
+        phone: '6392327595',
+        services: 'Construction, Floor Plan Design',
+        agreedAmount: 0,
+        paidAmount: 0,
+        balanceAmount: 0,
+        status: 'Active',
+        isDead: false,
+        followUps: [
+          {
+            date: new Date('2026-01-15'),
+            remarks: 'He is saying that sunday visit office for meeting discussion plan layout and estimate cost amount',
+            status: 'Pending',
+            createdAt: new Date('2026-03-20T11:00:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2026-01-15'),
+          remarks: 'He is saying that sunday visit office for meeting discussion plan layout and estimate cost amount',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000009',
+        registrationDate: new Date('2026-03-20'),
+        name: 'Adv. Sandeep Shukla Khargapur',
+        siteLocation: 'Geetapuri Colony, Gomti Nagar Vistar, Lucknow',
+        associate: 'Google',
+        associateType: 'Direct',
+        area: '-',
+        phone: '7938018809',
+        services: 'Construction Furnished',
+        agreedAmount: 0,
+        paidAmount: 0,
+        balanceAmount: 0,
+        status: 'Active',
+        isDead: false,
+        followUps: [
+          {
+            date: new Date('2026-01-05'),
+            remarks: 'They have already had a meeting with sir. They came for the meeting, visited the office and the site, and the mapping has also been completed. They will come to the office after which everything will be finalized to start the work.',
+            status: 'Pending',
+            createdAt: new Date('2026-03-20T13:00:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2026-01-05'),
+          remarks: 'They have already had a meeting with sir. They came for the meeting, visited the office and the site, and the mapping has also been completed. They will come to the office after which everything will be finalized to start the work.',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000007',
+        registrationDate: new Date('2026-03-20'),
+        name: 'Saurabh Gupta',
+        handlerName: 'ER. Tridev Sharma',
+        siteLocation: 'Gorakhpur',
+        associate: 'ads',
+        associateType: 'Direct',
+        area: '4,000',
+        phone: '8374427456',
+        services: 'Renovation',
+        agreedAmount: 0,
+        paidAmount: 0,
+        balanceAmount: 0,
+        status: 'Active',
+        isDead: false,
+        followUps: [
+          {
+            date: new Date('2026-09-06'),
+            remarks: 'he will go djp at dashara so we can also go on that time to site visit and also he wants our portfolio and projects image',
+            status: 'Pending',
+            createdAt: new Date('2026-03-20T14:30:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2026-09-06'),
+          remarks: 'he will go djp at dashara so we can also go on that time to site visit and also he wants our portfolio and projects image',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000006',
+        registrationDate: new Date('2026-03-20'),
+        name: 'Vicky Ji',
+        siteLocation: 'Ayodhya',
+        associate: 'Google',
+        associateType: 'Direct',
+        area: '1,500',
+        phone: '6393275803',
+        services: 'Elevation Design',
+        agreedAmount: 120000,
+        paidAmount: 0,
+        balanceAmount: 120000,
+        status: 'Active',
+        isDead: false,
+        followUps: [
+          {
+            date: new Date('2025-11-22'),
+            remarks: 'He is looking for G+1 Elevation design, 20*60 sqft area, west facing, In Ayodhya 5000 cost told by Oum Sir. Client need some samples and sketchup',
+            status: 'Pending',
+            createdAt: new Date('2026-03-20T15:00:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2025-11-22'),
+          remarks: 'He is looking for G+1 Elevation design, 20*60 sqft area, west facing, In Ayodhya 5000 cost told by Oum Sir. Client need some samples and sketchup',
+        },
+      },
+      {
+        companyId: compId,
+        clientCode: '000001',
+        registrationDate: new Date('2026-03-19'),
+        name: 'Anurag',
+        siteLocation: 'Renovation',
+        associate: 'ads',
+        associateType: 'Direct',
+        area: '-',
+        phone: '9399690013',
+        services: 'Renovation',
+        agreedAmount: 912900,
+        paidAmount: 0,
+        balanceAmount: 912900,
+        status: 'Active',
+        isDead: false,
+        followUps: [
+          {
+            date: new Date('2025-08-23'),
+            remarks: 'he is our client',
+            status: 'Pending',
+            createdAt: new Date('2026-03-19T18:00:00'),
+            createdByName: 'Admin',
+          },
+        ],
+        latestFollowUp: {
+          date: new Date('2025-08-23'),
+          remarks: 'he is our client',
+        },
+      },
+    ];
+
+    await ClientAccount.insertMany(realClients);
+  }
+
+  /**
+   * Get all payments with filters and ensure initial payments
+   */
+  static async getPayments(
+    companyId: string,
+    filter?: { search?: string; startDate?: string; endDate?: string; limit?: number }
+  ) {
+    const compId = new mongoose.Types.ObjectId(companyId);
+    const query: any = { companyId: compId };
+
+    if (filter?.search && filter.search.trim()) {
+      const regex = new RegExp(filter.search.trim(), 'i');
+      query.$or = [
+        { clientName: regex },
+        { receiptNo: regex },
+        { transactionRef: regex },
+        { serviceName: regex },
+        { servicePlan: regex },
+        { remarks: regex },
+        { purpose: regex },
+      ];
+    }
+
+    if (filter?.startDate || filter?.endDate) {
+      query.paymentDate = {};
+      if (filter.startDate) {
+        query.paymentDate.$gte = new Date(filter.startDate);
+      }
+      if (filter.endDate) {
+        const end = new Date(filter.endDate);
+        end.setHours(23, 59, 59, 999);
+        query.paymentDate.$lte = end;
+      }
+    }
+
+    const limit = filter?.limit && filter.limit > 0 ? filter.limit : 50;
+
+    const payments = await PaymentRecord.find(query)
+      .sort({ paymentDate: -1, createdAt: -1 })
+      .limit(limit)
+      .lean();
     return payments;
   }
 
   /**
-   * Record a payment (Pay Amount feature)
+   * Record a payment (money received FROM Client)
+   * Automatically updates client balance and generates commission if partner exists
    */
   static async recordPayment(companyId: string, paymentData: any) {
     const receiptNo = paymentData.receiptNo || `RCP-${Date.now().toString().slice(-6)}`;
@@ -601,6 +1635,7 @@ export class LeadService {
       companyId: compId,
       receiptNo,
       paymentDate: paymentData.paymentDate ? new Date(paymentData.paymentDate) : new Date(),
+      modeBadge: paymentData.modeBadge || (paymentData.paymentMode === 'Cash' ? 'Cash' : 'Online'),
     });
 
     await payment.save();
@@ -613,6 +1648,19 @@ export class LeadService {
         client.balanceAmount = Math.max(0, (client.agreedAmount || 0) - client.paidAmount);
         await client.save();
       }
+    }
+
+    // Automatically generate commission if client is referred by a reference partner
+    try {
+      await CommissionService.generateCommissionForPayment({
+        companyId: compId,
+        paymentId: payment._id,
+        clientId: paymentData.clientId,
+        paymentAmount: payment.amount,
+        receivedBy: paymentData.receivedBy || 'Admin',
+      });
+    } catch (commErr) {
+      console.error('Commission auto-generation warning:', commErr);
     }
 
     return payment;
@@ -662,27 +1710,38 @@ export class LeadService {
   }
 
   /**
-   * Get Commission Reports
+   * Get Unified Commission Reports
    */
   static async getCommissionReports(companyId: string, partnerId?: string) {
-    const query: any = { companyId: new mongoose.Types.ObjectId(companyId) };
-    if (partnerId) {
-      query.partnerId = new mongoose.Types.ObjectId(partnerId);
-    }
+    return await CommissionService.getCommissionReports(companyId, partnerId);
+  }
 
-    const reports = await CommissionRecord.find(query).sort({ createdAt: -1 }).lean();
+  /**
+   * Approve Commission (Admin Workflow)
+   */
+  static async approveCommission(companyId: string, commissionId: string, approvedBy: string = 'Admin') {
+    return await CommissionService.approveCommission(companyId, commissionId, approvedBy);
+  }
 
-    const summary = reports.reduce(
-      (acc, curr) => {
-        acc.totalCommission += curr.commissionAmount;
-        if (curr.status === 'Paid') acc.paidCommission += curr.commissionAmount;
-        if (curr.status === 'Pending') acc.pendingCommission += curr.commissionAmount;
-        return acc;
-      },
-      { totalCommission: 0, paidCommission: 0, pendingCommission: 0 }
-    );
+  /**
+   * Pay Amount: Disburse payout TO Reference Partner
+   */
+  static async processPayout(companyId: string, payoutData: any) {
+    return await CommissionService.processPayout(companyId, payoutData);
+  }
 
-    return { reports, summary };
+  /**
+   * Get Partner Payouts history
+   */
+  static async getPayouts(companyId: string, filter?: { partnerId?: string; search?: string }) {
+    return await CommissionService.getPayouts(companyId, filter);
+  }
+
+  /**
+   * Get full connected Dossier: Client → Lead → Payments → Partner → Commission → Payouts
+   */
+  static async getClientDossier(companyId: string, clientId: string) {
+    return await CommissionService.getClientDossier(companyId, clientId);
   }
 
   /**

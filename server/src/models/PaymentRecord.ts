@@ -8,9 +8,16 @@ export interface IPaymentRecord extends Document {
   receiptNo: string;
   amount: number;
   paymentDate: Date;
-  paymentMode: 'Cash' | 'Cheque' | 'UPI' | 'NEFT/RTGS' | 'Bank Transfer';
+  paymentMode: 'Cash' | 'Cheque' | 'UPI' | 'NEFT/RTGS' | 'Bank Transfer' | string;
+  modeBadge?: string; // 'Online' | 'Cash' | 'Cheque'
+  serviceName?: string; // e.g. 'Interior Full Design', 'Construction Furnished'
+  servicePlan?: string; // e.g. 'Construction'
+  referenceType?: string; // e.g. 'UPI'
   transactionRef?: string;
   purpose: string;
+  commissionGenerated?: boolean;
+  commissionId?: mongoose.Types.ObjectId;
+  remarks?: string;
   notes?: string;
   receivedBy: string;
   createdAt: Date;
@@ -56,7 +63,22 @@ const paymentRecordSchema = new Schema<IPaymentRecord>(
     },
     paymentMode: {
       type: String,
-      enum: ['Cash', 'Cheque', 'UPI', 'NEFT/RTGS', 'Bank Transfer'],
+      default: 'UPI',
+    },
+    modeBadge: {
+      type: String,
+      default: 'Online',
+    },
+    serviceName: {
+      type: String,
+      default: 'Construction Structure',
+    },
+    servicePlan: {
+      type: String,
+      default: 'Construction',
+    },
+    referenceType: {
+      type: String,
       default: 'UPI',
     },
     transactionRef: {
@@ -67,6 +89,18 @@ const paymentRecordSchema = new Schema<IPaymentRecord>(
     purpose: {
       type: String,
       default: 'Advance Booking',
+    },
+    commissionGenerated: {
+      type: Boolean,
+      default: false,
+    },
+    commissionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'CommissionRecord',
+    },
+    remarks: {
+      type: String,
+      default: '',
     },
     notes: {
       type: String,

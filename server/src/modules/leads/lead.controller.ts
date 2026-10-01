@@ -89,6 +89,26 @@ export class LeadController {
     }
   }
 
+  static async deleteAllClients(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      await LeadService.deleteAllClients(companyId);
+      res.status(200).json({ success: true, message: 'All clients removed successfully' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async removeAllData(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const result = await LeadService.removeAllData(companyId);
+      res.status(200).json({ success: true, message: 'All Lead, Client, Payment, Partner, Commission, and Payout data removed successfully', data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async addFollowUp(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
@@ -142,9 +162,136 @@ export class LeadController {
   static async getClients(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const search = req.query.search as string;
-      const clients = await LeadService.getClients(companyId, search);
+      const { search, statusMode, feeStatus, company, service, startDate, endDate } = req.query as any;
+      const clients = await LeadService.getClients(companyId, {
+        search,
+        statusMode,
+        feeStatus,
+        company,
+        service,
+        startDate,
+        endDate,
+      });
       res.status(200).json({ success: true, data: clients });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getClientById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const client = await LeadService.getClientById(companyId, req.params.id);
+      if (!client) {
+        return res.status(404).json({ success: false, message: 'Client not found' });
+      }
+      res.status(200).json({ success: true, data: client });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateClient(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const client = await LeadService.updateClient(companyId, req.params.id, req.body);
+      res.status(200).json({ success: true, message: 'Client updated successfully', data: client });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async addClientFollowUp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const client = await LeadService.addClientFollowUp(companyId, req.params.id, {
+        ...req.body,
+        createdByName: req.user?.name || 'Admin',
+      });
+      res.status(200).json({ success: true, message: 'Follow-up added successfully', data: client });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async markClientDead(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const { reason } = req.body;
+      const client = await LeadService.markClientDead(companyId, req.params.id, reason);
+      res.status(200).json({ success: true, message: 'Client marked as dead', data: client });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async restoreClientDead(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const client = await LeadService.restoreClientDead(companyId, req.params.id);
+      res.status(200).json({ success: true, message: 'Client restored successfully', data: client });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deleteClient(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      await LeadService.deleteClient(companyId, req.params.id);
+      res.status(200).json({ success: true, message: 'Client deleted successfully' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async reseedClients(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const clients = await LeadService.seedRealisticClients(companyId);
+      res.status(200).json({ success: true, message: '13 realistic clients seeded successfully', data: clients });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async saveLedgerSchedule(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const { estimator, stages } = req.body;
+      const client = await LeadService.saveLedgerSchedule(companyId, req.params.id, estimator, stages);
+      res.status(200).json({ success: true, message: 'Ledger schedule saved successfully', data: client });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async payLedgerStage(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const { stageId, amount, paymentMode, referenceNo } = req.body;
+      const client = await LeadService.payLedgerStage(
+        companyId,
+        req.params.id,
+        stageId,
+        amount,
+        paymentMode || 'UPI',
+        referenceNo
+      );
+      res.status(200).json({ success: true, message: 'Stage payment recorded successfully', data: client });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async submitDpr(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const client = await LeadService.submitDailyProgressReport(companyId, req.params.id, {
+        ...req.body,
+        reportedBy: req.user?.name || 'Admin',
+      });
+      res.status(200).json({ success: true, message: 'Daily Progress Report submitted', data: client });
     } catch (error) {
       next(error);
     }
@@ -153,8 +300,13 @@ export class LeadController {
   static async getPayments(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const search = req.query.search as string;
-      const payments = await LeadService.getPayments(companyId, search);
+      const { search, startDate, endDate, limit } = req.query;
+      const payments = await LeadService.getPayments(companyId, {
+        search: search as string,
+        startDate: startDate as string,
+        endDate: endDate as string,
+        limit: limit ? Number(limit) : undefined,
+      });
       res.status(200).json({ success: true, data: payments });
     } catch (error) {
       next(error);
@@ -220,6 +372,51 @@ export class LeadController {
       const partnerId = req.query.partnerId as string;
       const result = await LeadService.getCommissionReports(companyId, partnerId);
       res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async approveCommission(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const commissionId = req.params.id;
+      const commission = await LeadService.approveCommission(companyId, commissionId, req.user?.name || 'Admin');
+      res.status(200).json({ success: true, message: 'Commission approved successfully', data: commission });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async processPayout(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const result = await LeadService.processPayout(companyId, {
+        ...req.body,
+        paidBy: req.user?.name || 'Admin',
+      });
+      res.status(201).json({ success: true, message: 'Payout to partner disbursed successfully', data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPayouts(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const { partnerId, search } = req.query as any;
+      const payouts = await LeadService.getPayouts(companyId, { partnerId, search });
+      res.status(200).json({ success: true, data: payouts });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getClientDossier(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const dossier = await LeadService.getClientDossier(companyId, req.params.id);
+      res.status(200).json({ success: true, data: dossier });
     } catch (error) {
       next(error);
     }

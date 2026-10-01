@@ -6,13 +6,23 @@ export interface ICommissionRecord extends Document {
   partnerName: string;
   leadId?: mongoose.Types.ObjectId;
   leadCode?: string;
+  clientId?: mongoose.Types.ObjectId;
   clientName: string;
-  projectValue: number;
+  paymentId?: mongoose.Types.ObjectId; // exact PaymentRecord that triggered this commission
+  paymentAmount: number; // installment received from client
+  projectValue: number; // total agreed amount of project
   commissionPercent: number;
   commissionAmount: number;
+  paidAmount: number; // amount paid out to partner
+  balanceAmount: number; // remaining commission to pay out
   status: 'Pending' | 'Approved' | 'Paid';
+  payoutId?: mongoose.Types.ObjectId;
   paymentDate?: Date;
   paymentRef?: string;
+  approvedBy?: string;
+  approvedAt?: Date;
+  paidBy?: string;
+  paidAt?: Date;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -45,10 +55,24 @@ const commissionRecordSchema = new Schema<ICommissionRecord>(
       type: String,
       default: '',
     },
+    clientId: {
+      type: Schema.Types.ObjectId,
+      ref: 'ClientAccount',
+      index: true,
+    },
     clientName: {
       type: String,
       required: true,
       trim: true,
+    },
+    paymentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'PaymentRecord',
+      index: true,
+    },
+    paymentAmount: {
+      type: Number,
+      default: 0,
     },
     projectValue: {
       type: Number,
@@ -65,10 +89,24 @@ const commissionRecordSchema = new Schema<ICommissionRecord>(
       required: true,
       min: 0,
     },
+    paidAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    balanceAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     status: {
       type: String,
       enum: ['Pending', 'Approved', 'Paid'],
       default: 'Pending',
+    },
+    payoutId: {
+      type: Schema.Types.ObjectId,
+      ref: 'PartnerPayout',
     },
     paymentDate: {
       type: Date,
@@ -76,6 +114,20 @@ const commissionRecordSchema = new Schema<ICommissionRecord>(
     paymentRef: {
       type: String,
       default: '',
+    },
+    approvedBy: {
+      type: String,
+      default: '',
+    },
+    approvedAt: {
+      type: Date,
+    },
+    paidBy: {
+      type: String,
+      default: '',
+    },
+    paidAt: {
+      type: Date,
     },
     notes: {
       type: String,
@@ -88,5 +140,7 @@ const commissionRecordSchema = new Schema<ICommissionRecord>(
 );
 
 commissionRecordSchema.index({ companyId: 1, partnerId: 1, status: 1 });
+commissionRecordSchema.index({ companyId: 1, paymentId: 1 });
 
 export const CommissionRecord = mongoose.model<ICommissionRecord>('CommissionRecord', commissionRecordSchema);
+

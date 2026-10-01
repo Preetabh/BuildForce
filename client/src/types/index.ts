@@ -785,12 +785,51 @@ export interface PartnerItem {
   updatedAt: string;
 }
 
+export interface ClientFollowUp {
+  _id?: string;
+  date: string;
+  remarks: string;
+  status?: string;
+  createdAt?: string;
+  createdByName?: string;
+}
+
+export interface ClientLedgerStage {
+  _id?: string;
+  stageName: string;
+  percentage: number;
+  amount: number;
+  targetDate?: string;
+  paid: number;
+  due: number;
+  status: 'Pending' | 'Paid' | 'Partial';
+}
+
+export interface ClientDprReport {
+  _id?: string;
+  reportDate: string;
+  workCompletedToday: string;
+  materialsUsed?: string;
+  nextDayPlan?: string;
+  siteKharcha?: {
+    labourCost: number;
+    materialCost: number;
+  };
+  sitePhotos?: string[];
+  reportedBy?: string;
+  createdAt?: string;
+}
+
 export interface ClientRecord {
   _id: string;
   companyId: string;
   leadId?: string;
+  partnerId?: string;
+  partnerName?: string;
   clientCode: string;
   name: string;
+  businessName?: string;
+  contactPerson?: string;
   phone: string;
   secondaryPhone?: string;
   email?: string;
@@ -798,11 +837,47 @@ export interface ClientRecord {
   siteLocation: string;
   companyName: string;
   projectType: string;
+  propertyType?: string;
+  propertySubtype?: string;
+  buildupArea?: string;
+  dimensional?: string;
+  facing?: string;
+  level?: string;
+  requirementType?: string;
+  projectDuration?: string;
+  meetingDate?: string;
+  gender?: string;
+  priority?: string;
+  referenceSource?: string;
+  handlerName?: string;
+  subBadge?: string;
+  associate?: string;
+  associateType?: string;
+  area?: string;
+  services?: string;
+  servicesList?: Array<{ name: string; total: number; paid: number }>;
   agreedAmount: number;
   paidAmount: number;
   balanceAmount: number;
   registrationDate: string;
-  status: 'Active' | 'Under Construction' | 'Handover' | 'Archived';
+  projectEstimator?: {
+    areaSqft: number;
+    ratePerSqft: number;
+    discountPerSqft: number;
+    finalRate: number;
+    totalAmount: number;
+  };
+  ledgerStages?: ClientLedgerStage[];
+  dailyProgressReports?: ClientDprReport[];
+  followUps?: ClientFollowUp[];
+  latestFollowUp?: {
+    date?: string;
+    remarks?: string;
+  };
+  isDead?: boolean;
+  deadReason?: string;
+  deadAt?: string;
+  status: 'Active' | 'Under Construction' | 'Handover' | 'Archived' | 'Dead';
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -817,11 +892,18 @@ export interface PaymentItem {
   receiptNo: string;
   amount: number;
   paymentDate: string;
-  paymentMode: 'Cash' | 'Cheque' | 'UPI' | 'NEFT/RTGS' | 'Bank Transfer';
+  paymentMode: 'Cash' | 'Cheque' | 'UPI' | 'NEFT/RTGS' | 'Bank Transfer' | string;
+  modeBadge?: string; // 'Online' | 'Cash' | 'Cheque'
+  serviceName?: string; // 'Interior Full Design', 'Construction Furnished'
+  servicePlan?: string; // 'Construction'
+  referenceType?: string; // 'UPI'
   transactionRef?: string;
-  purpose: string;
+  purpose?: string;
+  commissionGenerated?: boolean;
+  commissionId?: string;
+  remarks?: string;
   notes?: string;
-  receivedBy: string;
+  receivedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -829,20 +911,61 @@ export interface PaymentItem {
 export interface CommissionItem {
   _id: string;
   companyId: string;
-  partnerId: string;
+  partnerId: any;
   partnerName: string;
   leadId?: string;
   leadCode?: string;
+  clientId?: any;
   clientName: string;
+  paymentId?: any;
+  paymentAmount?: number;
   projectValue: number;
   commissionPercent: number;
   commissionAmount: number;
+  paidAmount?: number;
+  balanceAmount?: number;
   status: 'Pending' | 'Approved' | 'Paid';
+  payoutId?: any;
   paymentDate?: string;
   paymentRef?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  paidBy?: string;
+  paidAt?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
 }
+
+export interface PartnerPayoutItem {
+  _id: string;
+  companyId: string;
+  payoutNo: string;
+  partnerId: any;
+  partnerName: string;
+  commissionId?: any;
+  paymentId?: any;
+  clientId?: any;
+  clientName?: string;
+  amount: number;
+  paymentDate: string;
+  paymentMode: 'Cash' | 'Cheque' | 'UPI' | 'NEFT/RTGS' | 'Bank Transfer' | string;
+  transactionRef?: string;
+  notes?: string;
+  status: 'Paid' | 'Processing';
+  paidBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClientDossier {
+  client: ClientRecord;
+  lead: LeadItem | null;
+  payments: PaymentItem[];
+  partner: PartnerItem | null;
+  commissions: CommissionItem[];
+  payouts: PartnerPayoutItem[];
+}
+
 
 
