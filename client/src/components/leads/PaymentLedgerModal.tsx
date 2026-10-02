@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Calculator,
@@ -250,49 +251,71 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
 
   const projectName = client.services || 'Renovation';
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-5xl bg-[#12161E] border border-amber-500/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
-        {/* Top Header: Payment Ledger [ Client Name ] (Matches Screenshot) */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1E2532] bg-[#12161E]">
-          <h2 className="text-lg font-black text-amber-400 tracking-wide">
-            Payment Ledger [ {client.name} ]
-          </h2>
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
+      <div className="relative w-full max-w-6xl my-auto bg-[#12161E] border border-amber-500/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+        {/* Top Header: Payment Ledger [ Client Name ] */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#1E2532] bg-[#12161E] shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 pr-2">
+            <h2 className="text-base sm:text-lg font-black text-amber-400 tracking-wide truncate">
+              Payment Ledger [ {client.name} ]
+            </h2>
+            {client.clientCode && (
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#1C2433] text-amber-300 border border-amber-500/30 shrink-0">
+                {client.clientCode}
+              </span>
+            )}
+          </div>
           <button
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer shrink-0"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Body Container (2 Columns) */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar flex flex-col md:flex-row gap-5">
-          {/* Left Column: CLIENT'S PROJECTS (Matches Screenshot) */}
-          <div className="w-full md:w-56 shrink-0 space-y-2.5">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              CLIENT'S PROJECTS
+        {/* Body Container (2 Columns on xl screens, stacked on smaller screens) */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 custom-scrollbar flex flex-col xl:flex-row gap-4 sm:gap-5 min-h-0">
+          {/* Left Column: CLIENT'S PROJECTS */}
+          <div className="w-full xl:w-60 shrink-0 space-y-2.5">
+            <div className="flex items-center justify-between xl:block">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                CLIENT'S PROJECTS
+              </div>
+              <div className="text-[11px] text-slate-400 font-mono xl:hidden">
+                Total Due: <span className="font-bold text-rose-400">₹{totalStageDue.toLocaleString()}</span>
+              </div>
             </div>
 
             {/* Active Project Card */}
-            <div className="p-3.5 rounded-xl bg-[#171E2B] border-2 border-amber-400 shadow-md flex items-center justify-between">
-              <div>
-                <div className="text-xs font-bold text-white capitalize leading-tight">
+            <div className="p-3 sm:p-3.5 rounded-xl bg-[#171E2B] border-2 border-amber-400 shadow-md flex items-center justify-between">
+              <div className="min-w-0 pr-2">
+                <div className="text-xs sm:text-sm font-bold text-white capitalize truncate leading-tight">
                   {projectName}
                 </div>
-                <span className="inline-block mt-1 px-2 py-0.5 rounded text-[9.5px] font-bold bg-[#20293C] text-slate-400">
-                  {totalStageDue <= 0 && totalStageAmount > 0 ? 'Completed' : 'Pending'}
-                </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`inline-block px-2 py-0.5 rounded text-[9.5px] font-bold ${
+                    totalStageDue <= 0 && totalStageAmount > 0
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-[#20293C] text-amber-300'
+                  }`}>
+                    {totalStageDue <= 0 && totalStageAmount > 0 ? 'Completed' : 'Pending'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 xl:hidden">
+                    Total: ₹{totalStageAmount.toLocaleString()}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-1 font-mono text-xs font-bold text-slate-200">
+              <div className="flex items-center gap-1 font-mono text-xs sm:text-sm font-bold text-slate-200 shrink-0">
                 <span className="w-2 h-2 rounded-full bg-amber-400"></span>
                 <span>₹{totalStageDue.toLocaleString()}</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column: ESTIMATOR TOGGLE & LEDGER TABLE (Matches Screenshot) */}
-          <div className="flex-1 space-y-4">
+          {/* Right Column: ESTIMATOR TOGGLE & LEDGER TABLE */}
+          <div className="flex-1 min-w-0 space-y-4">
             {error && (
               <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-400 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -306,28 +329,48 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
               </div>
             )}
 
-            {/* ESTIMATOR COLLAPSIBLE CONTROLLER */}
-            <div className="flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setShowEstimator(!showEstimator)}
-                className="flex items-center gap-1.5 px-3 py-1 bg-[#1A2232] hover:bg-[#232D42] text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-lg transition-all cursor-pointer"
-              >
-                <Calculator className="w-3.5 h-3.5" />
-                <span>{showEstimator ? 'Hide Estimator' : 'Modify Cost Estimator'}</span>
-                {showEstimator ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
+            {/* ESTIMATOR COLLAPSIBLE CONTROLLER & ACTIONS */}
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs sm:text-sm font-bold text-white tracking-wide">
+                  {projectName} Ledger
+                </h3>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1A2232] text-slate-400 border border-[#222E44]">
+                  {stages.length} Stages
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEstimator(!showEstimator)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1A2232] hover:bg-[#232D42] text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm"
+                >
+                  <Calculator className="w-3.5 h-3.5" />
+                  <span>{showEstimator ? 'Hide Estimator' : 'Modify Cost Estimator'}</span>
+                  {showEstimator ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1C2433] hover:bg-[#253044] text-slate-300 border border-[#2B384E] text-xs font-semibold rounded-lg transition-colors cursor-pointer shadow-sm"
+                >
+                  <History className="w-3.5 h-3.5 text-slate-400" />
+                  <span>History</span>
+                </button>
+              </div>
             </div>
 
-            {/* PROJECT COST ESTIMATOR (Only shown when expanded or schedule empty) */}
+            {/* PROJECT COST ESTIMATOR */}
             {showEstimator && (
-              <div className="bg-[#171E2B] border border-[#222B3D] rounded-xl p-4 sm:p-5 space-y-4 animate-in fade-in duration-150">
+              <div className="bg-[#171E2B] border border-[#222B3D] rounded-xl p-3.5 sm:p-5 space-y-4 animate-in fade-in duration-150">
                 <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
                   <Calculator className="w-4 h-4" />
                   <span>PROJECT COST ESTIMATOR</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
                   {/* Construction Area */}
                   <div>
                     <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
@@ -389,7 +432,7 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
                     type="button"
                     onClick={handleInitializeSchedule}
                     disabled={isSaving}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-50"
                   >
                     <Save className="w-4 h-4 stroke-[2.5]" />
                     <span>{isSaving ? 'SAVING...' : 'INITIALIZE / SAVE SCHEDULE'}</span>
@@ -398,36 +441,28 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
               </div>
             )}
 
-            {/* LEDGER SECTION (Exact Match to User Screenshot) */}
+            {/* LEDGER SECTION */}
             <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-white tracking-wide">
-                  {projectName} Ledger
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowHistoryModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1 bg-[#1C2433] hover:bg-[#253044] text-slate-300 border border-[#2B384E] text-[11px] font-semibold rounded-lg transition-colors cursor-pointer"
-                >
-                  <History className="w-3.5 h-3.5 text-slate-400" />
-                  <span>History</span>
-                </button>
-              </div>
-
-              {/* Table Container (Matches User Screenshot) */}
+              {/* Table Container */}
               <div className="bg-[#10141D] border border-[#1E2532] rounded-xl overflow-hidden shadow-2xl">
+                {/* Mobile scroll indicator */}
+                <div className="sm:hidden px-3 py-1.5 bg-[#141A26] border-b border-[#1E2532] text-[10.5px] text-slate-400 flex items-center justify-between">
+                  <span>Ledger Table</span>
+                  <span className="text-amber-400 text-[10px] font-mono">← Scroll horizontally →</span>
+                </div>
+
                 <div className="overflow-x-auto custom-scrollbar">
-                  <table className="w-full text-left border-collapse text-[11px] min-w-[650px]">
+                  <table className="w-full text-left border-collapse text-[11px] min-w-[700px]">
                     <thead>
                       <tr className="bg-white text-slate-800 text-[10px] font-black uppercase tracking-wider select-none whitespace-nowrap">
                         <th className="py-2.5 px-3 text-center w-8">S.N.</th>
-                        <th className="py-2.5 px-3">CONSTRUCTION STAGE</th>
-                        <th className="py-2.5 px-3 text-center">PERCENTAGE (%)</th>
-                        <th className="py-2.5 px-3 text-right">AMOUNT (₹)</th>
-                        <th className="py-2.5 px-3 text-center">TARGET DATE</th>
-                        <th className="py-2.5 px-3 text-right text-emerald-600">PAID (₹)</th>
-                        <th className="py-2.5 px-3 text-right text-rose-600">DUE (₹)</th>
-                        <th className="py-2.5 px-3 text-center">ACTION</th>
+                        <th className="py-2.5 px-3 min-w-[130px]">CONSTRUCTION STAGE</th>
+                        <th className="py-2.5 px-3 text-center min-w-[90px]">PERCENTAGE (%)</th>
+                        <th className="py-2.5 px-3 text-right min-w-[95px]">AMOUNT (₹)</th>
+                        <th className="py-2.5 px-3 text-center min-w-[110px]">TARGET DATE</th>
+                        <th className="py-2.5 px-3 text-right text-emerald-600 min-w-[90px]">PAID (₹)</th>
+                        <th className="py-2.5 px-3 text-right text-rose-600 min-w-[90px]">DUE (₹)</th>
+                        <th className="py-2.5 px-3 text-center min-w-[90px]">ACTION</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#1B2230] text-slate-200">
@@ -439,43 +474,43 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
                           </td>
 
                           {/* CONSTRUCTION STAGE */}
-                          <td className="py-2.5 px-3 font-semibold text-white">
+                          <td className="py-2.5 px-3 font-semibold text-white whitespace-nowrap">
                             {stage.stageName}
                           </td>
 
                           {/* PERCENTAGE (%) */}
-                          <td className="py-2.5 px-3 text-center">
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
                             <span className="font-mono font-bold text-amber-400 bg-[#1A2232] border border-[#263146] px-2 py-0.5 rounded text-[10.5px]">
                               {stage.percentage}%
                             </span>
                           </td>
 
                           {/* AMOUNT (₹) */}
-                          <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400">
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
                             ₹{(stage.amount || 0).toLocaleString()}
                           </td>
 
-                          {/* TARGET DATE (Dark Input Box) */}
+                          {/* TARGET DATE */}
                           <td className="py-2 px-3 text-center">
                             <input
                               type="text"
                               value={stage.targetDate || '01-10-2026'}
                               onChange={(e) => handleDateChange(idx, e.target.value)}
-                              className="w-28 bg-[#0D1017] border border-[#232B3B] text-slate-300 font-mono text-center px-2 py-1 rounded text-[11px] focus:outline-none focus:border-amber-400"
+                              className="w-24 sm:w-28 bg-[#0D1017] border border-[#232B3B] text-slate-300 font-mono text-center px-2 py-1 rounded text-[11px] focus:outline-none focus:border-amber-400"
                             />
                           </td>
 
                           {/* PAID (₹) */}
-                          <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400">
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
                             ₹{(stage.paid || 0).toLocaleString()}
                           </td>
 
                           {/* DUE (₹) */}
-                          <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-400">
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-400 whitespace-nowrap">
                             ₹{(stage.due || 0).toLocaleString()}
                           </td>
 
-                          {/* ACTION: Pay Now Blue Button */}
+                          {/* ACTION */}
                           <td className="py-2.5 px-3 text-center whitespace-nowrap">
                             {stage.due <= 0 && stage.amount > 0 ? (
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400">
@@ -495,15 +530,17 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
                         </tr>
                       ))}
 
-                      {/* TOTAL PROJECT BALANCE ROW (Emerald Green banner in screenshot) */}
-                      <tr className="bg-[#0A3326] text-emerald-300 font-bold text-xs">
-                        <td colSpan={3} className="py-3 px-4 uppercase tracking-wider font-mono text-emerald-300">
+                      {/* TOTAL PROJECT BALANCE ROW */}
+                      <tr className="bg-[#0A3326] text-emerald-300 font-bold text-xs whitespace-nowrap">
+                        <td colSpan={3} className="py-3 px-3 sm:px-4 uppercase tracking-wider font-mono text-emerald-300">
                           TOTAL PROJECT BALANCE
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-emerald-300 font-bold">
                           ₹{totalStageAmount.toLocaleString()}
                         </td>
-                        <td></td>
+                        <td className="text-center font-normal text-[10px] text-emerald-400/70">
+                          —
+                        </td>
                         <td className="py-3 px-3 text-right font-mono text-emerald-300 font-bold">
                           ₹{totalStagePaid.toLocaleString()}
                         </td>
@@ -511,7 +548,7 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
                           ₹{totalStageDue.toLocaleString()}
                         </td>
                         <td className="py-3 px-3 text-center text-[10px] text-emerald-300/90 font-medium leading-tight">
-                          Payments cascade to next pending stage
+                          Cascading payments
                         </td>
                       </tr>
                     </tbody>
@@ -522,8 +559,13 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
           </div>
         </div>
 
-        {/* Modal Bottom Footer with Close Button (Matches Screenshot) */}
-        <div className="px-6 py-3 border-t border-[#1E2532] bg-[#12161E] flex justify-end">
+        {/* Modal Bottom Footer with Close Button and Live Balances */}
+        <div className="px-4 sm:px-6 py-3 border-t border-[#1E2532] bg-[#12161E] shrink-0 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
+            <span>Due: <strong className="text-rose-400">₹{totalStageDue.toLocaleString()}</strong></span>
+            <span className="hidden sm:inline text-slate-600">|</span>
+            <span className="hidden sm:inline">Paid: <strong className="text-emerald-400">₹{totalStagePaid.toLocaleString()}</strong></span>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -536,8 +578,8 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
 
       {/* Pay Now Cascading Payment Sub-Modal */}
       {activePayStage && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-[#141822] border border-blue-500/30 rounded-2xl p-5 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 overflow-y-auto">
+          <div className="w-full max-w-md my-auto bg-[#141822] border border-blue-500/30 rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#222B3D]">
               <div>
                 <h3 className="text-sm font-bold text-white tracking-wide">
@@ -619,8 +661,8 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
 
       {/* Payment History Submodal */}
       {showHistoryModal && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-[#141A26] border border-amber-500/30 rounded-2xl p-5 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg my-auto bg-[#141A26] border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#222B3D]">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
                 <History className="w-4 h-4" />
@@ -660,6 +702,7 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -16,7 +16,14 @@ export interface IPartner extends Document {
   totalConverted: number;
   totalCommissionEarned: number;
   totalCommissionPaid: number;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: 'ACTIVE' | 'INACTIVE' | 'Active' | 'Dead';
+  followUps?: Array<{
+    date: string;
+    remarks: string;
+    status?: string;
+    createdAt?: Date;
+    createdByName?: string;
+  }>;
   bankDetails?: {
     accountName?: string;
     accountNumber?: string;
@@ -101,9 +108,18 @@ const partnerSchema = new Schema<IPartner>(
     },
     status: {
       type: String,
-      enum: ['ACTIVE', 'INACTIVE'],
-      default: 'ACTIVE',
+      enum: ['ACTIVE', 'INACTIVE', 'Active', 'Dead'],
+      default: 'Active',
     },
+    followUps: [
+      {
+        date: { type: String, default: '' },
+        remarks: { type: String, default: '' },
+        status: { type: String, default: 'Scheduled' },
+        createdAt: { type: Date, default: Date.now },
+        createdByName: { type: String, default: 'System' },
+      },
+    ],
     bankDetails: {
       accountName: { type: String, default: '' },
       accountNumber: { type: String, default: '' },

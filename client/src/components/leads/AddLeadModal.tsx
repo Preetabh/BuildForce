@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Plus, Check, Info } from 'lucide-react';
 import { LeadItem, PartnerItem } from '../../types';
 import leadService from '../../services/lead.service';
+import catalogService from '../../services/catalog.service';
 
 interface AddLeadModalProps {
   isOpen: boolean;
@@ -10,17 +11,6 @@ interface AddLeadModalProps {
   leadToEdit?: LeadItem | null;
 }
 
-const AVAILABLE_SERVICES = [
-  'Construction Furnished',
-  'Construction Raw / Grey Structure',
-  'Architectural Design',
-  'Interior Designing',
-  'Renovation & Remodelling',
-  'Commercial Construction',
-  'Turnkey Solution',
-  'Waterproofing & Painting',
-  'Modular Kitchen & Wardrobes',
-];
 
 const OCCUPATIONS = [
   'Business',
@@ -55,6 +45,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [partners, setPartners] = useState<PartnerItem[]>([]);
+  const [dynamicServices, setDynamicServices] = useState<string[]>([]);
 
   // Form State
   const [leadDate, setLeadDate] = useState(new Date().toISOString().split('T')[0]);
@@ -68,7 +59,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
 
   // Step 2 State
   const [siteLocation, setSiteLocation] = useState('');
-  const [requirements, setRequirements] = useState<string[]>(['Construction Furnished']);
+  const [requirements, setRequirements] = useState<string[]>(['']);
   const [propertyType, setPropertyType] = useState<'Resi.' | 'Comm.'>('Resi.');
   const [landArea, setLandArea] = useState('');
   const [buildupArea, setBuildupArea] = useState('');
@@ -90,6 +81,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      loadDynamicServices();
       loadPartners();
       if (leadToEdit) {
         setLeadDate(leadToEdit.leadDate ? new Date(leadToEdit.leadDate).toISOString().split('T')[0] : '');
@@ -101,7 +93,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
         setEmail(leadToEdit.email || '');
         setPermanentAddress(leadToEdit.permanentAddress || '');
         setSiteLocation(leadToEdit.siteLocation || '');
-        setRequirements(leadToEdit.requirements?.length ? leadToEdit.requirements : ['Construction Furnished']);
+        setRequirements(leadToEdit.requirements?.length ? leadToEdit.requirements : ['']);
         setPropertyType(
           leadToEdit.propertyType === 'Comm.' || leadToEdit.propertyType === 'Commercial'
             ? 'Comm.'
@@ -135,6 +127,20 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
     }
   }, [isOpen, leadToEdit]);
 
+  const loadDynamicServices = async () => {
+    try {
+      const data = await catalogService.getActiveServices();
+      const activeList = (data || []).filter((s) => s.isActive).map((s) => s.name);
+      setDynamicServices(activeList);
+      // If any selected requirement was deactivated, reset it so deactivated services are never shown or kept
+      setRequirements((prev) =>
+        prev.map((req) => (req && !activeList.includes(req) ? '' : req))
+      );
+    } catch (err) {
+      console.error('Failed to load dynamic services:', err);
+    }
+  };
+
   const resetForm = () => {
     setLeadDate(new Date().toISOString().split('T')[0]);
     setClientName('');
@@ -145,7 +151,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
     setEmail('');
     setPermanentAddress('');
     setSiteLocation('');
-    setRequirements(['Construction Furnished']);
+    setRequirements(['']);
     setPropertyType('Resi.');
     setLandArea('');
     setBuildupArea('');
@@ -176,7 +182,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
   if (!isOpen) return null;
 
   const handleAddRequirement = () => {
-    setRequirements([...requirements, 'Construction Furnished']);
+    setRequirements([...requirements, '']);
   };
 
   const handleRemoveRequirement = (index: number) => {
@@ -214,7 +220,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
       setErrorMessage('Please enter Site Location.');
       return;
     }
-    if (!requirements.length || !requirements[0]) {
+    if (!requirements.filter(Boolean).length) {
       setErrorMessage('Please specify at least one requirement service.');
       return;
     }
@@ -238,7 +244,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
         email: email.trim(),
         permanentAddress: permanentAddress.trim(),
         siteLocation: siteLocation.trim(),
-        requirements,
+        requirements: requirements.filter(Boolean),
         propertyType,
         landArea: landArea.trim(),
         buildupArea: buildupArea.trim(),
@@ -559,7 +565,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
                       className="flex-1 bg-[#121622] border border-[#2B354C] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#EAB308] transition-colors"
                     >
                       <option value="">-Select Service-</option>
-                      {AVAILABLE_SERVICES.map((srv) => (
+                      {dynamicServices.map((srv) => (
                         <option key={srv} value={srv}>
                           {srv}
                         </option>

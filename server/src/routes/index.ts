@@ -44,6 +44,10 @@ router.use('/projects/:projectId/billing', billingRoutes);
 // Lead Management Routes
 router.use('/leads', leadRoutes);
 
+// Service Catalog Routes
+import serviceCatalogRoutes from '../modules/services/serviceCatalog.routes';
+router.use('/services', serviceCatalogRoutes);
+
 // Audit Trail Routes
 router.get('/audit/recent', authenticate, async (req, res, next) => {
   try {

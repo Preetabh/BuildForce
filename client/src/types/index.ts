@@ -777,7 +777,15 @@ export interface PartnerItem {
   totalConverted: number;
   totalCommissionEarned: number;
   totalCommissionPaid: number;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: 'ACTIVE' | 'INACTIVE' | 'Active' | 'Dead' | string;
+  followUps?: Array<{
+    _id?: string;
+    date: string;
+    remarks: string;
+    status?: string;
+    createdAt?: string;
+    createdByName?: string;
+  }>;
   bankDetails?: {
     accountName?: string;
     accountNumber?: string;

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { LeadItem, LeadStats } from '../../types';
 import leadService, { LeadFilterQuery } from '../../services/lead.service';
+import catalogService from '../../services/catalog.service';
 import { AddLeadModal } from '../../components/leads/AddLeadModal';
 import { FollowUpModal } from '../../components/leads/FollowUpModal';
 import { RegisterClientModal } from '../../components/leads/RegisterClientModal';
@@ -54,6 +55,14 @@ export const LeadManagement: React.FC = () => {
   const [selectedLeadForFollowUp, setSelectedLeadForFollowUp] = useState<LeadItem | null>(null);
   const [selectedLeadForReg, setSelectedLeadForReg] = useState<LeadItem | null>(null);
   const [selectedLeadForDead, setSelectedLeadForDead] = useState<LeadItem | null>(null);
+  const [availableServices, setAvailableServices] = useState<string[]>([]);
+
+  useEffect(() => {
+    catalogService.getActiveServices().then((data) => {
+      const activeList = (data || []).filter((s) => s.isActive).map((s) => s.name);
+      setAvailableServices(activeList);
+    }).catch(() => {});
+  }, [activeView]);
 
   useEffect(() => {
     fetchLeads();
@@ -384,11 +393,11 @@ export const LeadManagement: React.FC = () => {
               className="bg-[#161C2C] border border-[#2B354C] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
             >
               <option value="All Services">All Services</option>
-              <option value="Construction Furnished">Construction Furnished</option>
-              <option value="Construction Raw / Grey Structure">Construction Raw</option>
-              <option value="Architectural Design">Architectural Design</option>
-              <option value="Interior Designing">Interior Designing</option>
-              <option value="Renovation & Remodelling">Renovation</option>
+              {availableServices.map((srv) => (
+                <option key={srv} value={srv}>
+                  {srv}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -635,7 +644,9 @@ export const LeadManagement: React.FC = () => {
 
                           {/* SERVICES */}
                           <td className="py-3 px-3 text-slate-300 font-medium">
-                            {lead.requirements?.[0] || 'Construction Furnished'}
+                            {lead.requirements && lead.requirements.length > 0
+                              ? lead.requirements.join(', ')
+                              : '-'}
                           </td>
 
                           {/* MOBILE */}

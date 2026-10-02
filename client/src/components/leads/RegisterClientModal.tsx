@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { LeadItem } from '../../types';
 import leadService from '../../services/lead.service';
+import catalogService from '../../services/catalog.service';
 
 interface RegisterClientModalProps {
   isOpen: boolean;
@@ -27,7 +28,7 @@ interface ServiceSelection {
   specificItems: string[];
 }
 
-const AVAILABLE_SERVICES: Record<string, string[]> = {
+const SPECIFIC_ITEMS_MAP: Record<string, string[]> = {
   'Construction Furnished': [
     'Complete Structure',
     'Flooring & Tiling',
@@ -84,6 +85,8 @@ export const RegisterClientModal: React.FC<RegisterClientModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const [dynamicServices, setDynamicServices] = useState<string[]>([]);
+
   // Client Details
   const [clientName, setClientName] = useState('');
   const [mobile1, setMobile1] = useState('');
@@ -154,7 +157,7 @@ export const RegisterClientModal: React.FC<RegisterClientModalProps> = ({
         setServicesList(
           lead.serviceItems.map((item, idx) => ({
             id: `srv-${idx}-${Date.now()}`,
-            service: item.service || 'Construction Furnished',
+            service: item.service || '',
             specificItems: item.specificItems || [],
           }))
         );
@@ -162,7 +165,7 @@ export const RegisterClientModal: React.FC<RegisterClientModalProps> = ({
         setServicesList(
           lead.requirements.map((req, idx) => ({
             id: `srv-${idx}-${Date.now()}`,
-            service: req in AVAILABLE_SERVICES ? req : 'Construction Furnished',
+            service: req || '',
             specificItems: [],
           }))
         );
@@ -170,7 +173,7 @@ export const RegisterClientModal: React.FC<RegisterClientModalProps> = ({
         setServicesList([
           {
             id: `srv-0-${Date.now()}`,
-            service: 'Construction Furnished',
+            service: '',
             specificItems: [],
           },
         ]);
@@ -193,6 +196,19 @@ export const RegisterClientModal: React.FC<RegisterClientModalProps> = ({
     }
   }, [lead, isOpen]);
 
+  useEffect(() => {
+    if (isOpen) {
+      catalogService.getActiveServices().then((data) => {
+        const activeList = (data || []).filter((s) => s.isActive).map((s) => s.name);
+        setDynamicServices(activeList);
+        // Exclude deactivated services from current selections
+        setServicesList((prev) =>
+          prev.map((s) => (s.service && !activeList.includes(s.service) ? { ...s, service: '' } : s))
+        );
+      }).catch(console.error);
+    }
+  }, [isOpen]);
+
   if (!isOpen || !lead) return null;
 
   const formattedLeadDate = lead.leadDate
@@ -200,7 +216,7 @@ export const RegisterClientModal: React.FC<RegisterClientModalProps> = ({
     : new Date().toISOString().split('T')[0];
 
   const handleAddService = () => {
-    const nextServiceKey = Object.keys(AVAILABLE_SERVICES)[servicesList.length % Object.keys(AVAILABLE_SERVICES).length] || 'Construction Furnished';
+    const nextServiceKey = dynamicServices[servicesList.length % (dynamicServices.length || 1)] || dynamicServices[0] || '';
     setServicesList((prev) => [
       ...prev,
       {
@@ -624,7 +640,7 @@ export const RegisterClientModal: React.FC<RegisterClientModalProps> = ({
             {/* List of dynamic service cards */}
             <div className="space-y-3">
               {servicesList.map((srv, index) => {
-                const availableSpecificItems = AVAILABLE_SERVICES[srv.service] || [];
+                const availableSpecificItems = SPECIFIC_ITEMS_MAP[srv.service] || [];
                 return (
                   <div
                     key={srv.id}
@@ -654,7 +670,8 @@ export const RegisterClientModal: React.FC<RegisterClientModalProps> = ({
                         onChange={(e) => handleServiceChange(srv.id, e.target.value)}
                         className="w-full bg-[#15161b] border border-[#2e303b] focus:border-[#e5a919] rounded-lg px-3 py-2 text-xs font-semibold text-white focus:outline-none appearance-none cursor-pointer transition-colors pr-8"
                       >
-                        {Object.keys(AVAILABLE_SERVICES).map((srvOption) => (
+                        <option value="">-Select Service-</option>
+                        {dynamicServices.map((srvOption) => (
                           <option key={srvOption} value={srvOption}>
                             {srvOption}
                           </option>

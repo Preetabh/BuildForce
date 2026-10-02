@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { ClientRecord } from '../../types';
 import leadService, { ClientFilterQuery } from '../../services/lead.service';
+import catalogService from '../../services/catalog.service';
 import { PaymentLedgerModal } from '../../components/leads/PaymentLedgerModal';
 import { DailyProgressReportModal } from '../../components/leads/DailyProgressReportModal';
 import { ClientFollowUpModal } from '../../components/leads/ClientFollowUpModal';
@@ -56,6 +57,14 @@ export const ClientManagement: React.FC = () => {
 
   const [selectedClientForEdit, setSelectedClientForEdit] = useState<ClientRecord | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [availableServices, setAvailableServices] = useState<string[]>([]);
+
+  useEffect(() => {
+    catalogService.getActiveServices().then((data) => {
+      const activeList = (data || []).filter((s) => s.isActive).map((s) => s.name);
+      setAvailableServices(activeList);
+    }).catch(() => {});
+  }, []);
 
   const [selectedClientForReport, setSelectedClientForReport] = useState<ClientRecord | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -400,12 +409,11 @@ export const ClientManagement: React.FC = () => {
             className="bg-[#0C1017] border border-[#1E273A] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
           >
             <option value="All Services">All Services</option>
-            <option value="Renovation">Renovation</option>
-            <option value="Construction Structure">Construction Structure</option>
-            <option value="Floor Plan Design">Floor Plan Design</option>
-            <option value="Construction Furnished">Construction Furnished</option>
-            <option value="Interior Full Design">Interior Full Design</option>
-            <option value="Elevation Design">Elevation Design</option>
+            {availableServices.map((srv) => (
+              <option key={srv} value={srv}>
+                {srv}
+              </option>
+            ))}
           </select>
 
           {/* Date Range */}

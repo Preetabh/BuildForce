@@ -31,6 +31,8 @@ import {
   Contact,
   Coins,
   Users,
+  Briefcase,
+  Box,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../utils/cn';
@@ -110,8 +112,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { label: 'Client', path: '/leads/clients', icon: Contact, isComingSoon: false },
         { label: 'Payment', path: '/leads/payments', icon: CreditCard, isComingSoon: false },
         { label: 'Pay Amount', path: '/leads/pay-amount', icon: Coins, isComingSoon: false },
-        { label: 'Associate Partners', path: '/leads/partners', icon: Handshake, isComingSoon: false },
+        { label: 'Reference Partners', path: '/leads/partners', icon: Handshake, isComingSoon: false },
         { label: 'Commission Report', path: '/leads/commission-reports', icon: FileSpreadsheet, isComingSoon: false },
+      ],
+    },
+    {
+      id: 'service_catalog',
+      label: 'SERVICE',
+      icon: Briefcase,
+      items: [
+        { label: 'Services', path: '/services', icon: Layers, isComingSoon: false },
+        { label: 'Module', path: '/services/modules', icon: Box, isComingSoon: true },
       ],
     },
     {

@@ -229,7 +229,7 @@ export class CommissionService {
       } else if (commission.status === 'Pending') {
         commission.status = 'Approved';
       }
-
+          
       commission.paymentDate = new Date();
       commission.paymentRef = payoutData.transactionRef || '';
       await commission.save();

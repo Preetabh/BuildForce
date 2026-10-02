@@ -213,10 +213,12 @@ export const AssociatePartnerModal: React.FC<AssociatePartnerModalProps> = ({
                   className="w-full bg-[#1B1F2A] border border-[#2B3242] focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition-all appearance-none cursor-pointer"
                 >
                   <option value="">-- Select --</option>
+                  <option value="A">Grade A (High)</option>
+                  <option value="B">Grade B (Medium)</option>
+                  <option value="C">Grade C (Low)</option>
                   <option value="High">High</option>
                   <option value="Medium">Medium</option>
                   <option value="Low">Low</option>
-                  <option value="Very High">Very High</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
                   <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">

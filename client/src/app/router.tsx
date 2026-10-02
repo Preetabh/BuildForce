@@ -19,6 +19,7 @@ import { PaymentManagement } from '../pages/leads/PaymentManagement';
 import { PayAmountPage } from '../pages/leads/PayAmountPage';
 import { ReferencePartners } from '../pages/leads/ReferencePartners';
 import { CommissionReport } from '../pages/leads/CommissionReport';
+import { ServiceCatalogPage } from '../pages/services/ServiceCatalogPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -120,7 +121,18 @@ export const AppRouter: React.FC = () => {
           <Route path="/leads/payments" element={<PaymentManagement />} />
           <Route path="/leads/pay-amount" element={<PayAmountPage />} />
           <Route path="/leads/partners" element={<ReferencePartners />} />
+          <Route path="/leads/associate-partners" element={<ReferencePartners />} />
+          <Route path="/admin/associate-partners" element={<ReferencePartners />} />
+          <Route path="/Admin/AssociatePartners" element={<ReferencePartners />} />
           <Route path="/leads/commission-reports" element={<CommissionReport />} />
+
+          {/* SERVICE CATALOG & MAIN SERVICES */}
+          <Route path="/services" element={<ServiceCatalogPage />} />
+          <Route path="/service/services" element={<ServiceCatalogPage />} />
+          <Route path="/admin/service-catalog" element={<ServiceCatalogPage />} />
+          <Route path="/admin/services" element={<ServiceCatalogPage />} />
+          <Route path="/services/modules" element={<ComingSoonModule />} />
+          <Route path="/service/modules" element={<ComingSoonModule />} />
 
           {/* VENDOR MANAGEMENT */}
           <Route path="/vendors" element={<ComingSoonModule />} />
