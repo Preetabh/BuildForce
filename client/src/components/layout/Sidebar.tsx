@@ -129,8 +129,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'PLANNINGS',
       icon: CalendarRange,
       items: [
-        { label: 'Schedule of Rates (SOR)', path: '/sor', icon: BookOpen, isComingSoon: false },
-        { label: 'Quantity Master', path: '/planning/quantity-master', icon: Calculator, isComingSoon: false },
+        { label: 'Schedule of Rates (SOR)', path: '/sor', icon: BookOpen, isComingSoon: false, permissionKey: '/sor' },
+        { label: 'Quantity Master', path: '/planning/quantity-master', icon: Calculator, isComingSoon: false, permissionKey: '/planning/quantity-master' },
         { label: 'QC Master & Checklists', path: '/planning/qc-master', icon: ClipboardCheck, isComingSoon: true },
         { label: 'Project Schedule & WBS', path: '/planning', icon: Layers, isComingSoon: true },
       ],

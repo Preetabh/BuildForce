@@ -38,6 +38,11 @@ export interface StagedRowsFilters {
   limit?: number;
 }
 
+const isUserAdmin = (role?: string): boolean => {
+  const norm = (role || '').trim().toUpperCase();
+  return norm === 'ADMIN' || norm === 'MASTER_ADMIN' || norm === 'SUPER_ADMIN' || norm === 'MASTER ADMIN';
+};
+
 export class SorService {
   /**
    * System-wide shared configuration
@@ -124,7 +129,9 @@ export class SorService {
       version: string;
       effectiveDate?: string;
       forceReimport?: boolean | string;
-    }
+    },
+    userRole?: string,
+    userName?: string
   ): Promise<ISorImport> {
     if (!file || !file.path) {
       throw new AppError('File upload failed: Temporary storage path missing', 400);
@@ -210,6 +217,9 @@ export class SorService {
       extractedRows: [],
       importErrors: [],
       createdBy: new Types.ObjectId(userId),
+      createdByName: userName || '',
+      creatorRole: userRole || '',
+      isAdminFile: isUserAdmin(userRole),
     });
 
     await AuditService.log({
@@ -1454,20 +1464,38 @@ export class SorService {
   /**
    * List Import History for Company
    */
-  public static async listImports(companyId: string, page = 1, limit = 20) {
+  public static async listImports(
+    companyId: string,
+    page = 1,
+    limit = 20,
+    userId?: string,
+    userRole?: string
+  ) {
     const compObjectId = new Types.ObjectId(companyId);
     const skip = (page - 1) * limit;
+    const isAdmin = isUserAdmin(userRole);
+
+    const query: Record<string, any> = { companyId: compObjectId };
+    if (!isAdmin && userId) {
+      const userObjectId = new Types.ObjectId(userId);
+      query.$or = [
+        { isAdminFile: true },
+        { createdBy: userObjectId },
+        { createdBy: { $exists: false } },
+        { createdBy: null },
+      ];
+    }
 
     const [imports, total] = await Promise.all([
-      SorImport.find({ companyId: compObjectId })
+      SorImport.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .select(
-          '_id fileName fileSize fileType authority scheduleName version status progress isOcrRequired createdAt'
+          '_id fileName fileSize fileType authority scheduleName version status progress isOcrRequired createdAt createdBy createdByName creatorRole isAdminFile'
         )
         .lean(),
-      SorImport.countDocuments({ companyId: compObjectId }),
+      SorImport.countDocuments(query),
     ]);
 
     return {
@@ -1484,9 +1512,15 @@ export class SorService {
   /**
    * Delete an import session and clean up staging items and temp file
    */
-  public static async deleteImport(companyId: string, importId: string) {
+  public static async deleteImport(
+    companyId: string,
+    importId: string,
+    userId?: string,
+    userRole?: string
+  ) {
     const compObjectId = new Types.ObjectId(companyId);
     const impObjectId = new Types.ObjectId(importId);
+    const isAdmin = isUserAdmin(userRole);
 
     const sorImport = await SorImport.findOne({
       _id: impObjectId,
@@ -1495,6 +1529,15 @@ export class SorService {
 
     if (!sorImport) {
       throw new AppError('Import record not found', 404);
+    }
+
+    const fileIsAdmin = sorImport.isAdminFile || !sorImport.createdBy || isUserAdmin(sorImport.creatorRole);
+    if (fileIsAdmin && !isAdmin) {
+      throw new AppError('Permission Denied: You cannot delete files uploaded by Admin.', 403);
+    }
+
+    if (!isAdmin && sorImport.createdBy && userId && sorImport.createdBy.toString() !== userId) {
+      throw new AppError('Permission Denied: You can only delete files uploaded by yourself.', 403);
     }
 
     if (sorImport.tempFilePath && fs.existsSync(sorImport.tempFilePath)) {
@@ -1516,13 +1559,28 @@ export class SorService {
   /**
    * Delete a published SOR master schedule and all its items
    */
-  public static async deleteSorMaster(companyId: string, masterId: string) {
+  public static async deleteSorMaster(
+    companyId: string,
+    masterId: string,
+    userId?: string,
+    userRole?: string
+  ) {
     const compObjectId = new Types.ObjectId(companyId);
     const mObjectId = new Types.ObjectId(masterId);
+    const isAdmin = isUserAdmin(userRole);
 
     const master = await SorMaster.findOne({ _id: mObjectId, companyId: compObjectId });
     if (!master) {
       throw new AppError('SOR Master schedule not found', 404);
+    }
+
+    const fileIsAdmin = master.isAdminFile || !master.createdBy || isUserAdmin(master.creatorRole);
+    if (fileIsAdmin && !isAdmin) {
+      throw new AppError('Permission Denied: You cannot delete SOR masters created by Admin.', 403);
+    }
+
+    if (!isAdmin && master.createdBy && userId && master.createdBy.toString() !== userId) {
+      throw new AppError('Permission Denied: You can only delete SOR masters created by yourself.', 403);
     }
 
     const [deletedItems, deletedImports] = await Promise.all([
@@ -1698,10 +1756,28 @@ export class SorService {
   /**
    * List all published SOR Schedules & Versions for company with accurate itemCount
    */
-  public static async getSorMasters(companyId: string) {
-    const compQuery = companyId && Types.ObjectId.isValid(companyId)
+  public static async getSorMasters(companyId: string, userId?: string, userRole?: string) {
+    const isAdmin = isUserAdmin(userRole);
+    let compQuery: Record<string, any> = companyId && Types.ObjectId.isValid(companyId)
       ? { $or: [{ companyId: new Types.ObjectId(companyId) }, { companyId: { $exists: false } }] }
       : {};
+
+    if (!isAdmin && userId) {
+      const userObjectId = new Types.ObjectId(userId);
+      compQuery = {
+        $and: [
+          compQuery,
+          {
+            $or: [
+              { isAdminFile: true },
+              { createdBy: userObjectId },
+              { createdBy: { $exists: false } },
+              { createdBy: null },
+            ],
+          },
+        ],
+      };
+    }
 
     const masters = await SorMaster.find(compQuery)
       .sort({ createdAt: -1 })

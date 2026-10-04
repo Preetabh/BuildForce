@@ -17,6 +17,10 @@ export interface IRateList extends Document {
   materialRates: IRateOverride[];
   labourRates: IRateOverride[];
   machineryRates: IRateOverride[];
+  createdBy?: Types.ObjectId;
+  createdByName?: string;
+  creatorRole?: string;
+  isAdminFile?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,6 +67,27 @@ const rateListSchema = new Schema<IRateList>(
     materialRates: [rateOverrideSchema],
     labourRates: [rateOverrideSchema],
     machineryRates: [rateOverrideSchema],
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
+    createdByName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    creatorRole: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    isAdminFile: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: true,

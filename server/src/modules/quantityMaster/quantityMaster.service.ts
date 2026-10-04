@@ -10,6 +10,11 @@ import { ManpowerItem } from '../../models/Manpower';
 import { MachineryItem } from '../../models/Machinery';
 import { AppError } from '../../middleware/error.middleware';
 
+const isUserAdmin = (role?: string): boolean => {
+  const norm = (role || '').trim().toUpperCase();
+  return norm === 'ADMIN' || norm === 'MASTER_ADMIN' || norm === 'SUPER_ADMIN' || norm === 'MASTER ADMIN';
+};
+
 export class QuantityMasterService {
   // ==========================================
   // 1. MATERIALS
@@ -887,11 +892,23 @@ export class QuantityMasterService {
   // ==========================================
   // 5. RATE LISTS
   // ==========================================
-  public static async getRateLists(companyId: string) {
+  public static async getRateLists(companyId: string, userId?: string, userRole?: string) {
     const compObjectId = new Types.ObjectId(companyId);
+    const isAdmin = isUserAdmin(userRole);
+
+    const query: Record<string, any> = { companyId: compObjectId };
+    if (!isAdmin && userId) {
+      const userObjectId = new Types.ObjectId(userId);
+      query.$or = [
+        { isAdminFile: true },
+        { createdBy: userObjectId },
+        { createdBy: { $exists: false } },
+        { createdBy: null },
+      ];
+    }
 
     const [rateLists, totalMaterials, totalLabour, totalMachinery] = await Promise.all([
-      RateList.find({ companyId: compObjectId }).sort({ createdAt: -1 }).lean(),
+      RateList.find(query).sort({ createdAt: -1 }).lean(),
       Material.countDocuments({ companyId: compObjectId }),
       LabourType.countDocuments({ companyId: compObjectId }),
       MachineryType.countDocuments({ companyId: compObjectId }),
@@ -919,7 +936,10 @@ export class QuantityMasterService {
       materialRates?: Array<{ itemId: string; itemCode: string; itemName: string; unit: string; rate: number }>;
       labourRates?: Array<{ itemId: string; itemCode: string; itemName: string; unit: string; rate: number }>;
       machineryRates?: Array<{ itemId: string; itemCode: string; itemName: string; unit: string; rate: number }>;
-    }
+    },
+    userId?: string,
+    userRole?: string,
+    userName?: string
   ) {
     const compObjectId = new Types.ObjectId(companyId);
     let code = data.code ? data.code.trim().toUpperCase() : '';
@@ -941,6 +961,8 @@ export class QuantityMasterService {
       await RateList.updateMany({ companyId: compObjectId }, { $set: { isDefault: false } });
     }
 
+    const isAdmin = isUserAdmin(userRole);
+
     const rateList = await RateList.create({
       companyId: compObjectId,
       name: data.name.trim(),
@@ -950,6 +972,10 @@ export class QuantityMasterService {
       materialRates: data.materialRates || [],
       labourRates: data.labourRates || [],
       machineryRates: data.machineryRates || [],
+      createdBy: userId ? new Types.ObjectId(userId) : null,
+      createdByName: userName || '',
+      creatorRole: userRole || '',
+      isAdminFile: isAdmin,
     });
 
     return rateList;
@@ -1004,23 +1030,73 @@ export class QuantityMasterService {
     return rateList;
   }
 
-  public static async deleteRateList(companyId: string, id: string) {
-    const res = await RateList.deleteOne({
-      _id: new Types.ObjectId(id),
-      companyId: new Types.ObjectId(companyId),
+  public static async deleteRateList(companyId: string, id: string, userId?: string, userRole?: string) {
+    const compObjectId = new Types.ObjectId(companyId);
+    const rlObjectId = new Types.ObjectId(id);
+    const isAdmin = isUserAdmin(userRole);
+
+    const rateList = await RateList.findOne({
+      _id: rlObjectId,
+      companyId: compObjectId,
     });
-    if (res.deletedCount === 0) throw new AppError('Rate list not found', 404);
+
+    if (!rateList) throw new AppError('Rate list not found', 404);
+
+    const fileIsAdmin = rateList.isAdminFile || !rateList.createdBy || isUserAdmin(rateList.creatorRole);
+    if (fileIsAdmin && !isAdmin) {
+      throw new AppError('Permission Denied: You cannot delete rate lists created by Admin.', 403);
+    }
+
+    if (!isAdmin && rateList.createdBy && userId && rateList.createdBy.toString() !== userId) {
+      throw new AppError('Permission Denied: You can only delete rate lists created by yourself.', 403);
+    }
+
+    await RateList.deleteOne({ _id: rlObjectId, companyId: compObjectId });
     return { success: true, message: 'Rate list deleted successfully' };
   }
 
   // ==========================================
   // 6. IMPORT HISTORY
   // ==========================================
-  public static async getImportHistory(companyId: string) {
+  public static async getImportHistory(companyId: string, userId?: string, userRole?: string) {
     const compObjectId = new Types.ObjectId(companyId);
-    return SorImport.find({ companyId: compObjectId })
+    const isAdmin = isUserAdmin(userRole);
+
+    const query: Record<string, any> = { companyId: compObjectId };
+    if (!isAdmin && userId) {
+      const userObjectId = new Types.ObjectId(userId);
+      query.$or = [
+        { isAdminFile: true },
+        { createdBy: userObjectId },
+        { createdBy: { $exists: false } },
+        { createdBy: null },
+      ];
+    }
+
+    return SorImport.find(query)
       .sort({ createdAt: -1 })
-      .limit(30)
+      .limit(50)
       .lean();
+  }
+
+  public static async deleteImportHistory(companyId: string, id: string, userId?: string, userRole?: string) {
+    const compObjectId = new Types.ObjectId(companyId);
+    const impObjectId = new Types.ObjectId(id);
+    const isAdmin = isUserAdmin(userRole);
+
+    const imp = await SorImport.findOne({ _id: impObjectId, companyId: compObjectId });
+    if (!imp) throw new AppError('Import record not found', 404);
+
+    const fileIsAdmin = imp.isAdminFile || !imp.createdBy || isUserAdmin(imp.creatorRole);
+    if (fileIsAdmin && !isAdmin) {
+      throw new AppError('Permission Denied: You cannot delete files uploaded by Admin.', 403);
+    }
+
+    if (!isAdmin && imp.createdBy && userId && imp.createdBy.toString() !== userId) {
+      throw new AppError('Permission Denied: You can only delete files uploaded by yourself.', 403);
+    }
+
+    await SorImport.deleteOne({ _id: impObjectId, companyId: compObjectId });
+    return { success: true, message: 'Import history record deleted successfully' };
   }
 }

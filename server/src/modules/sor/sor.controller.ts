@@ -36,13 +36,20 @@ export class SorController {
         throw new AppError('Authority, Schedule Name, and Version are required fields', 400);
       }
 
-      const result = await SorService.initiateImport(companyId, userId, req.file, {
-        authority,
-        scheduleName,
-        version,
-        effectiveDate,
-        forceReimport,
-      });
+      const result = await SorService.initiateImport(
+        companyId,
+        userId,
+        req.file,
+        {
+          authority,
+          scheduleName,
+          version,
+          effectiveDate,
+          forceReimport,
+        },
+        req.user?.role,
+        req.user?.name
+      );
 
       res.status(202).json({
         success: true,
@@ -175,7 +182,13 @@ export class SorController {
       const companyId = req.user!.companyId;
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 20;
-      const result = await SorService.listImports(companyId, page, limit);
+      const result = await SorService.listImports(
+        companyId,
+        page,
+        limit,
+        req.user?.userId,
+        req.user?.role
+      );
       res.status(200).json({
         success: true,
         data: result.imports,
@@ -193,7 +206,12 @@ export class SorController {
     try {
       const companyId = req.user!.companyId;
       const { importId } = req.params;
-      const result = await SorService.deleteImport(companyId, importId);
+      const result = await SorService.deleteImport(
+        companyId,
+        importId,
+        req.user?.userId,
+        req.user?.role
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -265,7 +283,11 @@ export class SorController {
   public static async getSorMasters(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const companyId = req.user!.companyId;
-      const masters = await SorService.getSorMasters(companyId);
+      const masters = await SorService.getSorMasters(
+        companyId,
+        req.user?.userId,
+        req.user?.role
+      );
       res.status(200).json({
         success: true,
         data: masters,
@@ -409,7 +431,12 @@ export class SorController {
       const companyId = req.user!.companyId;
       const { masterId } = req.params;
 
-      const result = await SorService.deleteSorMaster(companyId, masterId);
+      const result = await SorService.deleteSorMaster(
+        companyId,
+        masterId,
+        req.user?.userId,
+        req.user?.role
+      );
       res.status(200).json(result);
     } catch (error) {
       next(error);

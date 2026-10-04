@@ -222,7 +222,11 @@ export class QuantityMasterController {
   public static async getRateLists(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const data = await QuantityMasterService.getRateLists(companyId);
+      const data = await QuantityMasterService.getRateLists(
+        companyId,
+        req.user?.userId,
+        req.user?.role
+      );
       res.status(200).json({ success: true, data });
     } catch (err) {
       next(err);
@@ -232,7 +236,13 @@ export class QuantityMasterController {
   public static async createRateList(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const data = await QuantityMasterService.createRateList(companyId, req.body);
+      const data = await QuantityMasterService.createRateList(
+        companyId,
+        req.body,
+        req.user?.userId,
+        req.user?.role,
+        req.user?.name
+      );
       res.status(201).json({ success: true, data, message: 'Rate list created successfully' });
     } catch (err) {
       next(err);
@@ -266,7 +276,12 @@ export class QuantityMasterController {
   public static async deleteRateList(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const data = await QuantityMasterService.deleteRateList(companyId, req.params.id);
+      const data = await QuantityMasterService.deleteRateList(
+        companyId,
+        req.params.id,
+        req.user?.userId,
+        req.user?.role
+      );
       res.status(200).json(data);
     } catch (err) {
       next(err);
@@ -277,12 +292,32 @@ export class QuantityMasterController {
   public static async getImportHistory(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const data = await QuantityMasterService.getImportHistory(companyId);
+      const data = await QuantityMasterService.getImportHistory(
+        companyId,
+        req.user?.userId,
+        req.user?.role
+      );
       res.status(200).json({ success: true, data });
     } catch (err) {
       next(err);
     }
   }
+
+  public static async deleteImportHistory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const data = await QuantityMasterService.deleteImportHistory(
+        companyId,
+        req.params.id,
+        req.user?.userId,
+        req.user?.role
+      );
+      res.status(200).json(data);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   // PDF / Excel / CSV Bulk Extraction
   public static async parsePdfImport(req: Request, res: Response, next: NextFunction) {
     try {
@@ -310,6 +345,8 @@ export class QuantityMasterController {
     try {
       const companyId = req.user!.companyId;
       const userId = req.user!.userId;
+      const userRole = req.user?.role;
+      const userName = req.user?.name;
       const { type, items, fileName } = req.body;
 
       const { QuantityMasterPdfService } = await import('./quantityMasterPdf.service');
@@ -318,7 +355,9 @@ export class QuantityMasterController {
         userId,
         type,
         items,
-        fileName
+        fileName,
+        userRole,
+        userName
       );
 
       res.status(200).json({

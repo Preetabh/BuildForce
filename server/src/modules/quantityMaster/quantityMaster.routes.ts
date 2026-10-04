@@ -4,11 +4,20 @@ import multer from 'multer';
 import { QuantityMasterController } from './quantityMaster.controller';
 import { authenticate } from '../../middleware/auth.middleware';
 import { requireCompany } from '../../middleware/company.middleware';
+import { requireApiPermission } from '../../middleware/rbac.middleware';
 
 const router = Router();
 
 router.use(authenticate);
 router.use(requireCompany);
+router.use(
+  requireApiPermission([
+    'Admin/LibraryMgmt',
+    '/planning/quantity-master',
+    'Quantity Master',
+    'sor.view',
+  ])
+);
 
 // Materials
 router.get('/materials', QuantityMasterController.getMaterials);
@@ -70,6 +79,7 @@ const uploadMemory = multer({
 
 // Import History
 router.get('/import-history', QuantityMasterController.getImportHistory);
+router.delete('/import-history/:id', QuantityMasterController.deleteImportHistory);
 
 // PDF / Excel / CSV Import & Bulk Extraction Routes
 router.post(

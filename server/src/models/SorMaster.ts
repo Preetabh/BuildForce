@@ -17,6 +17,10 @@ export interface ISorMaster extends Document {
   effectiveTo?: Date;
   sourceDocument?: string;
   status: 'DRAFT' | 'ACTIVE' | 'SUPERSEDED' | 'ARCHIVED';
+  createdBy?: Types.ObjectId;
+  createdByName?: string;
+  creatorRole?: string;
+  isAdminFile?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -102,6 +106,27 @@ const sorMasterSchema = new Schema<ISorMaster>(
       type: String,
       enum: ['DRAFT', 'ACTIVE', 'SUPERSEDED', 'ARCHIVED'],
       default: 'ACTIVE',
+      index: true,
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
+    createdByName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    creatorRole: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    isAdminFile: {
+      type: Boolean,
+      default: false,
       index: true,
     },
   },

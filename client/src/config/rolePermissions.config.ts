@@ -186,15 +186,17 @@ export const ROLE_PERMISSION_MODULES: PermissionModuleConfig[] = [
   },
   {
     id: 'library_mgmt',
-    name: 'LIBRARY MGMT',
+    name: 'PLANNINGS & LIBRARY MGMT',
     iconName: 'BookOpen',
     entryPoint: {
       key: 'Admin/LibraryMgmt',
-      title: 'Library Mgmt Access',
+      title: 'Plannings / Library Access',
       route: 'Admin/LibraryMgmt',
-      description: 'Module Entry Point',
+      description: 'Module Entry Point for Plannings & Library',
     },
     items: [
+      { key: '/planning/quantity-master', title: 'Quantity Master', route: '/planning/quantity-master' },
+      { key: '/sor', title: 'Schedule of Rates (SOR)', route: '/sor' },
       { key: 'Library/Party', title: 'Library Setup', route: 'Library/Party' },
       { key: 'Procurement/Dashboard', title: 'PO', route: 'Procurement/Dashboard' },
       { key: 'Boq/Projects', title: 'Projects', route: 'Boq/Projects' },

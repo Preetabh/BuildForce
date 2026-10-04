@@ -121,7 +121,7 @@ export const leadService = {
   // Convert to registered client
   convertToClient: async (
     id: string,
-    clientData: any
+    clientData: any 
   ): Promise<{ lead: LeadItem; client: ClientRecord }> => {
     const res = await api.post(`/leads/${id}/convert-client`, clientData);
     return res.data.data;
@@ -132,7 +132,7 @@ export const leadService = {
     const res = await api.get('/leads/clients/all', { params });
     return res.data.data;
   },
-
+  
   getClientById: async (id: string): Promise<ClientRecord> => {
     const res = await api.get(`/leads/clients/${id}`);
     return res.data.data;

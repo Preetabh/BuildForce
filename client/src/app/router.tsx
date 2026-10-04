@@ -110,7 +110,7 @@ export const AppRouter: React.FC = () => {
           <Route
             path="/sor"
             element={
-              <PermissionRoute permission="Admin/LibraryMgmt">
+              <PermissionRoute permission={['Admin/LibraryMgmt', '/sor', 'Schedule of Rates (SOR)']}>
                 <RateMaster />
               </PermissionRoute>
             }
@@ -124,7 +124,7 @@ export const AppRouter: React.FC = () => {
           <Route
             path="/planning/quantity-master"
             element={
-              <PermissionRoute permission="Admin/LibraryMgmt">
+              <PermissionRoute permission={['Admin/LibraryMgmt', '/planning/quantity-master', 'Quantity Master']}>
                 <QuantityMaster />
               </PermissionRoute>
             }
@@ -132,7 +132,7 @@ export const AppRouter: React.FC = () => {
           <Route
             path="/quantity-master"
             element={
-              <PermissionRoute permission="Admin/LibraryMgmt">
+              <PermissionRoute permission={['Admin/LibraryMgmt', '/planning/quantity-master', 'Quantity Master']}>
                 <QuantityMaster />
               </PermissionRoute>
             }

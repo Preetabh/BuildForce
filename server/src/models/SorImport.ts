@@ -68,6 +68,9 @@ export interface ISorImport extends Document {
   extractedRows: IExtractedRow[];
   importErrors: { page?: number; row?: number; message: string }[];
   createdBy: Types.ObjectId;
+  createdByName?: string;
+  creatorRole?: string;
+  isAdminFile?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -215,6 +218,21 @@ const sorImportSchema = new Schema<ISorImport>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+    },
+    createdByName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    creatorRole: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    isAdminFile: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
   },
   {

@@ -1375,7 +1375,9 @@ export class QuantityMasterPdfService {
     userId: string,
     type: MasterType,
     items: any[],
-    fileName?: string
+    fileName?: string,
+    userRole?: string,
+    userName?: string
   ): Promise<{
     success: boolean;
     insertedCount: number;
@@ -1602,6 +1604,9 @@ export class QuantityMasterPdfService {
         extractedRows: [],
         importErrors: [],
         createdBy: new Types.ObjectId(userId),
+        createdByName: userName || '',
+        creatorRole: userRole || '',
+        isAdminFile: ['ADMIN', 'MASTER_ADMIN', 'SUPER_ADMIN', 'MASTER ADMIN'].includes((userRole || '').trim().toUpperCase()),
       });
     } catch (logErr) {
       console.warn('[QuantityMasterPdfService] Could not log import history:', logErr);

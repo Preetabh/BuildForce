@@ -78,6 +78,27 @@ export function usePermissions() {
       return true;
     }
 
+    // 4. Plannings / Library fallback: if user has general Admin/LibraryMgmt permission, allow sub-items
+    if (
+      keyOrRoute === '/planning/quantity-master' ||
+      keyOrRoute === 'Quantity Master' ||
+      keyOrRoute === '/sor' ||
+      keyOrRoute === 'Schedule of Rates (SOR)'
+    ) {
+      const parentOverrides = (user as any)?.permissions?.['Admin/LibraryMgmt'];
+      if (typeof parentOverrides === 'boolean') {
+        return parentOverrides;
+      }
+      if (activeRoleDoc && Array.isArray(activeRoleDoc.permissions)) {
+        const parentMatch = (activeRoleDoc.permissions as any[]).find(
+          (p: any) => p.menuRoute === 'Admin/LibraryMgmt' || p.menuTitle === 'Library Mgmt Access'
+        );
+        if (parentMatch) {
+          return Boolean(parentMatch.allow);
+        }
+      }
+    }
+
     // For any other standard role, default to false if not granted
     return false;
   };
@@ -88,20 +109,26 @@ export function usePermissions() {
   const isModuleAllowed = (moduleId: string): boolean => {
     if (isMasterAdmin) return true;
 
-    const moduleMapping: Record<string, string> = {
-      plannings: 'Admin/LibraryMgmt',
-      lead_management: 'Admin/Management',
-      service_catalog: 'Admin/Service',
-      all_teams: 'Admin/MyTeamsAccess',
-      site_enginner: 'Admin/SiteEngineersSection',
-      vendor_management: 'Admin/Venders',
-      project_management: 'Admin/ReportAnalytic',
-      settings: 'Admin/Settings',
+    const moduleMapping: Record<string, string[]> = {
+      plannings: [
+        'Admin/LibraryMgmt',
+        '/planning/quantity-master',
+        'Quantity Master',
+        '/sor',
+        'Schedule of Rates (SOR)',
+      ],
+      lead_management: ['Admin/Management'],
+      service_catalog: ['Admin/Service'],
+      all_teams: ['Admin/MyTeamsAccess'],
+      site_enginner: ['Admin/SiteEngineersSection'],
+      vendor_management: ['Admin/Venders'],
+      project_management: ['Admin/ReportAnalytic'],
+      settings: ['Admin/Settings'],
     };
 
-    const entryPoint = moduleMapping[moduleId];
-    if (entryPoint) {
-      return canAccess(entryPoint);
+    const entryPoints = moduleMapping[moduleId];
+    if (entryPoints) {
+      return entryPoints.some((ep) => canAccess(ep));
     }
 
     return true;

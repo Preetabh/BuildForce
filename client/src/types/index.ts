@@ -254,6 +254,10 @@ export interface SorImport {
   processingPercent?: number;
   currentBatch?: number;
   totalBatches?: number;
+  createdBy?: string;
+  createdByName?: string;
+  creatorRole?: string;
+  isAdminFile?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -675,6 +679,10 @@ export interface MasterRateList {
   materialRates: RateOverrideItem[];
   labourRates: RateOverrideItem[];
   machineryRates: RateOverrideItem[];
+  createdBy?: string;
+  createdByName?: string;
+  creatorRole?: string;
+  isAdminFile?: boolean;
   createdAt: string;
   updatedAt: string;
 }

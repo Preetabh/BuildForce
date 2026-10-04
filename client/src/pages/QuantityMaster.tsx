@@ -36,10 +36,13 @@ import {
   RotateCcw,
   Tag,
   Calendar,
+  Lock,
 } from 'lucide-react';
 import api from '../services/api';
 import { Header } from '../components/layout/Header';
 import { Button } from '../components/common/Button';
+import { usePermissions } from '../hooks/usePermissions';
+import { useAuth } from '../context/AuthContext';
 import {
   MasterMaterial,
   MasterLabour,
@@ -229,6 +232,8 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
 export const QuantityMaster: React.FC = () => {
   const { setSidebarOpen } = useOutletContext<OutletContextType>();
   const queryClient = useQueryClient();
+  const { isMasterAdmin } = usePermissions();
+  const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TabType>('materials');
   const [formulaSubTab, setFormulaSubTab] = useState<'all' | 'materials' | 'manpower' | 'machinery'>('all');
@@ -679,6 +684,21 @@ export const QuantityMaster: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['qm-rate-lists'] });
       showToast('Rate list deleted');
+    },
+    onError: (err: any) => {
+      alert(err?.response?.data?.message || 'Failed to delete rate list');
+    },
+  });
+
+  // Import History Delete Mutation
+  const deleteImportMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/quantity-master/import-history/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['qm-import-history'] });
+      showToast('Import record removed');
+    },
+    onError: (err: any) => {
+      alert(err?.response?.data?.message || 'Failed to delete import record');
     },
   });
 
@@ -1894,68 +1914,91 @@ export const QuantityMaster: React.FC = () => {
                         </td>
                       </tr>
                     ) : (
-                      rateListsData.map((rl, idx) => (
-                        <tr key={rl._id} className="hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3.5 px-3.5 text-center text-slate-500 font-mono text-xs">
-                            {idx + 1}
-                          </td>
-                          <td className="py-3.5 px-4 text-white font-medium">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-white">{rl.name}</span>
-                              {rl.isDefault && (
-                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                                  Default
-                                </span>
+                      rateListsData.map((rl, idx) => {
+                        const isFileAdmin = rl.isAdminFile || !rl.createdBy;
+                        const canDelete = isMasterAdmin || (!isFileAdmin && rl.createdBy === user?._id);
+
+                        return (
+                          <tr key={rl._id} className="hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3.5 px-3.5 text-center text-slate-500 font-mono text-xs">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3.5 px-4 text-white font-medium">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-white">{rl.name}</span>
+                                {rl.isDefault && (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                    Default
+                                  </span>
+                                )}
+                                {isFileAdmin ? (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    Admin Master
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                    By: {rl.createdByName || 'My Upload'}
+                                  </span>
+                                )}
+                              </div>
+                              {rl.description && (
+                                <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{rl.description}</p>
                               )}
-                            </div>
-                            {rl.description && (
-                              <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{rl.description}</p>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">
-                                🧱 {rl.coverage?.materials || '0/0'} MATERIAL
-                              </span>
-                              <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">
-                                👷 {rl.coverage?.labour || '0/0'} MANPOWER
-                              </span>
-                              <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">
-                                🚜 {rl.coverage?.machinery || '0/0'} MACHINERY
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4 text-center text-slate-400 text-xs">
-                            {rl.createdAt ? new Date(rl.createdAt).toLocaleDateString() : '—'}
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button
-                                onClick={() => {
-                                  setRateListToEdit(rl);
-                                  setIsRateListModalOpen(true);
-                                }}
-                                title="Edit Rates"
-                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 text-xs font-semibold flex items-center gap-1 border border-slate-700 transition-colors"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                                <span>Edit Rates</span>
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (window.confirm(`Delete rate list "${rl.name}"?`)) {
-                                    deleteRateListMutation.mutate(rl._id);
-                                  }
-                                }}
-                                title="Delete"
-                                className="p-1 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">
+                                  🧱 {rl.coverage?.materials || '0/0'} MATERIAL
+                                </span>
+                                <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">
+                                  👷 {rl.coverage?.labour || '0/0'} MANPOWER
+                                </span>
+                                <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">
+                                  🚜 {rl.coverage?.machinery || '0/0'} MACHINERY
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-center text-slate-400 text-xs">
+                              {rl.createdAt ? new Date(rl.createdAt).toLocaleDateString() : '—'}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => {
+                                    setRateListToEdit(rl);
+                                    setIsRateListModalOpen(true);
+                                  }}
+                                  title="Edit Rates"
+                                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 text-xs font-semibold flex items-center gap-1 border border-slate-700 transition-colors"
+                                >
+                                  <Edit2 className="w-3 h-3" />
+                                  <span>Edit Rates</span>
+                                </button>
+                                {canDelete ? (
+                                  <button
+                                    onClick={() => {
+                                      if (window.confirm(`Delete rate list "${rl.name}"?`)) {
+                                        deleteRateListMutation.mutate(rl._id);
+                                      }
+                                    }}
+                                    title="Delete"
+                                    className="p-1 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                ) : (
+                                  <span
+                                    title="Admin file: You do not have permission to delete files uploaded by Admin"
+                                    className="p-1 rounded-lg text-slate-600 cursor-not-allowed inline-flex items-center"
+                                  >
+                                    <Lock className="w-3.5 h-3.5" />
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
