@@ -63,6 +63,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         companyId: company._id,
+        permissions: user.permissions || {},
       },
       company: {
         id: company._id,
@@ -102,6 +103,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         companyId: company._id,
+        permissions: user.permissions || {},
       },
       company: {
         id: company._id,
@@ -125,6 +127,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         companyId: user.companyId,
+        permissions: user.permissions || {},
       },
       company: company
         ? {

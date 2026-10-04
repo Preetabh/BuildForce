@@ -343,6 +343,17 @@ export class RbacService {
     }
 
     await role.save();
+
+    // Propagate updated permissions to all users assigned to this role
+    const rolePermMap: Record<string, boolean> = {};
+    for (const p of role.permissions) {
+      rolePermMap[p.menuRoute] = p.allow;
+    }
+    await User.updateMany(
+      { companyId, $or: [{ role: role.code }, { role: role.name }] },
+      { $set: { permissions: rolePermMap } }
+    );
+
     return role;
   }
 
@@ -372,6 +383,22 @@ export class RbacService {
     data: { role?: string; permissions?: Record<string, boolean>; isActive?: boolean }
   ) {
     const companyId = this.toObjectId(companyIdInput);
+
+    // If role changed and explicit permissions override not provided, sync from new role
+    if (data.role && !data.permissions) {
+      const roleDoc = await RbacRole.findOne({
+        companyId,
+        $or: [{ code: data.role }, { name: data.role }],
+      });
+      if (roleDoc && roleDoc.permissions) {
+        const rolePerms: Record<string, boolean> = {};
+        for (const p of roleDoc.permissions) {
+          rolePerms[p.menuRoute] = p.allow;
+        }
+        data.permissions = rolePerms;
+      }
+    }
+
     const user = await User.findOneAndUpdate(
       { _id: userId, companyId },
       { $set: data },
@@ -379,6 +406,24 @@ export class RbacService {
     ).select('-passwordHash');
 
     if (!user) throw new AppError('User not found', 404);
+
+    // If updated to SITE_ENGINEER, ensure SiteEngineer record exists
+    if (data.role === 'SITE_ENGINEER' || data.role === 'Site Engineer') {
+      const existingSe = await SiteEngineer.findOne({ loginId: user.email.toLowerCase().trim(), companyId });
+      if (!existingSe) {
+        await SiteEngineer.create({
+          name: user.name,
+          loginId: user.email,
+          mobile: user.mobile || '-',
+          expertise: 'Common',
+          projectsCount: 0,
+          walletBalance: 0,
+          status: user.isActive ? 'Active' : 'Inactive',
+          companyId,
+        });
+      }
+    }
+
     return user;
   }
 
@@ -408,17 +453,33 @@ export class RbacService {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(data.password || 'password123', salt);
 
+    const targetRole = data.role || 'MASTER_ADMIN';
+
+    // Fetch the role's current permissions so the new user receives them immediately
+    const roleDoc = await RbacRole.findOne({
+      companyId,
+      $or: [{ code: targetRole }, { name: targetRole }],
+    });
+
+    const initialPermissions: Record<string, boolean> = {};
+    if (roleDoc && roleDoc.permissions) {
+      for (const p of roleDoc.permissions) {
+        initialPermissions[p.menuRoute] = p.allow;
+      }
+    }
+
     const user = await User.create({
       name: data.name.trim(),
       email: data.email.toLowerCase().trim(),
       passwordHash,
-      role: data.role || 'ADMIN',
+      role: targetRole,
       mobile: data.mobile || '',
       companyId,
+      permissions: initialPermissions,
       isActive: data.isActive !== undefined ? data.isActive : true,
     });
 
-    if (data.role === 'SITE_ENGINEER') {
+    if (targetRole === 'SITE_ENGINEER' || targetRole === 'Site Engineer') {
       await SiteEngineer.create({
         name: user.name,
         loginId: user.email,

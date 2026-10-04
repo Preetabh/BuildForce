@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
@@ -42,6 +42,23 @@ export const RoleVsUser: React.FC = () => {
     queryKey: ['rbacRoles'],
     queryFn: rbacService.getRoles,
   });
+
+  const availableRoles = useMemo(() => {
+    if (roles && roles.length > 0) return roles;
+    return [
+      { _id: '1', name: 'Master Admin', code: 'MASTER_ADMIN' },
+      { _id: '2', name: 'Counsellor', code: 'COUNSELLOR' },
+      { _id: '3', name: 'Accountant', code: 'ACCOUNTANT' },
+      { _id: '4', name: 'Employee', code: 'EMPLOYEE' },
+      { _id: '5', name: 'Developer', code: 'DEVELOPER' },
+      { _id: '6', name: 'Site Engineer', code: 'SITE_ENGINEER' },
+      { _id: '7', name: 'Interior Designer', code: 'INTERIOR_DESIGNER' },
+      { _id: '8', name: 'Project Manager', code: 'PROJECT_MANAGER' },
+      { _id: '9', name: 'Architect', code: 'ARCHITECT' },
+      { _id: '10', name: 'Estimate Engineer', code: 'ESTIMATE_ENGINEER' },
+      { _id: '11', name: 'BDM', code: 'BDM' },
+    ];
+  }, [roles]);
 
   const { data: menus = [] } = useQuery({
     queryKey: ['rbacMenus'],
@@ -180,7 +197,7 @@ export const RoleVsUser: React.FC = () => {
                       {/* Assigned Role Dropdown */}
                       <td className="py-3.5 px-4">
                         <select
-                          value={user.role}
+                          value={user.role === 'ADMIN' ? 'MASTER_ADMIN' : user.role}
                           onChange={(e) =>
                             updateRoleMutation.mutate({
                               userId: user._id,
@@ -189,8 +206,8 @@ export const RoleVsUser: React.FC = () => {
                           }
                           className="px-3 py-1.5 rounded-xl bg-[#131B2D] border border-[#232F4A] text-white text-xs font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
                         >
-                          {roles.map((r) => (
-                            <option key={r._id} value={r.code}>
+                          {availableRoles.map((r: any) => (
+                            <option key={r._id || r.code} value={r.code}>
                               {r.name}
                             </option>
                           ))}
@@ -256,6 +273,7 @@ export const RoleVsUser: React.FC = () => {
                               name: user.name,
                               email: user.email,
                               role: user.role,
+                              permissions: user.permissions,
                             });
                             navigate('/leads');
                           }}

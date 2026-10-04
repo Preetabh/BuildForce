@@ -46,6 +46,7 @@ import { rbacService } from '../../services/rbac.service';
 import { useAuth } from '../../context/AuthContext';
 import { useImpersonation } from '../../context/ImpersonationContext';
 import { cn } from '../../utils/cn';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export interface SidebarProps {
   isOpen: boolean;
@@ -62,6 +63,7 @@ interface NavSubItem {
   path: string;
   icon?: React.ElementType;
   isComingSoon?: boolean;
+  permissionKey?: string;
 }
 
 interface NavGroup {
@@ -82,7 +84,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const { viewingUser, startViewing, stopViewing, isViewing } = useImpersonation();
+  const { isModuleAllowed, canAccess, roleDisplayName, isMasterAdmin } = usePermissions();
   const location = useLocation();
+
+  const effectiveUser = isViewing && viewingUser ? viewingUser : user;
 
   const { data: teamUsers = [] } = useQuery({
     queryKey: ['rbacUsers'],
@@ -118,8 +123,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setOpenGroupId((prev) => (prev === groupId ? null : groupId));
   };
 
-  // Dedicated Navigation Sections matching user specification and screenshots
-  const navGroups: NavGroup[] = [
+  // Master Navigation Groups list with permission mapping
+  const allNavGroups: NavGroup[] = [
     {
       id: 'plannings',
       label: 'PLANNINGS',
@@ -136,12 +141,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'LEAD MANAGEMENT',
       icon: Users,
       items: [
-        { label: 'Leads', path: '/leads', icon: UserPlus, isComingSoon: false },
-        { label: 'Client', path: '/leads/clients', icon: Contact, isComingSoon: false },
-        { label: 'Payment', path: '/leads/payments', icon: CreditCard, isComingSoon: false },
-        { label: 'Pay Amount', path: '/leads/pay-amount', icon: Coins, isComingSoon: false },
-        { label: 'Reference Partners', path: '/leads/partners', icon: Handshake, isComingSoon: false },
-        { label: 'Commission Report', path: '/leads/commission-reports', icon: FileSpreadsheet, isComingSoon: false },
+        { label: 'Leads', path: '/leads', icon: UserPlus, isComingSoon: false, permissionKey: 'Admin/Enquiry' },
+        { label: 'Client', path: '/leads/clients', icon: Contact, isComingSoon: false, permissionKey: 'Admin/Clients' },
+        { label: 'Payment', path: '/leads/payments', icon: CreditCard, isComingSoon: false, permissionKey: 'Admin/PaymentHistory' },
+        { label: 'Pay Amount', path: '/leads/pay-amount', icon: Coins, isComingSoon: false, permissionKey: 'Admin/CollectPayment' },
+        { label: 'Reference Partners', path: '/leads/partners', icon: Handshake, isComingSoon: false, permissionKey: 'Admin/ReferencePartners' },
+        { label: 'Commission Report', path: '/leads/commission-reports', icon: FileSpreadsheet, isComingSoon: false, permissionKey: 'Admin/CommissionReport' },
       ],
     },
     {
@@ -149,8 +154,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'SERVICE',
       icon: Briefcase,
       items: [
-        { label: 'Services', path: '/services', icon: Layers, isComingSoon: false },
-        { label: 'Module', path: '/services/modules', icon: Box, isComingSoon: true },
+        { label: 'Services', path: '/services', icon: Layers, isComingSoon: false, permissionKey: 'Admin/ManageServices' },
+        { label: 'Module', path: '/services/modules', icon: Box, isComingSoon: true, permissionKey: 'Admin/Modules' },
       ],
     },
     {
@@ -165,7 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: HardHat,
       items: [
         { label: 'Detailed Site Engineers', path: '/admin/site-engineers', icon: Users, isComingSoon: false },
-        { label: 'AddSiteEnginner', path: '/admin/add-site-engineer', icon: Compass, isComingSoon: false },
+        { label: 'AddSiteEnginner', path: '/admin/add-site-engineer', icon: Compass, isComingSoon: false, permissionKey: 'Admin/ManageSiteEngineers' },
       ],
     },
     {
@@ -190,6 +195,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
   ];
+
+  // Dynamically filter allowed navigation groups and items based on role permissions
+  const navGroups = allNavGroups
+    .filter((group) => isModuleAllowed(group.id))
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (!item.permissionKey) return true;
+        return canAccess(item.permissionKey);
+      }),
+    }));
 
   // Auto-expand group that contains current path on initial mount or route change
   useEffect(() => {
@@ -652,146 +668,156 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </NavLink>
 
             {/* Expandable Settings Accordion matching Screenshot 4 */}
-            <div className="relative rounded-lg">
-              <button
-                type="button"
-                onClick={() => setIsSettingsOpen((prev) => !prev)}
-                title={isCompact ? 'Settings' : undefined}
-                className={cn(
-                  'w-full flex items-center rounded-lg font-semibold tracking-wider text-[11px] transition-all duration-150',
-                  isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
-                  isSettingsOpen && !isCompact
-                    ? 'text-amber-400 bg-amber-500/10'
-                    : location.pathname.startsWith('/settings') ||
-                      location.pathname.startsWith('/RBAC') ||
-                      location.pathname.startsWith('/Admin/Manage')
-                    ? 'text-amber-300 bg-slate-800/50'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
+            {isModuleAllowed('settings') && (
+              <div className="relative rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen((prev) => !prev)}
+                  title={isCompact ? 'Settings' : undefined}
+                  className={cn(
+                    'w-full flex items-center rounded-lg font-semibold tracking-wider text-[11px] transition-all duration-150',
+                    isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
+                    isSettingsOpen && !isCompact
+                      ? 'text-amber-400 bg-amber-500/10'
+                      : location.pathname.startsWith('/settings') ||
+                        location.pathname.startsWith('/RBAC') ||
+                        location.pathname.startsWith('/Admin/Manage')
+                      ? 'text-amber-300 bg-slate-800/50'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
+                  )}
+                >
+                  <div className={cn('flex items-center min-w-0', !isCompact && 'gap-2.5')}>
+                    <Settings
+                      className={cn(
+                        'w-4 h-4 shrink-0 transition-colors',
+                        isSettingsOpen ? 'text-amber-400' : 'text-slate-400'
+                      )}
+                    />
+                    {!isCompact && <span className="truncate">Settings</span>}
+                  </div>
+                  {!isCompact && (
+                    isSettingsOpen ? (
+                      <ChevronDown className="w-3.5 h-3.5 text-amber-400 transition-transform shrink-0 ml-1" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-500 transition-transform shrink-0 ml-1" />
+                    )
+                  )}
+                </button>
+
+                {/* Settings Sub-Items */}
+                {!isCompact && isSettingsOpen && (
+                  <div className="pl-4 pr-1 py-1 space-y-0.5 border-l border-amber-500/30 ml-4 my-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                    {canAccess('RBAC/ManageMenus') && (
+                      <NavLink
+                        to="/settings/manage-menus"
+                        onClick={() => onClose()}
+                        className={({ isActive }) =>
+                          cn(
+                            'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
+                            isActive
+                              ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
+                              : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                          )
+                        }
+                      >
+                        {({ isActive }) => (
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ListChecks
+                              className={cn(
+                                'w-3.5 h-3.5 shrink-0 transition-colors',
+                                isActive ? 'text-slate-950' : 'text-blue-400'
+                              )}
+                            />
+                            <span className="truncate">Manage Menus</span>
+                          </div>
+                        )}
+                      </NavLink>
+                    )}
+
+                    {canAccess('RBAC/ManageRoles') && (
+                      <NavLink
+                        to="/settings/manage-roles"
+                        onClick={() => onClose()}
+                        className={({ isActive }) =>
+                          cn(
+                            'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
+                            isActive
+                              ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
+                              : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                          )
+                        }
+                      >
+                        {({ isActive }) => (
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ShieldCheck
+                              className={cn(
+                                'w-3.5 h-3.5 shrink-0 transition-colors',
+                                isActive ? 'text-slate-950' : 'text-blue-400'
+                              )}
+                            />
+                            <span className="truncate">Manage Roles</span>
+                          </div>
+                        )}
+                      </NavLink>
+                    )}
+
+                    {canAccess('RBAC/UserOverrides') && (
+                      <NavLink
+                        to="/settings/role-vs-user"
+                        onClick={() => onClose()}
+                        className={({ isActive }) =>
+                          cn(
+                            'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
+                            isActive
+                              ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
+                              : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                          )
+                        }
+                      >
+                        {({ isActive }) => (
+                          <div className="flex items-center gap-2 min-w-0">
+                            <UserCheck
+                              className={cn(
+                                'w-3.5 h-3.5 shrink-0 transition-colors',
+                                isActive ? 'text-slate-950' : 'text-blue-400'
+                              )}
+                            />
+                            <span className="truncate">Role Vs User</span>
+                          </div>
+                        )}
+                      </NavLink>
+                    )}
+
+                    {canAccess('Home/ManageEmployees') && (
+                      <NavLink
+                        to="/settings/users"
+                        onClick={() => onClose()}
+                        className={({ isActive }) =>
+                          cn(
+                            'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
+                            isActive
+                              ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
+                              : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                          )
+                        }
+                      >
+                        {({ isActive }) => (
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Users
+                              className={cn(
+                                'w-3.5 h-3.5 shrink-0 transition-colors',
+                                isActive ? 'text-slate-950' : 'text-blue-400'
+                              )}
+                            />
+                            <span className="truncate">User</span>
+                          </div>
+                        )}
+                      </NavLink>
+                    )}
+                  </div>
                 )}
-              >
-                <div className={cn('flex items-center min-w-0', !isCompact && 'gap-2.5')}>
-                  <Settings
-                    className={cn(
-                      'w-4 h-4 shrink-0 transition-colors',
-                      isSettingsOpen ? 'text-amber-400' : 'text-slate-400'
-                    )}
-                  />
-                  {!isCompact && <span className="truncate">Settings</span>}
-                </div>
-                {!isCompact && (
-                  isSettingsOpen ? (
-                    <ChevronDown className="w-3.5 h-3.5 text-amber-400 transition-transform shrink-0 ml-1" />
-                  ) : (
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 transition-transform shrink-0 ml-1" />
-                  )
-                )}
-              </button>
-
-              {/* Settings Sub-Items */}
-              {!isCompact && isSettingsOpen && (
-                <div className="pl-4 pr-1 py-1 space-y-0.5 border-l border-amber-500/30 ml-4 my-1 animate-in fade-in slide-in-from-top-1 duration-150">
-                  <NavLink
-                    to="/settings/manage-menus"
-                    onClick={() => onClose()}
-                    className={({ isActive }) =>
-                      cn(
-                        'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
-                        isActive
-                          ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
-                          : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                      )
-                    }
-                  >
-                    {({ isActive }) => (
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ListChecks
-                          className={cn(
-                            'w-3.5 h-3.5 shrink-0 transition-colors',
-                            isActive ? 'text-slate-950' : 'text-blue-400'
-                          )}
-                        />
-                        <span className="truncate">Manage Menus</span>
-                      </div>
-                    )}
-                  </NavLink>
-
-                  <NavLink
-                    to="/settings/manage-roles"
-                    onClick={() => onClose()}
-                    className={({ isActive }) =>
-                      cn(
-                        'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
-                        isActive
-                          ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
-                          : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                      )
-                    }
-                  >
-                    {({ isActive }) => (
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ShieldCheck
-                          className={cn(
-                            'w-3.5 h-3.5 shrink-0 transition-colors',
-                            isActive ? 'text-slate-950' : 'text-blue-400'
-                          )}
-                        />
-                        <span className="truncate">Manage Roles</span>
-                      </div>
-                    )}
-                  </NavLink>
-
-                  <NavLink
-                    to="/settings/role-vs-user"
-                    onClick={() => onClose()}
-                    className={({ isActive }) =>
-                      cn(
-                        'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
-                        isActive
-                          ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
-                          : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                      )
-                    }
-                  >
-                    {({ isActive }) => (
-                      <div className="flex items-center gap-2 min-w-0">
-                        <UserCheck
-                          className={cn(
-                            'w-3.5 h-3.5 shrink-0 transition-colors',
-                            isActive ? 'text-slate-950' : 'text-blue-400'
-                          )}
-                        />
-                        <span className="truncate">Role Vs User</span>
-                      </div>
-                    )}
-                  </NavLink>
-
-                  <NavLink
-                    to="/settings/users"
-                    onClick={() => onClose()}
-                    className={({ isActive }) =>
-                      cn(
-                        'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
-                        isActive
-                          ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
-                          : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                      )
-                    }
-                  >
-                    {({ isActive }) => (
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Users
-                          className={cn(
-                            'w-3.5 h-3.5 shrink-0 transition-colors',
-                            isActive ? 'text-slate-950' : 'text-blue-400'
-                          )}
-                        />
-                        <span className="truncate">User</span>
-                      </div>
-                    )}
-                  </NavLink>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -801,10 +827,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             /* Minimized Profile Footer */
             <div className="flex flex-col items-center gap-2">
               <div
-                title={user?.name || user?.email || 'User'}
+                title={`${effectiveUser?.name || 'User'} (${roleDisplayName})`}
                 className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-md cursor-pointer hover:ring-2 hover:ring-amber-400 transition-all"
               >
-                {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+                {(effectiveUser?.name || effectiveUser?.email || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="flex flex-col items-center gap-1">
                 <button
@@ -821,15 +847,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-500 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-md">
-                  {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+                  {(effectiveUser?.name || effectiveUser?.email || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-slate-200 truncate">
-                    {user?.name || (user?.email ? user.email.split('@')[0] : 'User')}
+                  <p className="text-xs font-semibold text-slate-200 truncate flex items-center gap-1.5">
+                    <span>{effectiveUser?.name || (effectiveUser?.email ? effectiveUser.email.split('@')[0] : 'User')}</span>
+                    {isViewing && (
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold shrink-0">
+                        Viewing
+                      </span>
+                    )}
                   </p>
                   <div className="flex items-center gap-1.5">
-                    <p className="text-[10px] text-slate-400 truncate max-w-[90px]">
-                      {user?.email || ''}
+                    <p className="text-[10px] text-amber-400/90 font-medium truncate max-w-[110px]">
+                      {roleDisplayName}
                     </p>
                     <span className="text-[9px] text-slate-500 font-mono shrink-0">
                       v1.0

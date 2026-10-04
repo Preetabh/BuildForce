@@ -6,6 +6,7 @@ export interface ViewingUser {
   email: string;
   role?: string;
   mobile?: string;
+  permissions?: Record<string, boolean>;
 }
 
 interface ImpersonationContextType {

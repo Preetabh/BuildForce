@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { AppLayout } from '../components/layout/AppLayout';
 import { Login } from '../pages/Login';
 import { Register } from '../pages/Register';
@@ -13,6 +14,7 @@ import { ComingSoonModule } from '../pages/ComingSoonModule';
 import { Help } from '../pages/Help';
 import { Settings } from '../pages/Settings';
 import { ClassyAppLoader } from '../components/common/ClassyAppLoader';
+import { ForbiddenAccessPage } from '../pages/ForbiddenAccessPage';
 import { LeadManagement } from '../pages/leads/LeadManagement';
 import { ClientManagement } from '../pages/leads/ClientManagement';
 import { PaymentManagement } from '../pages/leads/PaymentManagement';
@@ -36,6 +38,24 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return <>{children}</>;
+};
+
+interface PermissionRouteProps {
+  permission: string | string[];
+  children: React.ReactNode;
+}
+
+const PermissionRoute: React.FC<PermissionRouteProps> = ({ permission, children }) => {
+  const { canAccess, isMasterAdmin } = usePermissions();
+
+  const perms = Array.isArray(permission) ? permission : [permission];
+  const hasAccess = isMasterAdmin || perms.some((p) => canAccess(p));
+
+  if (!hasAccess) {
+    return <ForbiddenAccessPage permissionRequired={perms.join(' or ')} />;
   }
 
   return <>{children}</>;
@@ -87,15 +107,36 @@ export const AppRouter: React.FC = () => {
         >
           {/* Functional Core */}
           <Route path="/" element={<Home />} />
-          <Route path="/sor" element={<RateMaster />} />
+          <Route
+            path="/sor"
+            element={
+              <PermissionRoute permission="Admin/LibraryMgmt">
+                <RateMaster />
+              </PermissionRoute>
+            }
+          />
           <Route path="/rate-master" element={<Navigate to="/sor" replace />} />
           <Route path="/projects/:projectId" element={<ProjectWorkspace />} />
           <Route path="/recycle-bin" element={<RecycleBin />} />
 
           {/* PLANNING */}
           <Route path="/planning" element={<ComingSoonModule />} />
-          <Route path="/planning/quantity-master" element={<QuantityMaster />} />
-          <Route path="/quantity-master" element={<QuantityMaster />} />
+          <Route
+            path="/planning/quantity-master"
+            element={
+              <PermissionRoute permission="Admin/LibraryMgmt">
+                <QuantityMaster />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/quantity-master"
+            element={
+              <PermissionRoute permission="Admin/LibraryMgmt">
+                <QuantityMaster />
+              </PermissionRoute>
+            }
+          />
           <Route path="/planning/qc-master" element={<ComingSoonModule />} />
 
           {/* EXECUTION */}
@@ -118,26 +159,152 @@ export const AppRouter: React.FC = () => {
           <Route path="/billing/escalation" element={<ComingSoonModule />} />
 
           {/* LEAD MANAGEMENT & CLIENT PORTAL */}
-          <Route path="/leads" element={<LeadManagement />} />
-          <Route path="/lead-management" element={<LeadManagement />} />
-          <Route path="/leads/clients" element={<ClientManagement />} />
-          <Route path="/admin/clients" element={<ClientManagement />} />
-          <Route path="/Admin/Clients" element={<ClientManagement />} />
-          <Route path="/leads/payments" element={<PaymentManagement />} />
-          <Route path="/leads/pay-amount" element={<PayAmountPage />} />
-          <Route path="/leads/partners" element={<ReferencePartners />} />
-          <Route path="/leads/associate-partners" element={<ReferencePartners />} />
-          <Route path="/admin/associate-partners" element={<ReferencePartners />} />
-          <Route path="/Admin/AssociatePartners" element={<ReferencePartners />} />
-          <Route path="/leads/commission-reports" element={<CommissionReport />} />
+          <Route
+            path="/leads"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/Enquiry']}>
+                <LeadManagement />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/lead-management"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/Enquiry']}>
+                <LeadManagement />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/leads/clients"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/Clients']}>
+                <ClientManagement />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/clients"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/Clients']}>
+                <ClientManagement />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/Admin/Clients"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/Clients']}>
+                <ClientManagement />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/leads/payments"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/PaymentHistory']}>
+                <PaymentManagement />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/leads/pay-amount"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/CollectPayment']}>
+                <PayAmountPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/leads/partners"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/ReferencePartners']}>
+                <ReferencePartners />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/leads/associate-partners"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/ReferencePartners']}>
+                <ReferencePartners />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/associate-partners"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/ReferencePartners']}>
+                <ReferencePartners />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/Admin/AssociatePartners"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/ReferencePartners']}>
+                <ReferencePartners />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/leads/commission-reports"
+            element={
+              <PermissionRoute permission={['Admin/Management', 'Admin/CommissionReport']}>
+                <CommissionReport />
+              </PermissionRoute>
+            }
+          />
 
           {/* SERVICE CATALOG & MAIN SERVICES */}
-          <Route path="/services" element={<ServiceCatalogPage />} />
-          <Route path="/service/services" element={<ServiceCatalogPage />} />
-          <Route path="/admin/service-catalog" element={<ServiceCatalogPage />} />
-          <Route path="/admin/services" element={<ServiceCatalogPage />} />
-          <Route path="/services/modules" element={<ComingSoonModule />} />
-          <Route path="/service/modules" element={<ComingSoonModule />} />
+          <Route
+            path="/services"
+            element={
+              <PermissionRoute permission={['Admin/Service', 'Admin/ManageServices']}>
+                <ServiceCatalogPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/service/services"
+            element={
+              <PermissionRoute permission={['Admin/Service', 'Admin/ManageServices']}>
+                <ServiceCatalogPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/service-catalog"
+            element={
+              <PermissionRoute permission={['Admin/Service', 'Admin/ManageServices']}>
+                <ServiceCatalogPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/services"
+            element={
+              <PermissionRoute permission={['Admin/Service', 'Admin/ManageServices']}>
+                <ServiceCatalogPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/services/modules"
+            element={
+              <PermissionRoute permission={['Admin/Service', 'Admin/Modules']}>
+                <ComingSoonModule />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/service/modules"
+            element={
+              <PermissionRoute permission={['Admin/Service', 'Admin/Modules']}>
+                <ComingSoonModule />
+              </PermissionRoute>
+            }
+          />
 
           {/* VENDOR MANAGEMENT */}
           <Route path="/vendors" element={<ComingSoonModule />} />
@@ -175,34 +342,174 @@ export const AppRouter: React.FC = () => {
           <Route path="/hse/safety" element={<ComingSoonModule />} />
 
           {/* SITE ENGINEERS & FIELD OPERATIONS */}
-          <Route path="/admin/site-engineers" element={<DetailedSiteEngineers />} />
-          <Route path="/Admin/ManageSiteEngineers" element={<DetailedSiteEngineers />} />
-          <Route path="/admin/add-site-engineer" element={<DetailedSiteEngineers />} />
-          <Route path="/Admin/AddSiteEngineer" element={<DetailedSiteEngineers />} />
+          <Route
+            path="/admin/site-engineers"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'Admin/ManageSiteEngineers']}>
+                <DetailedSiteEngineers />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/Admin/ManageSiteEngineers"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'Admin/ManageSiteEngineers']}>
+                <DetailedSiteEngineers />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/add-site-engineer"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'Admin/ManageSiteEngineers']}>
+                <DetailedSiteEngineers />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/Admin/AddSiteEngineer"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'Admin/ManageSiteEngineers']}>
+                <DetailedSiteEngineers />
+              </PermissionRoute>
+            }
+          />
 
           {/* RBAC ROLE ADMIN SECTION */}
-          <Route path="/settings/manage-menus" element={<ManageMenus />} />
-          <Route path="/RBAC/ManageMenus" element={<ManageMenus />} />
-          <Route path="/Admin/ManageMenus" element={<ManageMenus />} />
-          <Route path="/admin/manage-menus" element={<ManageMenus />} />
+          <Route
+            path="/settings/manage-menus"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/ManageMenus']}>
+                <ManageMenus />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/RBAC/ManageMenus"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/ManageMenus']}>
+                <ManageMenus />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/Admin/ManageMenus"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/ManageMenus']}>
+                <ManageMenus />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/manage-menus"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/ManageMenus']}>
+                <ManageMenus />
+              </PermissionRoute>
+            }
+          />
 
-          <Route path="/settings/manage-roles" element={<ManageRoles />} />
-          <Route path="/RBAC/ManageRoles" element={<ManageRoles />} />
-          <Route path="/Admin/ManageRoles" element={<ManageRoles />} />
-          <Route path="/admin/manage-roles" element={<ManageRoles />} />
+          <Route
+            path="/settings/manage-roles"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/ManageRoles']}>
+                <ManageRoles />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/RBAC/ManageRoles"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/ManageRoles']}>
+                <ManageRoles />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/Admin/ManageRoles"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/ManageRoles']}>
+                <ManageRoles />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/manage-roles"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/ManageRoles']}>
+                <ManageRoles />
+              </PermissionRoute>
+            }
+          />
 
-          <Route path="/settings/role-vs-user" element={<RoleVsUser />} />
-          <Route path="/RBAC/RoleVsUser" element={<RoleVsUser />} />
-          <Route path="/Admin/RoleVsUser" element={<RoleVsUser />} />
-          <Route path="/admin/role-vs-user" element={<RoleVsUser />} />
+          <Route
+            path="/settings/role-vs-user"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/UserOverrides']}>
+                <RoleVsUser />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/RBAC/RoleVsUser"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/UserOverrides']}>
+                <RoleVsUser />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/Admin/RoleVsUser"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/UserOverrides']}>
+                <RoleVsUser />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/role-vs-user"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'RBAC/UserOverrides']}>
+                <RoleVsUser />
+              </PermissionRoute>
+            }
+          />
 
-          <Route path="/settings/users" element={<UserManagement />} />
-          <Route path="/Admin/Users" element={<UserManagement />} />
-          <Route path="/admin/users" element={<UserManagement />} />
+          <Route
+            path="/settings/users"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'Home/ManageEmployees']}>
+                <UserManagement />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/Admin/Users"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'Home/ManageEmployees']}>
+                <UserManagement />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'Home/ManageEmployees']}>
+                <UserManagement />
+              </PermissionRoute>
+            }
+          />
 
           {/* Utilities */}
           <Route path="/help" element={<Help />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route
+            path="/settings"
+            element={
+              <PermissionRoute permission="Admin/Settings">
+                <Settings />
+              </PermissionRoute>
+            }
+          />
         </Route>
 
         {/* Catch-all redirect */}
@@ -211,3 +518,5 @@ export const AppRouter: React.FC = () => {
     </BrowserRouter>
   );
 };
+
+export default AppRouter;

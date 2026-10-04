@@ -1,13 +1,14 @@
 export type ProjectStatus = 'draft' | 'active' | 'on_hold' | 'completed' | 'archived';
 export type ProjectType = 'Residential' | 'Commercial' | 'Infrastructure' | 'Industrial' | 'Institutional' | 'Other';
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER';
+export type UserRole = string;
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: string;
   companyId: string;
+  permissions?: Record<string, boolean>;
 }
 
 export interface Company {

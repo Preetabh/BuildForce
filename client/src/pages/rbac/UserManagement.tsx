@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
@@ -41,14 +41,14 @@ export const UserManagement: React.FC = () => {
   // Form State for Edit
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
-  const [formRole, setFormRole] = useState('ADMIN');
+  const [formRole, setFormRole] = useState('MASTER_ADMIN');
   const [formMobile, setFormMobile] = useState('');
 
   // Form State for Add
   const [addName, setAddName] = useState('');
   const [addEmail, setAddEmail] = useState('');
   const [addPassword, setAddPassword] = useState('password123');
-  const [addRole, setAddRole] = useState('ADMIN');
+  const [addRole, setAddRole] = useState('MASTER_ADMIN');
   const [addMobile, setAddMobile] = useState('');
 
   const { data: users = [], isLoading } = useQuery({
@@ -60,6 +60,32 @@ export const UserManagement: React.FC = () => {
     queryKey: ['rbacRoles'],
     queryFn: rbacService.getRoles,
   });
+
+  const availableRoles = useMemo(() => {
+    if (roles && roles.length > 0) return roles;
+    return [
+      { _id: '1', name: 'Master Admin', code: 'MASTER_ADMIN' },
+      { _id: '2', name: 'Counsellor', code: 'COUNSELLOR' },
+      { _id: '3', name: 'Accountant', code: 'ACCOUNTANT' },
+      { _id: '4', name: 'Employee', code: 'EMPLOYEE' },
+      { _id: '5', name: 'Developer', code: 'DEVELOPER' },
+      { _id: '6', name: 'Site Engineer', code: 'SITE_ENGINEER' },
+      { _id: '7', name: 'Interior Designer', code: 'INTERIOR_DESIGNER' },
+      { _id: '8', name: 'Project Manager', code: 'PROJECT_MANAGER' },
+      { _id: '9', name: 'Architect', code: 'ARCHITECT' },
+      { _id: '10', name: 'Estimate Engineer', code: 'ESTIMATE_ENGINEER' },
+      { _id: '11', name: 'BDM', code: 'BDM' },
+    ];
+  }, [roles]);
+
+  const getRoleDisplayName = (roleStr: string) => {
+    if (!roleStr) return 'Master Admin';
+    if (roleStr === 'ADMIN') return 'Master Admin';
+    const found = availableRoles.find(
+      (r: any) => r.code.toUpperCase() === roleStr.toUpperCase() || r.name.toLowerCase() === roleStr.toLowerCase()
+    );
+    return found ? found.name : roleStr;
+  };
 
   const toggleStatusMutation = useMutation({
     mutationFn: (userId: string) => rbacService.toggleUserStatus(userId),
@@ -103,7 +129,7 @@ export const UserManagement: React.FC = () => {
     setAddName('');
     setAddEmail('');
     setAddPassword('password123');
-    setAddRole('ADMIN');
+    setAddRole('MASTER_ADMIN');
     setAddMobile('');
     setIsAddModalOpen(true);
   };
@@ -116,7 +142,7 @@ export const UserManagement: React.FC = () => {
     setEditingUser(user);
     setFormName(user.name);
     setFormEmail(user.email);
-    setFormRole(user.role);
+    setFormRole(user.role === 'ADMIN' ? 'MASTER_ADMIN' : user.role);
     setFormMobile(user.mobile || '');
     setIsModalOpen(true);
   };
@@ -260,7 +286,7 @@ export const UserManagement: React.FC = () => {
                       <td className="py-3.5 px-4">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-bold bg-[#141C2E] border border-amber-500/30 text-amber-400">
                           <Shield className="w-3 h-3 text-amber-400" />
-                          <span>{user.role}</span>
+                          <span>{getRoleDisplayName(user.role)}</span>
                         </span>
                       </td>
 
@@ -419,17 +445,17 @@ export const UserManagement: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Role</label>
+                  <label className="block text-slate-300 font-semibold mb-1">Role *</label>
                   <select
                     value={addRole}
                     onChange={(e) => setAddRole(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-[#141B2D] border border-[#232F4A] text-white focus:outline-none focus:border-amber-500"
+                    className="w-full px-3 py-2 rounded-xl bg-[#141B2D] border border-[#232F4A] text-white focus:outline-none focus:border-amber-500 font-medium"
                   >
-                    <option value="ADMIN">ADMIN</option>
-                    <option value="PROJECT_MANAGER">PROJECT_MANAGER</option>
-                    <option value="SITE_ENGINEER">SITE_ENGINEER</option>
-                    <option value="ACCOUNTANT">ACCOUNTANT</option>
-                    <option value="ESTIMATOR">ESTIMATOR</option>
+                    {availableRoles.map((r: any) => (
+                      <option key={r._id || r.code} value={r.code}>
+                        {r.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -501,12 +527,12 @@ export const UserManagement: React.FC = () => {
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">Assigned Role</label>
                 <select
-                  value={formRole}
+                  value={formRole === 'ADMIN' ? 'MASTER_ADMIN' : formRole}
                   onChange={(e) => setFormRole(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-[#141B2D] border border-[#232F4A] text-white focus:outline-none focus:border-amber-500"
+                  className="w-full px-3 py-2 rounded-xl bg-[#141B2D] border border-[#232F4A] text-white focus:outline-none focus:border-amber-500 font-medium"
                 >
-                  {roles.map((r) => (
-                    <option key={r._id} value={r.code}>
+                  {availableRoles.map((r: any) => (
+                    <option key={r._id || r.code} value={r.code}>
                       {r.name}
                     </option>
                   ))}

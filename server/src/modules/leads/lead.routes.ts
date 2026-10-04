@@ -1,10 +1,22 @@
 import { Router } from 'express';
 import { LeadController } from './lead.controller';
 import { authenticate } from '../../middleware/auth.middleware';
+import { requireApiPermission } from '../../middleware/rbac.middleware';
 
 const router = Router();
 
 router.use(authenticate);
+router.use(
+  requireApiPermission([
+    'Admin/Management',
+    'Admin/Enquiry',
+    'Admin/Clients',
+    'Admin/PaymentHistory',
+    'Admin/CollectPayment',
+    'Admin/ReferencePartners',
+    'Admin/CommissionReport',
+  ])
+);
 
 // Leads List & Stats
 router.get('/', LeadController.getLeads);
