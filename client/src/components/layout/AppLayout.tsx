@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
@@ -9,9 +9,18 @@ import { useAuth } from '../../context/AuthContext';
 import { useImpersonation } from '../../context/ImpersonationContext';
 
 export const AppLayout: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated } = useAuth();
   const { viewingUser, stopViewing, isViewing } = useImpersonation();
+
+  const handleStopViewing = () => {
+    stopViewing();
+    if (location.pathname.startsWith('/leads')) {
+      navigate('/leads', { replace: true });
+    }
+  };
 
   // Sidebar dynamic width with localStorage persistence
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -139,29 +148,32 @@ export const AppLayout: React.FC = () => {
           </div>
         </header>
 
-        {/* Impersonation Banner ("Viewing: [User Name] [x Stop Viewing]") */}
+        {/* Data Scope Filter Banner: Viewing leads/records for a specific user */}
         {isViewing && viewingUser && (
-          <div className="sticky top-0 z-40 bg-[#1A1407]/95 backdrop-blur-md border-b border-amber-500/40 px-4 py-2 flex items-center justify-between text-xs shadow-lg animate-in fade-in duration-200">
-            <div className="flex items-center gap-2.5">
+          <div className="sticky top-0 z-40 bg-[#161B28]/95 backdrop-blur-md border-b border-amber-500/40 px-4 py-2 flex items-center justify-between text-xs shadow-lg animate-in fade-in duration-200">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
               </span>
-              <span className="text-amber-300 font-bold flex items-center gap-1.5">
-                Viewing: <span className="text-white font-semibold underline underline-offset-2">{viewingUser.name}</span>
-              </span>
-              {viewingUser.email && (
-                <span className="hidden sm:inline-block text-[11px] text-amber-200/70 font-mono">
-                  ({viewingUser.email})
+              <span className="text-amber-300 font-bold flex items-center gap-1.5 flex-wrap">
+                Filtered Data for User: <span className="text-white font-extrabold underline underline-offset-2">{viewingUser.name}</span>
+                {viewingUser.role && (
+                  <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {viewingUser.role}
+                  </span>
+                )}
+                <span className="text-[11px] text-slate-400 font-normal">
+                  (Admin full permissions active)
                 </span>
-              )}
+              </span>
             </div>
             <button
               type="button"
-              onClick={stopViewing}
-              className="px-2.5 py-1 rounded text-[11px] font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-white border border-red-500/40 flex items-center gap-1 transition-all cursor-pointer shadow-sm active:scale-95"
+              onClick={handleStopViewing}
+              className="px-2.5 py-1 rounded text-[11px] font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 hover:text-white border border-amber-500/40 flex items-center gap-1 transition-all cursor-pointer shadow-sm active:scale-95 shrink-0"
             >
-              ✕ Stop Viewing
+              ✕ Clear Filter (Show All Data)
             </button>
           </div>
         )}

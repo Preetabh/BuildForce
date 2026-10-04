@@ -2,6 +2,7 @@ import api from './api';
 import {
   LeadItem,
   LeadStats,
+  UserTodayStats,
   PartnerItem,
   ClientRecord,
   PaymentItem,
@@ -13,16 +14,22 @@ import {
 
 export interface LeadFilterQuery {
   search?: string;
-  statusMode?: 'NonDead' | 'Dead' | 'All';
+  statusMode?: 'NonDead' | 'Dead' | 'All' | 'Active';
   companyCode?: string;
   service?: string;
   startDate?: string;
   endDate?: string;
+  date?: string;
   stage?: string;
   priority?: string;
   view?: 'list' | 'today-due' | 'process';
   page?: number;
   limit?: number;
+  userId?: string;
+  viewingUserId?: string;
+  selectedUserId?: string;
+  userName?: string;
+  todayOnly?: boolean;
 }
 
 export interface LeadsResponse {
@@ -30,6 +37,7 @@ export interface LeadsResponse {
   leads: LeadItem[];
   pagination: PaginationMeta;
   stats: LeadStats;
+  userTodayStats?: UserTodayStats;
 }
 
 export interface ClientFilterQuery {
@@ -142,7 +150,7 @@ export const leadService = {
     const res = await api.post(`/leads/clients/${id}/follow-up`, data);
     return res.data.data;
   },
-
+      
   markClientDead: async (id: string, reason?: string): Promise<ClientRecord> => {
     const res = await api.post(`/leads/clients/${id}/mark-dead`, { reason });
     return res.data.data;

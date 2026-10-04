@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
+  Filter,
+  X,
   RotateCcw,
   Plus,
   Phone,
@@ -13,11 +15,13 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPin,
-  Building,
-  Sparkles,
-  ExternalLink,
+  Clock,
+  CheckCircle2,
+  CalendarDays,
+  Activity,
+  Layers,
 } from 'lucide-react';
-import { LeadItem, LeadStats } from '../../types';
+import { LeadItem, LeadStats, UserTodayStats } from '../../types';
 import leadService, { LeadFilterQuery } from '../../services/lead.service';
 import catalogService from '../../services/catalog.service';
 import { AddLeadModal } from '../../components/leads/AddLeadModal';
@@ -25,25 +29,37 @@ import { FollowUpModal } from '../../components/leads/FollowUpModal';
 import { RegisterClientModal } from '../../components/leads/RegisterClientModal';
 import { MarkDeadModal } from '../../components/leads/MarkDeadModal';
 import { useAuth } from '../../context/AuthContext';
+import { useImpersonation } from '../../context/ImpersonationContext';
 
 export const LeadManagement: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { viewingUser, isViewing, stopViewing } = useImpersonation();
+
+  // User Profile Filter from URL params or Impersonation
+  const urlUserId = searchParams.get('userId') || '';
+  const urlUserName = searchParams.get('userName') || '';
+
+  const activeUserId = urlUserId || (isViewing && viewingUser ? viewingUser.id : '');
+  const activeUserName = urlUserName || (isViewing && viewingUser ? viewingUser.name : '');
+  const activeUserRole = viewingUser?.role || (activeUserName ? 'Team Member' : '');
 
   // Active view: 'list' | 'today-due' | 'process'
   const [activeView, setActiveView] = useState<'list' | 'today-due' | 'process'>('list');
 
-  // Filter States
+  // Filter States matching Screenshot 2
   const [searchQuery, setSearchQuery] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [statusMode, setStatusMode] = useState<'NonDead' | 'Dead' | 'All'>('NonDead');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [statusMode, setStatusMode] = useState<'Active' | 'Dead' | 'All'>('Active');
   const [companyFilter, setCompanyFilter] = useState('All Companies');
   const [serviceFilter, setServiceFilter] = useState('All Services');
+  const [todayOnly, setTodayOnly] = useState(false);
 
   // Leads & Pagination
   const [leads, setLeads] = useState<LeadItem[]>([]);
   const [stats, setStats] = useState<LeadStats | null>(null);
+  const [userTodayStats, setUserTodayStats] = useState<UserTodayStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -58,36 +74,57 @@ export const LeadManagement: React.FC = () => {
   const [availableServices, setAvailableServices] = useState<string[]>([]);
 
   useEffect(() => {
-    catalogService.getActiveServices().then((data) => {
-      const activeList = (data || []).filter((s) => s.isActive).map((s) => s.name);
-      setAvailableServices(activeList);
-    }).catch(() => {});
+    catalogService
+      .getActiveServices()
+      .then((data) => {
+        const activeList = (data || []).filter((s) => s.isActive).map((s) => s.name);
+        setAvailableServices(activeList);
+      })
+      .catch(() => {});
   }, [activeView]);
 
   useEffect(() => {
     fetchLeads();
-  }, [activeView, statusMode, companyFilter, serviceFilter, currentPage]);
+  }, [
+    activeView,
+    statusMode,
+    companyFilter,
+    serviceFilter,
+    currentPage,
+    activeUserId,
+    activeUserName,
+    todayOnly,
+  ]);
 
   const fetchLeads = async () => {
     setIsLoading(true);
     try {
       const query: LeadFilterQuery = {
-        search: searchQuery,
-        statusMode,
-        companyCode: companyFilter,
-        service: serviceFilter,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
+        search: searchQuery.trim() || undefined,
+        statusMode: statusMode === 'Active' ? 'NonDead' : statusMode,
+        companyCode: companyFilter !== 'All Companies' ? companyFilter : undefined,
+        service: serviceFilter !== 'All Services' ? serviceFilter : undefined,
+        date: selectedDate || undefined,
         view: activeView,
         page: currentPage,
         limit: 15,
+        userId: activeUserId || undefined,
+        viewingUserId: activeUserId || undefined,
+        selectedUserId: activeUserId || undefined,
+        userName: activeUserName || undefined,
+        todayOnly: todayOnly || undefined,
       };
 
       const res = await leadService.getLeads(query);
-      setLeads(res.leads);
-      setTotalPages(res.pagination.totalPages);
-      setTotalCount(res.pagination.total);
-      setStats(res.stats);
+      setLeads(res.leads || []);
+      setTotalPages(res.pagination?.totalPages || 1);
+      setTotalCount(res.pagination?.total || 0);
+      setStats(res.stats || null);
+      if (res.userTodayStats) {
+        setUserTodayStats(res.userTodayStats);
+      } else {
+        setUserTodayStats(null);
+      }
     } catch (err) {
       console.error('Failed to load leads', err);
     } finally {
@@ -103,18 +140,51 @@ export const LeadManagement: React.FC = () => {
 
   const handleResetFilters = () => {
     setSearchQuery('');
-    setStartDate('');
-    setEndDate('');
-    setStatusMode('NonDead');
+    setSelectedDate('');
+    setStatusMode('Active');
     setCompanyFilter('All Companies');
     setServiceFilter('All Services');
+    setTodayOnly(false);
     setCurrentPage(1);
+    // Trigger immediate refetch with clean values
+    setIsLoading(true);
+    leadService
+      .getLeads({
+        statusMode: 'NonDead',
+        view: activeView,
+        page: 1,
+        limit: 15,
+        userId: activeUserId || undefined,
+        viewingUserId: activeUserId || undefined,
+        selectedUserId: activeUserId || undefined,
+        userName: activeUserName || undefined,
+      })
+      .then((res) => {
+        setLeads(res.leads || []);
+        setTotalPages(res.pagination?.totalPages || 1);
+        setTotalCount(res.pagination?.total || 0);
+        setStats(res.stats || null);
+        setUserTodayStats(res.userTodayStats || null);
+      })
+      .finally(() => setIsLoading(false));
+  };
+
+  const handleClearMemberFilter = () => {
+    setSearchParams({});
+    if (isViewing) {
+      stopViewing();
+    }
+    setUserTodayStats(null);
+    setTodayOnly(false);
+    setCurrentPage(1);
+    navigate('/leads', { replace: true });
   };
 
   const formatDateDisplay = (dateStr?: string | Date) => {
     if (!dateStr) return '-';
     try {
       const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return String(dateStr);
       return d.toLocaleDateString('en-GB', {
         day: '2-digit',
         month: 'short',
@@ -159,7 +229,7 @@ export const LeadManagement: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0D1017] text-slate-200">
-      {/* 1. Portal Brand Top Bar (Desktop only, AppLayout provides mobile bar) */}
+      {/* 1. Portal Brand Top Bar */}
       <div className="hidden md:flex bg-[#0A0D14] border-b border-[#1A2234] px-4 sm:px-6 py-2.5 items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -179,6 +249,7 @@ export const LeadManagement: React.FC = () => {
 
           {/* Notifications */}
           <button
+            type="button"
             title="Notifications"
             className="w-8 h-8 rounded-full bg-[#141B2D] border border-[#222E48] text-amber-400 hover:text-amber-300 flex items-center justify-center transition-colors"
           >
@@ -202,42 +273,43 @@ export const LeadManagement: React.FC = () => {
 
       {/* Main Container */}
       <div className="p-4 sm:p-6 space-y-4">
-        {/* Navigation Tabs (Leads / Associate Partners) */}
-        <div className="flex items-center gap-2 border-b border-[#1A2234] pb-3">
-          <button
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-[#EAB308] text-slate-950 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
-          >
-            Leads
-          </button>
-          <button
-            onClick={() => navigate('/leads/partners')}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-[#161D2B] transition-all cursor-pointer"
-          >
-            Associate Partners
-          </button>
+        {/* Breadcrumb matching Screenshot 2 */}
+        <div className="text-[11px] font-medium text-slate-400 flex items-center gap-1.5">
+          <span>Admin</span>
+          <span>/</span>
+          <span className="text-amber-400 font-semibold">Lead Management</span>
         </div>
 
-        {/* 2. Subheader & Action Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="text-[11px] font-medium text-slate-400 flex items-center gap-1.5">
-              <span>Admin</span>
-              <span>/</span>
-              <span className="text-amber-400 font-semibold">Lead Management</span>
+        {/* Header line matching Screenshot 2 */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-xl sm:text-2xl font-black text-[#EAB308] tracking-tight">
+              Leads Management
+            </h2>
+
+            {/* Tabs: [Leads] [Associate Partners] matching Screenshot 2 */}
+            <div className="flex items-center gap-1 bg-[#121724] border border-[#1E2638] rounded-xl p-1">
+              <button
+                type="button"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[#EAB308] text-slate-950 shadow-md cursor-pointer transition-all"
+              >
+                Leads
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/leads/partners')}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-[#1A2234] transition-all cursor-pointer"
+              >
+                Associate Partners
+              </button>
             </div>
-            <div className="flex items-baseline gap-2 mt-1">
-              <h2 className="text-2xl font-black text-white tracking-tight">
-                Leads ({totalCount})
-              </h2>
-            </div>
-            <p className="text-xs text-slate-400">Track and manage your sales pipeline</p>
           </div>
 
-          {/* Views Toggles & New Lead Button */}
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-            <div className="flex bg-[#121724] border border-[#20293D] rounded-xl p-1 gap-1">
-              {/* List View */}
+          <div className="flex items-center gap-2.5">
+            {/* View switcher (List / Today Due / Process) */}
+            <div className="hidden md:flex bg-[#121724] border border-[#20293D] rounded-xl p-1 gap-1">
               <button
+                type="button"
                 onClick={() => setActiveView('list')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   activeView === 'list'
@@ -249,8 +321,8 @@ export const LeadManagement: React.FC = () => {
                 <span>List</span>
               </button>
 
-              {/* Today Due View */}
               <button
+                type="button"
                 onClick={() => setActiveView('today-due')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   activeView === 'today-due'
@@ -263,7 +335,9 @@ export const LeadManagement: React.FC = () => {
                 {stats && stats.todayDueCount > 0 && (
                   <span
                     className={`ml-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
-                      activeView === 'today-due' ? 'bg-slate-950 text-[#EAB308]' : 'bg-amber-500/20 text-amber-300'
+                      activeView === 'today-due'
+                        ? 'bg-slate-950 text-[#EAB308]'
+                        : 'bg-amber-500/20 text-amber-300'
                     }`}
                   >
                     {stats.todayDueCount}
@@ -271,8 +345,8 @@ export const LeadManagement: React.FC = () => {
                 )}
               </button>
 
-              {/* Process / Kanban View */}
               <button
+                type="button"
                 onClick={() => setActiveView('process')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   activeView === 'process'
@@ -285,99 +359,203 @@ export const LeadManagement: React.FC = () => {
               </button>
             </div>
 
-            {/* + New Lead Button */}
+            {/* + Add Leads Button matching Screenshot 2 */}
             <button
+              type="button"
               onClick={() => {
                 setSelectedLeadForEdit(null);
                 setIsAddModalOpen(true);
               }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#9333ea] to-[#a855f7] hover:from-[#8b24e6] hover:to-[#9f45f0] text-white font-bold text-xs shadow-lg shadow-purple-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#EAB308] hover:bg-yellow-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
-              <span>New Lead</span>
+              <span>+ Add Leads</span>
             </button>
           </div>
         </div>
 
-        {/* 3. Filter Controls Row */}
+        {/* 2. Team Member Profile & Today's Lead Management Activity Banner */}
+        {(activeUserName || activeUserId) && (
+          <div className="bg-gradient-to-r from-[#141A28] via-[#182136] to-[#121724] border border-amber-500/50 rounded-2xl p-4 sm:p-5 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 relative z-10">
+              {/* Member Identity */}
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-black text-lg flex items-center justify-center shadow-lg shadow-amber-500/30 shrink-0">
+                  {activeUserName ? activeUserName.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-base sm:text-lg font-black text-white">
+                      {activeUserName || 'Team Member'}
+                    </span>
+                    {activeUserRole && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 uppercase">
+                        {activeUserRole}
+                      </span>
+                    )}
+                    {viewingUser?.email && (
+                      <span className="text-xs text-slate-400 font-mono">
+                        ({viewingUser.email})
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-amber-300/90 font-medium flex items-center gap-1.5 mt-0.5">
+                    <Activity className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Today's Lead Management Performance & Pipeline Record</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Today's Management Activity Counters */}
+              <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+                {/* Leads Added Today */}
+                <div className="bg-[#0B0F1A] border border-amber-500/30 px-3.5 py-2 rounded-xl text-center min-w-[110px] shadow-sm">
+                  <div className="text-[9.5px] uppercase font-bold text-slate-400 tracking-wider">
+                    Leads Added Today
+                  </div>
+                  <div className="text-xl font-black text-amber-400 mt-0.5">
+                    {userTodayStats?.leadsCreatedToday ?? 0}
+                  </div>
+                </div>
+
+                {/* Follow-ups Handled Today */}
+                <div className="bg-[#0B0F1A] border border-emerald-500/30 px-3.5 py-2 rounded-xl text-center min-w-[110px] shadow-sm">
+                  <div className="text-[9.5px] uppercase font-bold text-slate-400 tracking-wider">
+                    Follow-ups Today
+                  </div>
+                  <div className="text-xl font-black text-emerald-400 mt-0.5">
+                    {userTodayStats?.followUpsToday ?? 0}
+                  </div>
+                </div>
+
+                {/* Total Leads Managed */}
+                <div className="bg-[#0B0F1A] border border-slate-700/60 px-3.5 py-2 rounded-xl text-center min-w-[90px] shadow-sm">
+                  <div className="text-[9.5px] uppercase font-bold text-slate-400 tracking-wider">
+                    Total Managed
+                  </div>
+                  <div className="text-xl font-black text-white mt-0.5">
+                    {userTodayStats?.totalManaged ?? totalCount}
+                  </div>
+                </div>
+
+                {/* Quick Toggle: Today's Work Only */}
+                <div className="flex items-center gap-2 pl-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTodayOnly(!todayOnly);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
+                      todayOnly
+                        ? 'bg-[#EAB308] text-slate-950 font-black shadow-amber-500/25'
+                        : 'bg-[#1C2538] hover:bg-[#25324c] text-slate-300 hover:text-white border border-[#2B3852]'
+                    }`}
+                  >
+                    <span>⚡ Today's Work Only</span>
+                    {todayOnly && <span className="w-2 h-2 rounded-full bg-slate-950 animate-pulse" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearMemberFilter}
+                    className="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-all cursor-pointer flex items-center gap-1"
+                    title="Clear filter to view all team leads"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>View All Team Leads</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Filter Controls Row matching Screenshot 2 */}
         <form
           onSubmit={handleSearchSubmit}
-          className="bg-[#10141F] border border-[#1E2638] rounded-2xl p-3 sm:p-3.5 flex flex-wrap items-center gap-3 text-xs shadow-xl"
+          className="bg-[#10141F] border border-[#1E2638] rounded-xl px-4 py-3 flex flex-wrap items-center gap-3.5 text-xs shadow-md"
         >
-          {/* Search input + button */}
-          <div className="flex items-center gap-2 flex-1 min-w-[240px]">
-            <input
-              type="text"
-              placeholder="Search Lead"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#161C2C] border border-[#2B354C] rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
-            />
-            <button
-              type="submit"
-              className="px-3.5 py-1.5 rounded-xl bg-[#0284C7] hover:bg-[#0369a1] text-white font-bold text-xs shadow-md transition-all shrink-0 cursor-pointer"
-            >
-              Search
-            </button>
-          </div>
-
-          {/* Date Range: dd-mm-yyyy To dd-mm-yyyy */}
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="bg-[#161C2C] border border-[#2B354C] rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
-            />
-            <span className="text-[11px] text-slate-500">To</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="bg-[#161C2C] border border-[#2B354C] rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
-            />
-          </div>
-
-          {/* Status Radio Buttons: NonDead, Dead, All */}
-          <div className="flex items-center gap-3 px-3 py-1.5 bg-[#161C2C] border border-[#2B354C] rounded-xl">
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 font-medium">
+          {/* Status Radio Buttons: Active / Dead / All */}
+          <div className="flex items-center gap-3 text-slate-300">
+            <span className="font-bold text-[#EAB308]">Status:</span>
+            <label className="flex items-center gap-1.5 cursor-pointer hover:text-white font-medium">
               <input
                 type="radio"
                 name="statusMode"
-                checked={statusMode === 'NonDead'}
-                onChange={() => setStatusMode('NonDead')}
-                className="accent-amber-400"
+                checked={statusMode === 'Active'}
+                onChange={() => {
+                  setStatusMode('Active');
+                  setCurrentPage(1);
+                }}
+                className="accent-amber-400 cursor-pointer"
               />
-              <span>NonDead</span>
+              <span>Active</span>
             </label>
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 font-medium">
+            <label className="flex items-center gap-1.5 cursor-pointer hover:text-white font-medium">
               <input
                 type="radio"
                 name="statusMode"
                 checked={statusMode === 'Dead'}
-                onChange={() => setStatusMode('Dead')}
-                className="accent-amber-400"
+                onChange={() => {
+                  setStatusMode('Dead');
+                  setCurrentPage(1);
+                }}
+                className="accent-amber-400 cursor-pointer"
               />
               <span>Dead</span>
             </label>
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 font-medium">
+            <label className="flex items-center gap-1.5 cursor-pointer hover:text-white font-medium">
               <input
                 type="radio"
                 name="statusMode"
                 checked={statusMode === 'All'}
-                onChange={() => setStatusMode('All')}
-                className="accent-amber-400"
+                onChange={() => {
+                  setStatusMode('All');
+                  setCurrentPage(1);
+                }}
+                className="accent-amber-400 cursor-pointer"
               />
               <span>All</span>
             </label>
           </div>
 
-          {/* Company Filter Dropdown */}
+          {/* Search Input: Search Lead Name/Mobile... matching Screenshot 2 */}
+          <div className="flex-1 min-w-[200px] max-w-sm">
+            <input
+              type="text"
+              placeholder="Search Lead Name/Mobile..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#161C2C] border border-[#2B354C] rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
+            />
+          </div>
+
+          {/* Date Picker: dd-mm-yyyy matching Screenshot 2 */}
+          <div className="relative">
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                setSelectedDate(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-[#161C2C] border border-[#2B354C] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+              title="Pick Date to see that day's leads & activity"
+            />
+          </div>
+
+          {/* Company filter */}
           <div>
             <select
               value={companyFilter}
-              onChange={(e) => setCompanyFilter(e.target.value)}
-              className="bg-[#161C2C] border border-[#2B354C] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+              onChange={(e) => {
+                setCompanyFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-[#161C2C] border border-[#2B354C] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
             >
               <option value="All Companies">All Companies</option>
               <option value="LB">Lucknow Builders (LB)</option>
@@ -385,30 +563,23 @@ export const LeadManagement: React.FC = () => {
             </select>
           </div>
 
-          {/* Service Filter Dropdown */}
-          <div>
-            <select
-              value={serviceFilter}
-              onChange={(e) => setServiceFilter(e.target.value)}
-              className="bg-[#161C2C] border border-[#2B354C] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
-            >
-              <option value="All Services">All Services</option>
-              {availableServices.map((srv) => (
-                <option key={srv} value={srv}>
-                  {srv}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Filter Button (Gold with Funnel) matching Screenshot 2 */}
+          <button
+            type="submit"
+            className="px-4 py-1.5 rounded-lg bg-[#EAB308] hover:bg-yellow-400 text-slate-950 font-bold text-xs shadow transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+          >
+            <Filter className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Filter</span>
+          </button>
 
-          {/* Reset button */}
+          {/* Clear Button (Dark with 'x') matching Screenshot 2 */}
           <button
             type="button"
             onClick={handleResetFilters}
-            className="px-3 py-1.5 rounded-xl bg-[#1E2638] hover:bg-[#2A354E] text-slate-300 hover:text-white font-semibold text-xs border border-[#2B354C] transition-all cursor-pointer flex items-center gap-1"
+            className="px-3.5 py-1.5 rounded-lg bg-[#283248] hover:bg-[#34405c] text-slate-200 font-semibold text-xs border border-slate-700 transition-all flex items-center gap-1 cursor-pointer"
           >
-            <RotateCcw className="w-3 h-3" />
-            <span>Reset</span>
+            <X className="w-3.5 h-3.5" />
+            <span>Clear</span>
           </button>
         </form>
 
@@ -423,7 +594,6 @@ export const LeadManagement: React.FC = () => {
                   key={colStage}
                   className="bg-[#111520] border border-[#1E273A] rounded-2xl flex flex-col max-h-[75vh]"
                 >
-                  {/* Column Header */}
                   <div className="p-3 border-b border-[#1E273A] flex items-center justify-between bg-[#151B2A] rounded-t-2xl">
                     <span className="font-bold text-xs uppercase tracking-wider text-slate-200">
                       {colStage}
@@ -433,7 +603,6 @@ export const LeadManagement: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Cards List */}
                   <div className="p-2 space-y-2 overflow-y-auto flex-1 custom-scrollbar">
                     {colLeads.length === 0 ? (
                       <div className="p-4 text-center text-slate-500 text-xs italic">
@@ -454,11 +623,7 @@ export const LeadManagement: React.FC = () => {
                                 lead.priority
                               )}`}
                             >
-                              {lead.priority === 'High'
-                                ? '🔥 High'
-                                : lead.priority === 'Urgent'
-                                ? '🚨 Urgent'
-                                : lead.priority}
+                              {lead.priority}
                             </span>
                           </div>
 
@@ -493,12 +658,14 @@ export const LeadManagement: React.FC = () => {
                             </span>
                             <div className="flex gap-1">
                               <button
+                                type="button"
                                 onClick={() => setSelectedLeadForFollowUp(lead)}
                                 className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold"
                               >
                                 Follow
                               </button>
                               <button
+                                type="button"
                                 onClick={() => {
                                   setSelectedLeadForEdit(lead);
                                   setIsAddModalOpen(true);
@@ -518,45 +685,51 @@ export const LeadManagement: React.FC = () => {
             })}
           </div>
         ) : (
-          /* TABULAR LIST VIEW (Matching Image 2 exactly!) */
-          <div className="bg-[#10141F] border border-[#1E2638] rounded-2xl overflow-hidden shadow-2xl">
+          /* TABULAR LIST VIEW EXACTLY MATCHING SCREENSHOT 2 COLUMNS:
+             SN | DATE | TYPE | EMAIL | LEAD NAME | MOBILE | SERVICE / INTEREST | DUE DATE | STATUS | LAST REMARK | ACTIONS
+          */
+          <div className="bg-[#10141F] border border-[#1E2638] rounded-xl overflow-hidden shadow-2xl">
             <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse text-[11.5px] min-w-[950px]">
+              <table className="w-full text-left border-collapse text-[11.5px] min-w-[1050px]">
                 <thead>
-                  <tr className="bg-[#131825] border-b border-[#1E2638] text-[10px] font-bold tracking-wider text-amber-400/90 uppercase select-none">
-                    <th className="py-3 px-3 w-10 text-center">S.N</th>
-                    <th className="py-3 px-3">ID</th>
-                    <th className="py-3 px-3">DATE</th>
-                    <th className="py-3 px-3 min-w-[130px]">LEAD NAME</th>
-                    <th className="py-3 px-3">SITE LOCATION</th>
-                    <th className="py-3 px-3 min-w-[140px]">ASSOCIATE</th>
-                    <th className="py-3 px-3 text-center">AREA</th>
-                    <th className="py-3 px-3">SERVICES</th>
-                    <th className="py-3 px-3 min-w-[110px]">MOBILE</th>
-                    <th className="py-3 px-3 text-center">PRIORITY</th>
-                    <th className="py-3 px-3 text-center">STAGE</th>
-                    <th className="py-3 px-3 min-w-[150px]">FOLLOW UP</th>
-                    <th className="py-3 px-3 text-center min-w-[190px]">ACTION</th>
+                  <tr className="bg-[#131825] border-b border-[#1E2638] text-[10.5px] font-extrabold tracking-wider text-[#EAB308] uppercase select-none">
+                    <th className="py-3.5 px-3 w-12 text-center">SN</th>
+                    <th className="py-3.5 px-3 min-w-[90px]">DATE</th>
+                    <th className="py-3.5 px-3 min-w-[90px]">TYPE</th>
+                    <th className="py-3.5 px-3 min-w-[140px]">EMAIL</th>
+                    <th className="py-3.5 px-3 min-w-[150px]">LEAD NAME</th>
+                    <th className="py-3.5 px-3 min-w-[110px]">MOBILE</th>
+                    <th className="py-3.5 px-3 min-w-[150px]">SERVICE / INTEREST</th>
+                    <th className="py-3.5 px-3 min-w-[100px]">DUE DATE</th>
+                    <th className="py-3.5 px-3 min-w-[95px] text-center">STATUS</th>
+                    <th className="py-3.5 px-3 min-w-[180px]">LAST REMARK</th>
+                    <th className="py-3.5 px-3 text-center min-w-[190px]">ACTIONS</th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-[#1A2234]">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={13} className="py-12 text-center text-slate-400 text-xs">
+                      <td colSpan={11} className="py-12 text-center text-slate-400 text-xs">
                         <div className="flex flex-col items-center justify-center gap-2">
                           <span className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                          <span>Loading real lead records...</span>
+                          <span>Loading lead records...</span>
                         </div>
                       </td>
                     </tr>
                   ) : leads.length === 0 ? (
                     <tr>
-                      <td colSpan={13} className="py-12 text-center text-slate-400 text-xs">
+                      <td colSpan={11} className="py-12 text-center text-slate-400 text-xs">
                         <div className="max-w-md mx-auto space-y-2">
-                          <p className="text-sm font-semibold text-slate-300">No leads found</p>
+                          <p className="text-sm font-semibold text-slate-300">
+                            {todayOnly
+                              ? `No lead activity recorded today for ${activeUserName || 'this user'}`
+                              : 'No leads found matching your criteria'}
+                          </p>
                           <p className="text-slate-500 text-xs">
-                            Try adjusting your filters or search keywords.
+                            {todayOnly
+                              ? 'Try clicking "View All Team Leads" or scheduling a follow-up.'
+                              : 'Try adjusting filters or search keywords.'}
                           </p>
                           <button
                             type="button"
@@ -566,7 +739,7 @@ export const LeadManagement: React.FC = () => {
                             }}
                             className="mt-2 px-4 py-1.5 bg-[#EAB308] hover:bg-yellow-400 text-slate-950 font-bold text-xs rounded-xl shadow"
                           >
-                            Add New Lead
+                            + Add New Lead
                           </button>
                         </div>
                       </td>
@@ -574,82 +747,69 @@ export const LeadManagement: React.FC = () => {
                   ) : (
                     leads.map((lead, index) => {
                       const serialNumber = (currentPage - 1) * 15 + (index + 1);
-                      const associateTitle =
-                        lead.referenceType === 'Social Media'
-                          ? `Social Media : ${lead.referenceDetails?.channel || 'Facebook'}`
-                          : lead.referenceType === 'Associate'
-                          ? lead.referenceDetails?.partnerName || 'Associate'
-                          : lead.referenceType === 'Employee'
-                          ? lead.referenceDetails?.employeeName || 'Employee'
-                          : 'Direct';
+                      const leadTypeDisplay =
+                        lead.propertyType ||
+                        (lead.targetCompanyCode ? `${lead.targetCompanyCode}` : 'Residential');
 
-                      const associateSub =
-                        lead.referenceType === 'Social Media'
-                          ? 'Social Media'
-                          : lead.referenceType === 'Associate'
-                          ? 'Associate'
-                          : lead.referenceType === 'Employee'
-                          ? 'Employee'
-                          : 'Direct';
+                      const dueDateDisplay = lead.latestFollowUp?.date
+                        ? formatDateDisplay(lead.latestFollowUp.date)
+                        : lead.meetingDateTime
+                        ? formatDateDisplay(lead.meetingDateTime)
+                        : '-';
+
+                      const lastRemarkText =
+                        lead.latestFollowUp?.remarks ||
+                        (lead.followUps && lead.followUps.length > 0
+                          ? lead.followUps[lead.followUps.length - 1].remarks
+                          : '-');
 
                       return (
                         <tr
                           key={lead._id}
                           className="hover:bg-[#151C2C]/80 transition-colors group"
                         >
-                          {/* S.N */}
+                          {/* 1. SN */}
                           <td className="py-3 px-3 text-center text-slate-400 font-mono text-[11px]">
                             {serialNumber}
                           </td>
 
-                          {/* ID */}
-                          <td className="py-3 px-3 font-mono text-cyan-400 font-semibold tracking-wide">
-                            {lead.leadCode}
-                          </td>
-
-                          {/* DATE */}
+                          {/* 2. DATE */}
                           <td className="py-3 px-3 whitespace-nowrap text-slate-300 font-medium">
-                            {formatDateDisplay(lead.leadDate)}
+                            {formatDateDisplay(lead.leadDate || lead.createdAt)}
                           </td>
 
-                          {/* LEAD NAME with company code */}
+                          {/* 3. TYPE */}
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700/60">
+                              {leadTypeDisplay}
+                            </span>
+                          </td>
+
+                          {/* 4. EMAIL */}
+                          <td className="py-3 px-3 text-slate-300 truncate max-w-[160px]">
+                            {lead.email ? (
+                              <a
+                                href={`mailto:${lead.email}`}
+                                className="text-slate-300 hover:text-amber-300 underline-offset-2 hover:underline transition-colors"
+                              >
+                                {lead.email}
+                              </a>
+                            ) : (
+                              <span className="text-slate-500">-</span>
+                            )}
+                          </td>
+
+                          {/* 5. LEAD NAME */}
                           <td className="py-3 px-3">
                             <div className="font-bold text-slate-100 group-hover:text-amber-300 transition-colors">
                               {lead.clientName}
                             </div>
                             <div className="text-[10px] text-amber-500/90 font-mono font-semibold">
-                              {lead.targetCompanyCode || 'LB'}
+                              {lead.leadCode}
                             </div>
                           </td>
 
-                          {/* SITE LOCATION */}
-                          <td className="py-3 px-3 font-medium text-slate-300">
-                            {lead.siteLocation || '-'}
-                          </td>
-
-                          {/* ASSOCIATE */}
-                          <td className="py-3 px-3">
-                            <div className="text-amber-400/95 font-medium leading-tight">
-                              {associateTitle}
-                            </div>
-                            <div className="text-[10px] text-slate-500 font-medium">
-                              {associateSub}
-                            </div>
-                          </td>
-
-                          {/* AREA */}
-                          <td className="py-3 px-3 text-center font-mono text-slate-300">
-                            {lead.landArea || '-'}
-                          </td>
-
-                          {/* SERVICES */}
-                          <td className="py-3 px-3 text-slate-300 font-medium">
-                            {lead.requirements && lead.requirements.length > 0
-                              ? lead.requirements.join(', ')
-                              : '-'}
-                          </td>
-
-                          {/* MOBILE */}
+                          {/* 6. MOBILE */}
                           <td className="py-3 px-3 whitespace-nowrap">
                             <a
                               href={`tel:${lead.mobile1}`}
@@ -660,23 +820,20 @@ export const LeadManagement: React.FC = () => {
                             </a>
                           </td>
 
-                          {/* PRIORITY */}
-                          <td className="py-3 px-3 text-center">
-                            <span
-                              className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${getPriorityBadgeClass(
-                                lead.priority
-                              )}`}
-                            >
-                              {lead.priority === 'High'
-                                ? '🔥 High'
-                                : lead.priority === 'Urgent'
-                                ? '🚨 Urgent'
-                                : lead.priority}
-                            </span>
+                          {/* 7. SERVICE / INTEREST */}
+                          <td className="py-3 px-3 text-slate-300 font-medium">
+                            {lead.requirements && lead.requirements.length > 0
+                              ? lead.requirements.join(', ')
+                              : lead.requirementType || '-'}
                           </td>
 
-                          {/* STAGE */}
-                          <td className="py-3 px-3 text-center">
+                          {/* 8. DUE DATE */}
+                          <td className="py-3 px-3 whitespace-nowrap text-slate-300 font-medium">
+                            {dueDateDisplay}
+                          </td>
+
+                          {/* 9. STATUS */}
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
                             <span
                               className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] ${getStageBadgeClass(
                                 lead.stage
@@ -686,27 +843,24 @@ export const LeadManagement: React.FC = () => {
                             </span>
                           </td>
 
-                          {/* FOLLOW UP */}
+                          {/* 10. LAST REMARK */}
                           <td className="py-3 px-3">
-                            {lead.latestFollowUp?.date ? (
-                              <div className="space-y-0.5">
-                                <div className="font-bold text-slate-200 text-[11px]">
-                                  {formatDateDisplay(lead.latestFollowUp.date)}
-                                </div>
-                                <div className="text-[10px] text-slate-400 line-clamp-1 italic">
-                                  {lead.latestFollowUp.remarks}
-                                </div>
+                            <div className="text-[11px] text-slate-300 line-clamp-2 max-w-[200px]" title={lastRemarkText}>
+                              {lastRemarkText}
+                            </div>
+                            {lead.latestFollowUp?.createdByName && (
+                              <div className="text-[9px] text-amber-400/80 font-medium mt-0.5">
+                                by {lead.latestFollowUp.createdByName}
                               </div>
-                            ) : (
-                              <span className="text-slate-500 text-[11px]">-</span>
                             )}
                           </td>
 
-                          {/* ACTION BUTTONS (Follow, Edit, Reg, Dead) */}
-                          <td className="py-3 px-3 text-center">
+                          {/* 11. ACTIONS */}
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
                             <div className="flex items-center justify-center gap-1.5">
                               {/* Follow Button */}
                               <button
+                                type="button"
                                 onClick={() => setSelectedLeadForFollowUp(lead)}
                                 title="Schedule Follow Up"
                                 className="px-2.5 py-1 rounded-md bg-[#059669] hover:bg-[#10B981] text-white font-bold text-[10px] shadow-sm transition-all cursor-pointer"
@@ -716,6 +870,7 @@ export const LeadManagement: React.FC = () => {
 
                               {/* Edit Button */}
                               <button
+                                type="button"
                                 onClick={() => {
                                   setSelectedLeadForEdit(lead);
                                   setIsAddModalOpen(true);
@@ -728,6 +883,7 @@ export const LeadManagement: React.FC = () => {
 
                               {/* Reg Button */}
                               <button
+                                type="button"
                                 onClick={() => setSelectedLeadForReg(lead)}
                                 title="Register as Official Client"
                                 className="px-2.5 py-1 rounded-md bg-[#0891B2] hover:bg-[#06B6D4] text-white font-bold text-[10px] shadow-sm transition-all cursor-pointer"
@@ -735,8 +891,9 @@ export const LeadManagement: React.FC = () => {
                                 Reg
                               </button>
 
-                              {/* Dead Button */}
+                              {/* Dead / Revive Button */}
                               <button
+                                type="button"
                                 onClick={() => setSelectedLeadForDead(lead)}
                                 title={lead.isDead ? 'Restore Dead Lead' : 'Mark Lead as Dead'}
                                 className={`px-2.5 py-1 rounded-md text-white font-bold text-[10px] shadow-sm transition-all cursor-pointer ${
@@ -765,17 +922,19 @@ export const LeadManagement: React.FC = () => {
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button
+                    type="button"
                     disabled={currentPage <= 1}
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    className="p-1 rounded-lg bg-[#182030] hover:bg-[#202B40] disabled:opacity-40 text-slate-300"
+                    className="p-1 rounded-lg bg-[#182030] hover:bg-[#202B40] disabled:opacity-40 text-slate-300 cursor-pointer"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <span className="px-2 font-semibold text-white">{currentPage}</span>
                   <button
+                    type="button"
                     disabled={currentPage >= totalPages}
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    className="p-1 rounded-lg bg-[#182030] hover:bg-[#202B40] disabled:opacity-40 text-slate-300"
+                    className="p-1 rounded-lg bg-[#182030] hover:bg-[#202B40] disabled:opacity-40 text-slate-300 cursor-pointer"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>

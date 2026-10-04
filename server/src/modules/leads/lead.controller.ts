@@ -5,8 +5,27 @@ export class LeadController {
   static async getLeads(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const { search, statusMode, companyCode, service, startDate, endDate, stage, priority, view, page, limit } =
-        req.query;
+      const {
+        search,
+        statusMode,
+        companyCode,
+        service,
+        startDate,
+        endDate,
+        date,
+        stage,
+        priority,
+        view,
+        page,
+        limit,
+        userId,
+        viewingUserId,
+        selectedUserId,
+        userName,
+        todayOnly,
+      } = req.query;
+
+      const targetUserId = (viewingUserId || selectedUserId || userId) as string;
 
       const result = await LeadService.getLeads(companyId, {
         search: search as string,
@@ -15,11 +34,17 @@ export class LeadController {
         service: service as string,
         startDate: startDate as string,
         endDate: endDate as string,
+        date: date as string,
         stage: stage as string,
         priority: priority as string,
         view: view as any,
         page: page ? parseInt(page as string, 10) : 1,
         limit: limit ? parseInt(limit as string, 10) : 20,
+        userId: targetUserId,
+        viewingUserId: targetUserId,
+        selectedUserId: targetUserId,
+        userName: userName as string,
+        todayOnly: todayOnly === 'true' || todayOnly === true,
       });
 
       res.status(200).json({ success: true, ...result });

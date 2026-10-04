@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { useImpersonation } from '../context/ImpersonationContext';
 import { rbacService } from '../services/rbac.service';
 import { RbacRole } from '../types/rbac';
 
@@ -21,7 +20,10 @@ export const SYSTEM_ROLE_FALLBACKS: Array<{ name: string; code: string }> = [
 
 export function usePermissions() {
   const { user } = useAuth();
-  const { viewingUser, isViewing } = useImpersonation();
+  // CRITICAL ARCHITECTURE RULE:
+  // Viewing another user profile is strictly for DATA FILTERING/CONTEXT (e.g., scoping leads).
+  // It must NEVER switch the session role, permissions, sidebar, or UI.
+  // The authenticated logged-in user (Admin) retains their own role and permissions.
 
   const { data: roles = [] } = useQuery<RbacRole[]>({
     queryKey: ['rbacRoles'],
@@ -29,9 +31,8 @@ export function usePermissions() {
     staleTime: 30 * 1000,
   });
 
-  // Effective user is viewingUser when impersonating, else the logged in user
-  const effectiveUser = isViewing && viewingUser ? viewingUser : user;
-  const userRoleCode = (effectiveUser?.role || 'MASTER_ADMIN').trim();
+  // Always use the authenticated logged-in user's role
+  const userRoleCode = (user?.role || 'MASTER_ADMIN').trim();
 
   // Master Admin has full unrestricted access by default unless explicitly overridden
   const isMasterAdmin =
@@ -40,7 +41,7 @@ export function usePermissions() {
     userRoleCode.toLowerCase() === 'master admin' ||
     userRoleCode === 'SUPER_ADMIN';
 
-  // Find the matching role definition
+  // Find the matching role definition for the logged-in user
   const activeRoleDoc = useMemo(() => {
     return (
       roles.find(
@@ -55,7 +56,7 @@ export function usePermissions() {
   // Unified lookup function for permissions
   const canAccess = (keyOrRoute: string): boolean => {
     // 1. Check user-level granular override first
-    const userOverrides = (effectiveUser as any)?.permissions;
+    const userOverrides = (user as any)?.permissions;
     if (userOverrides && typeof userOverrides === 'object') {
       if (userOverrides[keyOrRoute] !== undefined) {
         return Boolean(userOverrides[keyOrRoute]);

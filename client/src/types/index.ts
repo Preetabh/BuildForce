@@ -742,6 +742,7 @@ export interface LeadItem {
   latestFollowUp?: {
     date?: string;
     remarks?: string;
+    createdByName?: string;
   };
   isDead: boolean;
   deadReason?: string;
@@ -759,6 +760,14 @@ export interface LeadStats {
   totalClients: number;
   todayDueCount: number;
   totalAll: number;
+}
+
+export interface UserTodayStats {
+  leadsCreatedToday: number;
+  followUpsToday: number;
+  totalManaged: number;
+  userId: string;
+  userName: string;
 }
 
 export interface PartnerItem {

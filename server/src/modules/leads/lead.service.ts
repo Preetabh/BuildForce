@@ -10,97 +10,156 @@ import { CommissionService } from './commission.service';
 
 export interface LeadFilterParams {
   search?: string;
-  statusMode?: 'NonDead' | 'Dead' | 'Converted' | 'Client' | 'All';
+  statusMode?: 'NonDead' | 'Dead' | 'Converted' | 'Client' | 'All' | 'Active';
   companyCode?: string;
   service?: string;
   startDate?: string;
   endDate?: string;
+  date?: string;
   stage?: string;
   priority?: string;
   view?: 'list' | 'today-due' | 'process';
   page?: number;
   limit?: number;
+  userId?: string;
+  viewingUserId?: string;
+  selectedUserId?: string;
+  userName?: string;
+  todayOnly?: boolean | string;
 }
 
 export class LeadService {
   /**
-   * Fetch leads with full filter and pagination support
+   * Fetch leads with full filter, user-scoped lead management, and pagination support
    */
   static async getLeads(companyId: string, params: LeadFilterParams) {
-    const query: any = { companyId: new mongoose.Types.ObjectId(companyId) };
+    const andConditions: any[] = [{ companyId: new mongoose.Types.ObjectId(companyId) }];
 
-    // 1. Status mode (NonDead / Dead / Converted / All)
+    // 1. Status mode (Active / NonDead / Dead / Converted / All)
     if (params.statusMode === 'Dead') {
-      query.isDead = true;
+      andConditions.push({ isDead: true });
     } else if (params.statusMode === 'Converted' || (params.statusMode as any) === 'Client') {
-      query.$or = [{ isRegisteredClient: true }, { stage: 'Client' }];
+      andConditions.push({ $or: [{ isRegisteredClient: true }, { stage: 'Client' }] });
     } else if (params.statusMode === 'All' || params.view === 'process') {
       // In All mode or process view, include all leads
     } else {
-      // Default: NonDead (Active Leads only in pipeline)
-      // Confirmed clients are moved to Client section, so they do NOT remain in active leads
-      query.isDead = false;
-      query.isRegisteredClient = { $ne: true };
-      query.stage = { $ne: 'Client' };
+      // Default: Active (NonDead leads)
+      andConditions.push({
+        isDead: false,
+        isRegisteredClient: { $ne: true },
+        stage: { $ne: 'Client' },
+      });
     }
 
     // 2. Search
     if (params.search && params.search.trim()) {
       const searchRegex = new RegExp(params.search.trim(), 'i');
-      query.$or = [
-        { clientName: searchRegex },
-        { leadCode: searchRegex },
-        { mobile1: searchRegex },
-        { mobile2: searchRegex },
-        { siteLocation: searchRegex },
-        { 'referenceDetails.partnerName': searchRegex },
-        { 'referenceDetails.channel': searchRegex },
-        { 'referenceDetails.employeeName': searchRegex },
-      ];
+      andConditions.push({
+        $or: [
+          { clientName: searchRegex },
+          { email: searchRegex },
+          { leadCode: searchRegex },
+          { mobile1: searchRegex },
+          { mobile2: searchRegex },
+          { siteLocation: searchRegex },
+          { requirements: searchRegex },
+          { 'referenceDetails.partnerName': searchRegex },
+          { 'referenceDetails.channel': searchRegex },
+          { 'referenceDetails.employeeName': searchRegex },
+        ],
+      });
     }
 
-    // 3. Company code filter (LB / LD / All)
-    if (params.companyCode && params.companyCode !== 'All Companies' && params.companyCode !== 'ALL') {
-      query.targetCompanyCode = params.companyCode;
+    // 3. User / Team Member Filter (when viewing a user's lead management)
+    const effectiveTargetUserId = params.viewingUserId || params.selectedUserId || params.userId;
+    const userOrConditions: any[] = [];
+    if (effectiveTargetUserId && mongoose.Types.ObjectId.isValid(effectiveTargetUserId)) {
+      userOrConditions.push({ createdBy: new mongoose.Types.ObjectId(effectiveTargetUserId) });
+    }
+    if (params.userName && params.userName.trim()) {
+      const safeName = params.userName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const nameRegex = new RegExp(`^${safeName}$`, 'i');
+      userOrConditions.push({ 'referenceDetails.employeeName': nameRegex });
+      userOrConditions.push({ 'followUps.createdByName': nameRegex });
+    }
+    if (userOrConditions.length > 0) {
+      andConditions.push({ $or: userOrConditions });
     }
 
-    // 4. Service filter
-    if (params.service && params.service !== 'All Services' && params.service !== 'ALL') {
-      query.requirements = { $in: [params.service] };
-    }
+    // 4. Single Date or Date Range
+    if (params.date) {
+      const selected = new Date(params.date);
+      if (!isNaN(selected.getTime())) {
+        const dStart = new Date(selected);
+        dStart.setHours(0, 0, 0, 0);
+        const dEnd = new Date(selected);
+        dEnd.setHours(23, 59, 59, 999);
 
-    // 5. Stage filter
-    if (params.stage && params.stage !== 'ALL') {
-      query.stage = params.stage;
-    }
-
-    // 6. Priority filter
-    if (params.priority && params.priority !== 'ALL') {
-      query.priority = params.priority;
-    }
-
-    // 7. Date range filter on leadDate
-    if (params.startDate || params.endDate) {
-      query.leadDate = {};
+        andConditions.push({
+          $or: [
+            { leadDate: { $gte: dStart, $lte: dEnd } },
+            { createdAt: { $gte: dStart, $lte: dEnd } },
+            { 'followUps.date': { $gte: dStart, $lte: dEnd } },
+            { 'followUps.createdAt': { $gte: dStart, $lte: dEnd } },
+          ],
+        });
+      }
+    } else if (params.startDate || params.endDate) {
+      const dateCond: any = {};
       if (params.startDate) {
-        query.leadDate.$gte = new Date(params.startDate);
+        dateCond.$gte = new Date(params.startDate);
       }
       if (params.endDate) {
         const end = new Date(params.endDate);
         end.setHours(23, 59, 59, 999);
-        query.leadDate.$lte = end;
+        dateCond.$lte = end;
       }
+      andConditions.push({ leadDate: dateCond });
     }
 
-    // 8. View: today-due filter
+    // 5. Today Only Filter
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    if (params.todayOnly === true || params.todayOnly === 'true') {
+      andConditions.push({
+        $or: [
+          { leadDate: { $gte: todayStart, $lte: todayEnd } },
+          { createdAt: { $gte: todayStart, $lte: todayEnd } },
+          { 'followUps.date': { $gte: todayStart, $lte: todayEnd } },
+          { 'followUps.createdAt': { $gte: todayStart, $lte: todayEnd } },
+        ],
+      });
+    }
+
+    // 6. Company code filter (LB / LD / All)
+    if (params.companyCode && params.companyCode !== 'All Companies' && params.companyCode !== 'ALL') {
+      andConditions.push({ targetCompanyCode: params.companyCode });
+    }
+
+    // 7. Service filter
+    if (params.service && params.service !== 'All Services' && params.service !== 'ALL') {
+      andConditions.push({ requirements: { $in: [params.service] } });
+    }
+
+    // 8. Stage filter
+    if (params.stage && params.stage !== 'ALL') {
+      andConditions.push({ stage: params.stage });
+    }
+
+    // 9. Priority filter
+    if (params.priority && params.priority !== 'ALL') {
+      andConditions.push({ priority: params.priority });
+    }
+
+    // 10. View: today-due filter
     if (params.view === 'today-due') {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
-
-      query['latestFollowUp.date'] = { $lte: endOfDay };
+      andConditions.push({ 'latestFollowUp.date': { $lte: todayEnd } });
     }
+
+    const query = andConditions.length === 1 ? andConditions[0] : { $and: andConditions };
 
     const page = Math.max(1, Number(params.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(params.limit) || 20));
@@ -116,6 +175,55 @@ export class LeadService {
       this.getLeadStats(companyId),
     ]);
 
+    // Calculate Today's Activity Stats for the specified user
+    let userTodayStats: any = null;
+    if (userOrConditions.length > 0) {
+      const userBaseQuery = {
+        companyId: new mongoose.Types.ObjectId(companyId),
+        $or: userOrConditions,
+      };
+
+      const [userTotal, userTodayLeads, userLeadsDocs] = await Promise.all([
+        Lead.countDocuments(userBaseQuery),
+        Lead.countDocuments({
+          companyId: new mongoose.Types.ObjectId(companyId),
+          $and: [
+            { $or: userOrConditions },
+            {
+              $or: [
+                { createdAt: { $gte: todayStart, $lte: todayEnd } },
+                { leadDate: { $gte: todayStart, $lte: todayEnd } },
+              ],
+            },
+          ],
+        }),
+        Lead.find(userBaseQuery).select('followUps').lean(),
+      ]);
+
+      let userFollowUpsToday = 0;
+      const targetName = params.userName ? params.userName.trim().toLowerCase() : '';
+      for (const doc of userLeadsDocs) {
+        if (Array.isArray(doc.followUps)) {
+          for (const f of doc.followUps) {
+            const fDate = f.createdAt ? new Date(f.createdAt) : f.date ? new Date(f.date) : null;
+            if (fDate && fDate >= todayStart && fDate <= todayEnd) {
+              if (!targetName || (f.createdByName && f.createdByName.trim().toLowerCase() === targetName)) {
+                userFollowUpsToday++;
+              }
+            }
+          }
+        }
+      }
+
+      userTodayStats = {
+        leadsCreatedToday: userTodayLeads,
+        followUpsToday: userFollowUpsToday,
+        totalManaged: userTotal,
+        userId: effectiveTargetUserId || params.userId || '',
+        userName: params.userName || '',
+      };
+    }
+
     return {
       leads,
       pagination: {
@@ -125,6 +233,7 @@ export class LeadService {
         totalPages: Math.ceil(total / limit) || 1,
       },
       stats,
+      userTodayStats,
     };
   }
 

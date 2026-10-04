@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home,
   CalendarRange,
@@ -86,8 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { viewingUser, startViewing, stopViewing, isViewing } = useImpersonation();
   const { isModuleAllowed, canAccess, roleDisplayName, isMasterAdmin } = usePermissions();
   const location = useLocation();
-
-  const effectiveUser = isViewing && viewingUser ? viewingUser : user;
+  const navigate = useNavigate();
 
   const { data: teamUsers = [] } = useQuery({
     queryKey: ['rbacUsers'],
@@ -520,6 +519,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         role: member.role,
                                         mobile: member.mobile,
                                       });
+                                      navigate(`/leads?userId=${member._id}&userName=${encodeURIComponent(member.name)}`);
                                     }}
                                     className={cn(
                                       'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150 cursor-pointer',
@@ -827,10 +827,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             /* Minimized Profile Footer */
             <div className="flex flex-col items-center gap-2">
               <div
-                title={`${effectiveUser?.name || 'User'} (${roleDisplayName})`}
+                title={`${user?.name || 'User'} (${roleDisplayName})`}
                 className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-md cursor-pointer hover:ring-2 hover:ring-amber-400 transition-all"
               >
-                {(effectiveUser?.name || effectiveUser?.email || 'U').charAt(0).toUpperCase()}
+                {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="flex flex-col items-center gap-1">
                 <button
@@ -847,14 +847,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-500 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-md">
-                  {(effectiveUser?.name || effectiveUser?.email || 'U').charAt(0).toUpperCase()}
+                  {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-slate-200 truncate flex items-center gap-1.5">
-                    <span>{effectiveUser?.name || (effectiveUser?.email ? effectiveUser.email.split('@')[0] : 'User')}</span>
-                    {isViewing && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold shrink-0">
-                        Viewing
+                    <span>{user?.name || (user?.email ? user.email.split('@')[0] : 'User')}</span>
+                    {isViewing && viewingUser && (
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold shrink-0" title={`Filtering data for ${viewingUser.name}`}>
+                        Data Filtered
                       </span>
                     )}
                   </p>
