@@ -371,7 +371,7 @@ export class CommissionService {
 
   /**
    * Complete connected dossier for a client:
-   * Client → Lead → Payments → Reference Partner → Commission → Payouts
+   * Client → Lead → Payments → Reference Partner → Commission → Payouts  
    */
   static async getClientDossier(companyId: string, clientId: string) {
     const compId = new mongoose.Types.ObjectId(companyId);

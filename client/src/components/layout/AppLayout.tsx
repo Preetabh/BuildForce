@@ -6,10 +6,12 @@ import { Sidebar } from './Sidebar';
 import { AiAssistantWidget } from '../common/AiAssistantWidget';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useImpersonation } from '../../context/ImpersonationContext';
 
 export const AppLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated } = useAuth();
+  const { viewingUser, stopViewing, isViewing } = useImpersonation();
 
   // Sidebar dynamic width with localStorage persistence
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -136,6 +138,33 @@ export const AppLayout: React.FC = () => {
             </div>
           </div>
         </header>
+
+        {/* Impersonation Banner ("Viewing: [User Name] [x Stop Viewing]") */}
+        {isViewing && viewingUser && (
+          <div className="sticky top-0 z-40 bg-[#1A1407]/95 backdrop-blur-md border-b border-amber-500/40 px-4 py-2 flex items-center justify-between text-xs shadow-lg animate-in fade-in duration-200">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+              <span className="text-amber-300 font-bold flex items-center gap-1.5">
+                Viewing: <span className="text-white font-semibold underline underline-offset-2">{viewingUser.name}</span>
+              </span>
+              {viewingUser.email && (
+                <span className="hidden sm:inline-block text-[11px] text-amber-200/70 font-mono">
+                  ({viewingUser.email})
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={stopViewing}
+              className="px-2.5 py-1 rounded text-[11px] font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-white border border-red-500/40 flex items-center gap-1 transition-all cursor-pointer shadow-sm active:scale-95"
+            >
+              ✕ Stop Viewing
+            </button>
+          </div>
+        )}
 
         <main className="flex-1 pb-16">
           <Outlet context={{ setSidebarOpen, deletedCount }} />

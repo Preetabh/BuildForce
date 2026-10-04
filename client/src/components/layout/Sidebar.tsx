@@ -33,8 +33,18 @@ import {
   Users,
   Briefcase,
   Box,
+  ListChecks,
+  ShieldCheck,
+  UserCheck,
+  Compass,
+  User as UserIcon,
+  Eye,
+  Lock,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { rbacService } from '../../services/rbac.service';
 import { useAuth } from '../../context/AuthContext';
+import { useImpersonation } from '../../context/ImpersonationContext';
 import { cn } from '../../utils/cn';
 
 export interface SidebarProps {
@@ -71,7 +81,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleMinimize,
 }) => {
   const { user, logout } = useAuth();
+  const { viewingUser, startViewing, stopViewing, isViewing } = useImpersonation();
   const location = useLocation();
+
+  const { data: teamUsers = [] } = useQuery({
+    queryKey: ['rbacUsers'],
+    queryFn: rbacService.getUsers,
+  });
 
   // Resize drag state
   const [isDragging, setIsDragging] = useState(false);
@@ -82,6 +98,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Group accordion state (only ONE section open at a time: "jab ek section open ho dusra close")
   const [openGroupId, setOpenGroupId] = useState<string | null>('plannings');
 
+  // Dedicated Settings Accordion state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(() => {
+    return (
+      location.pathname.startsWith('/settings') ||
+      location.pathname.startsWith('/RBAC') ||
+      location.pathname.startsWith('/Admin/ManageMenus') ||
+      location.pathname.startsWith('/Admin/ManageRoles') ||
+      location.pathname.startsWith('/Admin/RoleVsUser') ||
+      location.pathname.startsWith('/Admin/Users')
+    );
+  });
+
   // The sidebar is visually compact ONLY if it is minimized AND not currently hovered
   const isCompact = isMinimized && !isHovered;
 
@@ -90,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setOpenGroupId((prev) => (prev === groupId ? null : groupId));
   };
 
-  // 5 Dedicated Sections requested: Home, Plannings, Lead Management, Vendor Management, Project Management
+  // Dedicated Navigation Sections matching user specification and screenshots
   const navGroups: NavGroup[] = [
     {
       id: 'plannings',
@@ -123,6 +151,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { label: 'Services', path: '/services', icon: Layers, isComingSoon: false },
         { label: 'Module', path: '/services/modules', icon: Box, isComingSoon: true },
+      ],
+    },
+    {
+      id: 'all_teams',
+      label: 'All Teams',
+      icon: CreditCard,
+      items: [],
+    },
+    {
+      id: 'site_enginner',
+      label: 'Site Enginner',
+      icon: HardHat,
+      items: [
+        { label: 'Detailed Site Engineers', path: '/admin/site-engineers', icon: Users, isComingSoon: false },
+        { label: 'AddSiteEnginner', path: '/admin/add-site-engineer', icon: Compass, isComingSoon: false },
       ],
     },
     {
@@ -355,9 +398,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1.5">
             {navGroups.map((group) => {
               const isOpenGroup = openGroupId === group.id;
-              const hasActiveChild = group.items.some(
-                (item) => location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path))
-              );
+              const hasActiveChild =
+                group.id === 'all_teams'
+                  ? isViewing
+                  : group.items.some(
+                      (item) =>
+                        location.pathname === item.path ||
+                        (item.path !== '/' && location.pathname.startsWith(item.path))
+                    );
 
               return (
                 <div key={group.id} className="relative rounded-lg">
@@ -375,7 +423,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={cn(
                       'w-full flex items-center rounded-lg font-semibold tracking-wider text-[11px] transition-all duration-150',
                       isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
-                      isOpenGroup && !isCompact
+                      group.id === 'all_teams' && isViewing
+                        ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                        : isOpenGroup && !isCompact
                         ? 'text-amber-400 bg-amber-500/10'
                         : hasActiveChild
                         ? 'text-amber-300 bg-slate-800/50'
@@ -386,16 +436,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <group.icon
                         className={cn(
                           'w-4 h-4 shrink-0 transition-colors',
-                          isOpenGroup || hasActiveChild ? 'text-amber-400' : 'text-slate-400'
+                          group.id === 'all_teams' && isViewing
+                            ? 'text-slate-950'
+                            : isOpenGroup || hasActiveChild
+                            ? 'text-amber-400'
+                            : 'text-slate-400'
                         )}
                       />
                       {!isCompact && <span className="truncate">{group.label}</span>}
                     </div>
                     {!isCompact && (
                       isOpenGroup ? (
-                        <ChevronDown className="w-3.5 h-3.5 text-amber-400 transition-transform shrink-0 ml-1" />
+                        <ChevronDown
+                          className={cn(
+                            'w-3.5 h-3.5 transition-transform shrink-0 ml-1',
+                            group.id === 'all_teams' && isViewing ? 'text-slate-950' : 'text-amber-400'
+                          )}
+                        />
                       ) : (
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 transition-transform shrink-0 ml-1" />
+                        <ChevronRight
+                          className={cn(
+                            'w-3.5 h-3.5 transition-transform shrink-0 ml-1',
+                            group.id === 'all_teams' && isViewing ? 'text-slate-950' : 'text-slate-500'
+                          )}
+                        />
                       )
                     )}
                   </button>
@@ -403,51 +467,137 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {/* Group Sub-Items (Single accordion active) */}
                   {!isCompact && isOpenGroup && (
                     <div className="pl-4 pr-1 py-1 space-y-0.5 border-l border-amber-500/30 ml-4 my-1 animate-in fade-in slide-in-from-top-1 duration-150">
-                      {group.items.map((subItem) => {
-                        const SubIcon = subItem.icon || FileSpreadsheet;
-                        return (
-                          <NavLink
-                            key={subItem.path}
-                            to={subItem.path}
-                            end
-                            onClick={() => onClose()}
-                            className={({ isActive }) =>
-                              cn(
-                                'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
-                                isActive
-                                  ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
-                                  : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                              )
-                            }
-                          >
-                            {({ isActive }) => (
-                              <>
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <SubIcon
+                      {group.id === 'all_teams' ? (
+                        /* Dynamic All Teams */
+                        <div className="space-y-1">
+                          {teamUsers.length === 0 ? (
+                            <div className="py-2.5 px-2 text-center space-y-1.5 bg-[#0A0E18] rounded-lg border border-slate-800/80">
+                              <p className="text-[11px] text-slate-400">No team members yet</p>
+                              <NavLink
+                                to="/settings/users"
+                                onClick={() => onClose()}
+                                className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-amber-400 hover:text-amber-300"
+                              >
+                                <UserPlus className="w-3 h-3" />
+                                <span>+ Add in Users</span>
+                              </NavLink>
+                            </div>
+                          ) : (
+                            <>
+                              {teamUsers.map((member) => {
+                                const isSelected =
+                                  viewingUser?.email?.toLowerCase() === member.email?.toLowerCase() ||
+                                  viewingUser?.id === member._id;
+                                const isCurrentUser =
+                                  user?.email?.toLowerCase() === member.email?.toLowerCase();
+
+                                return (
+                                  <button
+                                    key={member._id}
+                                    type="button"
+                                    onClick={() => {
+                                      onClose();
+                                      startViewing({
+                                        id: member._id,
+                                        name: member.name,
+                                        email: member.email,
+                                        role: member.role,
+                                        mobile: member.mobile,
+                                      });
+                                    }}
                                     className={cn(
-                                      'w-3.5 h-3.5 shrink-0 transition-colors',
-                                      isActive ? 'text-slate-950' : 'text-slate-400 group-hover:text-slate-200'
-                                    )}
-                                  />
-                                  <span className="truncate">{subItem.label}</span>
-                                </div>
-                                {subItem.isComingSoon && (
-                                  <span
-                                    className={cn(
-                                      'text-[9px] px-1 py-0.2 rounded font-medium shrink-0 ml-1.5',
-                                      isActive
-                                        ? 'bg-amber-900/60 text-amber-200 border border-amber-600/50'
-                                        : 'bg-slate-800/90 text-slate-400 border border-slate-700/50'
+                                      'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150 cursor-pointer',
+                                      isSelected
+                                        ? 'bg-[#1E190D] text-amber-300 font-bold border border-amber-500/40 shadow-sm'
+                                        : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                                     )}
                                   >
-                                    Soon
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </NavLink>
-                        );
-                      })}
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <UserIcon
+                                        className={cn(
+                                          'w-3.5 h-3.5 shrink-0',
+                                          isSelected ? 'text-amber-400' : 'text-slate-400'
+                                        )}
+                                      />
+                                      <span className="truncate">{member.name}</span>
+                                      {isCurrentUser && (
+                                        <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 shrink-0 font-normal">
+                                          You
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[9px] font-mono uppercase px-1 py-0.5 rounded bg-amber-500/10 text-amber-400/90 shrink-0 ml-1">
+                                      {member.role === 'SITE_ENGINEER' ? 'SE' : member.role}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+
+                              {isViewing && (
+                                <button
+                                  type="button"
+                                  onClick={() => stopViewing()}
+                                  className="w-full mt-1.5 flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition-all cursor-pointer"
+                                >
+                                  <X className="w-3 h-3" />
+                                  <span>Stop Viewing</span>
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        /* Standard Sub-items */
+                        group.items.map((subItem) => {
+                          const SubIcon = subItem.icon || FileSpreadsheet;
+                          return (
+                            <NavLink
+                              key={subItem.path}
+                              to={subItem.path}
+                              end
+                              onClick={() => onClose()}
+                              className={({ isActive }) =>
+                                cn(
+                                  'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
+                                  isActive
+                                    ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
+                                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                                )
+                              }
+                            >
+                              {({ isActive }) => (
+                                <>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <SubIcon
+                                      className={cn(
+                                        'w-3.5 h-3.5 shrink-0 transition-colors',
+                                        isActive
+                                          ? 'text-slate-950'
+                                          : subItem.label.includes('AddSiteEnginner')
+                                          ? 'text-blue-400'
+                                          : 'text-slate-400 group-hover:text-slate-200'
+                                      )}
+                                    />
+                                    <span className="truncate">{subItem.label}</span>
+                                  </div>
+                                  {subItem.isComingSoon && (
+                                    <span
+                                      className={cn(
+                                        'text-[9px] px-1 py-0.2 rounded font-medium shrink-0 ml-1.5',
+                                        isActive
+                                          ? 'bg-amber-900/60 text-amber-200 border border-amber-600/50'
+                                          : 'bg-slate-800/90 text-slate-400 border border-slate-700/50'
+                                      )}
+                                    >
+                                      Soon
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </NavLink>
+                          );
+                        })
+                      )}
                     </div>
                   )}
                 </div>
@@ -455,7 +605,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             })}
           </div>
 
-          {/* Recycle Bin & Settings */}
+          {/* Recycle Bin & Settings Section */}
           <div className="pt-2 border-t border-slate-800/60 space-y-1">
             <NavLink
               to="/recycle-bin"
@@ -501,32 +651,147 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </NavLink>
 
-            <NavLink
-              to="/settings"
-              onClick={() => onClose()}
-              title={isCompact ? 'Settings' : undefined}
-              className={({ isActive }) =>
-                cn(
-                  'group flex items-center rounded-lg font-medium transition-all duration-150',
-                  isCompact ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2',
-                  isActive
-                    ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
+            {/* Expandable Settings Accordion matching Screenshot 4 */}
+            <div className="relative rounded-lg">
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen((prev) => !prev)}
+                title={isCompact ? 'Settings' : undefined}
+                className={cn(
+                  'w-full flex items-center rounded-lg font-semibold tracking-wider text-[11px] transition-all duration-150',
+                  isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
+                  isSettingsOpen && !isCompact
+                    ? 'text-amber-400 bg-amber-500/10'
+                    : location.pathname.startsWith('/settings') ||
+                      location.pathname.startsWith('/RBAC') ||
+                      location.pathname.startsWith('/Admin/Manage')
+                    ? 'text-amber-300 bg-slate-800/50'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
+                )}
+              >
+                <div className={cn('flex items-center min-w-0', !isCompact && 'gap-2.5')}>
                   <Settings
                     className={cn(
                       'w-4 h-4 shrink-0 transition-colors',
-                      isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-white'
+                      isSettingsOpen ? 'text-amber-400' : 'text-slate-400'
                     )}
                   />
-                  {!isCompact && <span className="font-semibold truncate">Settings</span>}
-                </>
+                  {!isCompact && <span className="truncate">Settings</span>}
+                </div>
+                {!isCompact && (
+                  isSettingsOpen ? (
+                    <ChevronDown className="w-3.5 h-3.5 text-amber-400 transition-transform shrink-0 ml-1" />
+                  ) : (
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 transition-transform shrink-0 ml-1" />
+                  )
+                )}
+              </button>
+
+              {/* Settings Sub-Items */}
+              {!isCompact && isSettingsOpen && (
+                <div className="pl-4 pr-1 py-1 space-y-0.5 border-l border-amber-500/30 ml-4 my-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <NavLink
+                    to="/settings/manage-menus"
+                    onClick={() => onClose()}
+                    className={({ isActive }) =>
+                      cn(
+                        'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
+                        isActive
+                          ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ListChecks
+                          className={cn(
+                            'w-3.5 h-3.5 shrink-0 transition-colors',
+                            isActive ? 'text-slate-950' : 'text-blue-400'
+                          )}
+                        />
+                        <span className="truncate">Manage Menus</span>
+                      </div>
+                    )}
+                  </NavLink>
+
+                  <NavLink
+                    to="/settings/manage-roles"
+                    onClick={() => onClose()}
+                    className={({ isActive }) =>
+                      cn(
+                        'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
+                        isActive
+                          ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ShieldCheck
+                          className={cn(
+                            'w-3.5 h-3.5 shrink-0 transition-colors',
+                            isActive ? 'text-slate-950' : 'text-blue-400'
+                          )}
+                        />
+                        <span className="truncate">Manage Roles</span>
+                      </div>
+                    )}
+                  </NavLink>
+
+                  <NavLink
+                    to="/settings/role-vs-user"
+                    onClick={() => onClose()}
+                    className={({ isActive }) =>
+                      cn(
+                        'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
+                        isActive
+                          ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <UserCheck
+                          className={cn(
+                            'w-3.5 h-3.5 shrink-0 transition-colors',
+                            isActive ? 'text-slate-950' : 'text-blue-400'
+                          )}
+                        />
+                        <span className="truncate">Role Vs User</span>
+                      </div>
+                    )}
+                  </NavLink>
+
+                  <NavLink
+                    to="/settings/users"
+                    onClick={() => onClose()}
+                    className={({ isActive }) =>
+                      cn(
+                        'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
+                        isActive
+                          ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Users
+                          className={cn(
+                            'w-3.5 h-3.5 shrink-0 transition-colors',
+                            isActive ? 'text-slate-950' : 'text-blue-400'
+                          )}
+                        />
+                        <span className="truncate">User</span>
+                      </div>
+                    )}
+                  </NavLink>
+                </div>
               )}
-            </NavLink>
+            </div>
           </div>
         </div>
 

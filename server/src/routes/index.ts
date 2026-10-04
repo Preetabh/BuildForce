@@ -48,6 +48,14 @@ router.use('/leads', leadRoutes);
 import serviceCatalogRoutes from '../modules/services/serviceCatalog.routes';
 router.use('/services', serviceCatalogRoutes);
 
+// RBAC Role Admin Section Routes (Manage Menus, Manage Roles, Role Vs User, Users)
+import rbacRoutes from '../modules/rbac/rbac.routes';
+router.use('/rbac', rbacRoutes);
+
+// Site Engineer Routes (Detailed Site Engineers, Add Site Engineer, Status Allow/Decline, Wallet)
+import siteEngineerRoutes from '../modules/siteEngineers/siteEngineer.routes';
+router.use('/site-engineers', siteEngineerRoutes);
+
 // Audit Trail Routes
 router.get('/audit/recent', authenticate, async (req, res, next) => {
   try {

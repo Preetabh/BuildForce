@@ -4,6 +4,14 @@ import { UserRole } from '../models/User';
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   SUPER_ADMIN: ['*'],
   ADMIN: ['*'],
+  SITE_ENGINEER: [
+    'project.view',
+    'measurement.view',
+    'measurement.create',
+    'measurement.edit',
+    'sor.view',
+    'boq.view',
+  ],
   MANAGER: [
     'project.view',
     'project.create',

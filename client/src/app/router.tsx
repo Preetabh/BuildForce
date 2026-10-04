@@ -20,6 +20,11 @@ import { PayAmountPage } from '../pages/leads/PayAmountPage';
 import { ReferencePartners } from '../pages/leads/ReferencePartners';
 import { CommissionReport } from '../pages/leads/CommissionReport';
 import { ServiceCatalogPage } from '../pages/services/ServiceCatalogPage';
+import { ManageMenus } from '../pages/rbac/ManageMenus';
+import { ManageRoles } from '../pages/rbac/ManageRoles';
+import { RoleVsUser } from '../pages/rbac/RoleVsUser';
+import { UserManagement } from '../pages/rbac/UserManagement';
+import { DetailedSiteEngineers } from '../pages/siteEngineers/DetailedSiteEngineers';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -168,6 +173,32 @@ export const AppRouter: React.FC = () => {
           <Route path="/hse" element={<ComingSoonModule />} />
           <Route path="/hse/qc" element={<ComingSoonModule />} />
           <Route path="/hse/safety" element={<ComingSoonModule />} />
+
+          {/* SITE ENGINEERS & FIELD OPERATIONS */}
+          <Route path="/admin/site-engineers" element={<DetailedSiteEngineers />} />
+          <Route path="/Admin/ManageSiteEngineers" element={<DetailedSiteEngineers />} />
+          <Route path="/admin/add-site-engineer" element={<DetailedSiteEngineers />} />
+          <Route path="/Admin/AddSiteEngineer" element={<DetailedSiteEngineers />} />
+
+          {/* RBAC ROLE ADMIN SECTION */}
+          <Route path="/settings/manage-menus" element={<ManageMenus />} />
+          <Route path="/RBAC/ManageMenus" element={<ManageMenus />} />
+          <Route path="/Admin/ManageMenus" element={<ManageMenus />} />
+          <Route path="/admin/manage-menus" element={<ManageMenus />} />
+
+          <Route path="/settings/manage-roles" element={<ManageRoles />} />
+          <Route path="/RBAC/ManageRoles" element={<ManageRoles />} />
+          <Route path="/Admin/ManageRoles" element={<ManageRoles />} />
+          <Route path="/admin/manage-roles" element={<ManageRoles />} />
+
+          <Route path="/settings/role-vs-user" element={<RoleVsUser />} />
+          <Route path="/RBAC/RoleVsUser" element={<RoleVsUser />} />
+          <Route path="/Admin/RoleVsUser" element={<RoleVsUser />} />
+          <Route path="/admin/role-vs-user" element={<RoleVsUser />} />
+
+          <Route path="/settings/users" element={<UserManagement />} />
+          <Route path="/Admin/Users" element={<UserManagement />} />
+          <Route path="/admin/users" element={<UserManagement />} />
 
           {/* Utilities */}
           <Route path="/help" element={<Help />} />

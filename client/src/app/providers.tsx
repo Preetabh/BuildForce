@@ -4,6 +4,8 @@ import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { AppLoaderProvider } from '../context/AppLoaderContext';
 
+import { ImpersonationProvider } from '../context/ImpersonationContext';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -19,7 +21,9 @@ export const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <AppLoaderProvider>{children}</AppLoaderProvider>
+          <ImpersonationProvider>
+            <AppLoaderProvider>{children}</AppLoaderProvider>
+          </ImpersonationProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>

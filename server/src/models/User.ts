@@ -1,13 +1,18 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'USER' | 'SITE_ENGINEER';
 
 export interface IUser extends Document {
   name: string;
   email: string;
   passwordHash: string;
-  role: UserRole;
+  role: string;
   companyId: Types.ObjectId;
+  mobile?: string;
+  expertise?: string;
+  walletBalance?: number;
+  projectsCount?: number;
+  permissions?: Record<string, boolean>; // Granular menu/feature allow/decline flags
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -34,8 +39,29 @@ const userSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'USER'],
       default: 'ADMIN',
+    },
+    mobile: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    expertise: {
+      type: String,
+      default: 'Common',
+    },
+    walletBalance: {
+      type: Number,
+      default: 0,
+    },
+    projectsCount: {
+      type: Number,
+      default: 0,
+    },
+    permissions: {
+      type: Map,
+      of: Boolean,
+      default: {},
     },
     companyId: {
       type: Schema.Types.ObjectId,

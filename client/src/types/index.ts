@@ -980,5 +980,7 @@ export interface ClientDossier {
   payouts: PartnerPayoutItem[];
 }
 
+export * from './rbac';
+
 
 
