@@ -7,6 +7,7 @@ import { AiAssistantWidget } from '../common/AiAssistantWidget';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useImpersonation } from '../../context/ImpersonationContext';
+import { UserProfileMenu } from '../profile/UserProfileMenu';
 
 export const AppLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -142,9 +143,7 @@ export const AppLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 text-slate-950 font-black text-xs flex items-center justify-center shadow-md">
-              A
-            </div>
+            <UserProfileMenu showRoleBadge={false} />
           </div>
         </header>
 

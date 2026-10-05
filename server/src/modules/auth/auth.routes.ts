@@ -9,5 +9,6 @@ const router = Router();
 router.post('/register', validateBody(registerSchema), AuthController.register);
 router.post('/login', validateBody(loginSchema), AuthController.login);
 router.get('/me', authenticate, AuthController.getCurrentUser);
+router.patch('/profile', authenticate, AuthController.updateProfile);
 
 export default router;

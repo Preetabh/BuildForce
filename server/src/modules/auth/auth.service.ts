@@ -139,6 +139,60 @@ export class AuthService {
     };
   }
 
+  public static async updateProfile(
+    userId: string,
+    data: { name?: string; mobile?: string; expertise?: string; currentPassword?: string; newPassword?: string }
+  ) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (data.name && data.name.trim()) {
+      user.name = data.name.trim();
+    }
+    if (data.mobile !== undefined) {
+      user.mobile = data.mobile.trim();
+    }
+    if (data.expertise !== undefined) {
+      user.expertise = data.expertise.trim();
+    }
+
+    if (data.currentPassword && data.newPassword) {
+      const isMatch = await bcrypt.compare(data.currentPassword, user.passwordHash);
+      if (!isMatch) {
+        throw new AppError('Incorrect current password', 400);
+      }
+      if (data.newPassword.length < 6) {
+        throw new AppError('New password must be at least 6 characters', 400);
+      }
+      user.passwordHash = await bcrypt.hash(data.newPassword, 10);
+    }
+
+    await user.save();
+
+    const company = await Company.findById(user.companyId);
+    return {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        companyId: user.companyId,
+        mobile: user.mobile,
+        expertise: user.expertise,
+        permissions: user.permissions || {},
+      },
+      company: company
+        ? {
+            id: company._id,
+            name: company.name,
+            code: company.code,
+          }
+        : null,
+    };
+  }
+
   private static generateToken(user: IUser): string {
     return jwt.sign(
       {

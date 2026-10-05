@@ -27,6 +27,8 @@ import { ManageRoles } from '../pages/rbac/ManageRoles';
 import { RoleVsUser } from '../pages/rbac/RoleVsUser';
 import { UserManagement } from '../pages/rbac/UserManagement';
 import { DetailedSiteEngineers } from '../pages/siteEngineers/DetailedSiteEngineers';
+import { VendorManagement } from '../pages/vendors/VendorManagement';
+import { WorkerManagement } from '../pages/vendors/WorkerManagement';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -321,10 +323,42 @@ export const AppRouter: React.FC = () => {
           />
 
           {/* VENDOR MANAGEMENT */}
-          <Route path="/vendors" element={<ComingSoonModule />} />
-          <Route path="/vendor-management" element={<ComingSoonModule />} />
-          <Route path="/vendors/suppliers" element={<ComingSoonModule />} />
-          <Route path="/vendors/workers" element={<ComingSoonModule />} />
+          <Route
+            path="/vendors"
+            element={
+              <PermissionRoute permission={['Admin/Venders', 'Admin/Vendors_Suppliers', 'vendor_management']}>
+                <VendorManagement />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/vendor-management"
+            element={<Navigate to="/vendors/suppliers" replace />}
+          />
+          <Route
+            path="/vendors/suppliers"
+            element={
+              <PermissionRoute permission={['Admin/Venders', 'Admin/Vendors_Suppliers', 'vendor_management']}>
+                <VendorManagement />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/Admin/Suppliers"
+            element={<Navigate to="/vendors/suppliers" replace />}
+          />
+          <Route
+            path="/vendors/workers"
+            element={
+              <PermissionRoute permission={['Admin/Venders', 'Admin/Vendors_Workers', 'vendor_management']}>
+                <WorkerManagement />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/Admin/Workers"
+            element={<Navigate to="/vendors/workers" replace />}
+          />
 
           {/* SALES & TENDERING */}
           <Route path="/sales" element={<ComingSoonModule />} />

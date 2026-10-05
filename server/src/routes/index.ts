@@ -56,6 +56,10 @@ router.use('/rbac', rbacRoutes);
 import siteEngineerRoutes from '../modules/siteEngineers/siteEngineer.routes';
 router.use('/site-engineers', siteEngineerRoutes);
 
+// Vendor & Worker Routes
+import vendorRoutes from '../modules/vendors/vendor.routes';
+router.use('/', vendorRoutes);
+
 // Audit Trail Routes
 router.get('/audit/recent', authenticate, async (req, res, next) => {
   try {

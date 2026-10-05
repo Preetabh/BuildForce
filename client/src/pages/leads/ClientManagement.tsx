@@ -31,6 +31,7 @@ import { DailyProgressReportModal } from '../../components/leads/DailyProgressRe
 import { ClientFollowUpModal } from '../../components/leads/ClientFollowUpModal';
 import { ClientEditModal } from '../../components/leads/ClientEditModal';
 import { ClientDeadModal } from '../../components/leads/ClientDeadModal';
+import { UserProfileMenu } from '../../components/profile/UserProfileMenu';
 
 export const ClientManagement: React.FC = () => {
   const [clients, setClients] = useState<ClientRecord[]>([]);
@@ -187,6 +188,10 @@ export const ClientManagement: React.FC = () => {
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span className="text-slate-300 font-bold">2026-2027</span>
             <span className="text-emerald-400 font-semibold text-[11px]">Session Active</span>
+          </div>
+
+          <div className="pl-1 border-l border-slate-800">
+            <UserProfileMenu />
           </div>
 
           <button

@@ -47,6 +47,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useImpersonation } from '../../context/ImpersonationContext';
 import { cn } from '../../utils/cn';
 import { usePermissions } from '../../hooks/usePermissions';
+import { UserProfileModal } from '../profile/UserProfileModal';
 
 export interface SidebarProps {
   isOpen: boolean;
@@ -114,6 +115,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   });
 
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
   // The sidebar is visually compact ONLY if it is minimized AND not currently hovered
   const isCompact = isMinimized && !isHovered;
 
@@ -174,11 +177,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'vendor_management',
-      label: 'VENDOR MANAGEMENT',
+      label: 'Venders',
       icon: Truck,
       items: [
-        { label: 'Suppliers', path: '/vendors/suppliers', icon: Truck, isComingSoon: true, permissionKey: 'Admin/Vendors_Suppliers' },
-        { label: 'Workers', path: '/vendors/workers', icon: HardHat, isComingSoon: true, permissionKey: 'Admin/Vendors_Workers' },
+        { label: 'Supplier', path: '/vendors/suppliers', icon: Truck, isComingSoon: false, permissionKey: 'Admin/Vendors_Suppliers' },
+        { label: 'Workers', path: '/vendors/workers', icon: HardHat, isComingSoon: false, permissionKey: 'Admin/Vendors_Workers' },
       ],
     },
     {
@@ -828,8 +831,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             /* Minimized Profile Footer */
             <div className="flex flex-col items-center gap-2">
               <div
-                title={`${user?.name || 'User'} (${roleDisplayName})`}
-                className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-md cursor-pointer hover:ring-2 hover:ring-amber-400 transition-all"
+                onClick={() => setIsProfileModalOpen(true)}
+                title="Click to view profile & account settings"
+                className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-500 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-md cursor-pointer hover:ring-2 hover:ring-amber-400 transition-all"
               >
                 {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
@@ -846,12 +850,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             /* Full Profile Footer (also shown on hover!) */
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-500 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-md">
+              <div
+                onClick={() => setIsProfileModalOpen(true)}
+                title="Click to view profile, permissions & settings"
+                className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer hover:bg-slate-800/50 p-1 rounded-xl transition-all group"
+              >
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-500 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-md ring-1 ring-amber-500/30 group-hover:ring-amber-400 transition-all">
                   {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-slate-200 truncate flex items-center gap-1.5">
+                  <p className="text-xs font-semibold text-slate-200 truncate flex items-center gap-1.5 group-hover:text-amber-300 transition-colors">
                     <span>{user?.name || (user?.email ? user.email.split('@')[0] : 'User')}</span>
                     {isViewing && viewingUser && (
                       <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold shrink-0" title={`Filtering data for ${viewingUser.name}`}>
@@ -883,6 +891,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
         </div>
+
+        {/* Global User Profile Modal */}
+        <UserProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+        />
 
         {/* Desktop Mouse Drag Resize Handle (Only active when not in compact rail mode) */}
         {!isCompact && (

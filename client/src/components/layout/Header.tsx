@@ -3,6 +3,7 @@ import { Menu, RefreshCw, Plus, Search, Building2, Bell, ChevronDown } from 'luc
 import { Button } from '../common/Button';
 import { BreadcrumbItem, Breadcrumb } from './Breadcrumb';
 import { useAuth } from '../../context/AuthContext';
+import { UserProfileMenu } from '../profile/UserProfileMenu';
 
 export interface HeaderProps {
   breadcrumbs?: BreadcrumbItem[];
@@ -19,7 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
   onRefresh,
   isRefreshing = false,
-  onNewProject,
+  onNewProject, 
   searchValue,
   onSearchChange,
 }) => {
@@ -55,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
-              type="text"
+              type="text" 
               value={searchValue ?? ''}
               onChange={(e) => onSearchChange?.(e.target.value)}
               placeholder="Search projects, tasks, RFIs..."
@@ -83,16 +84,15 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Notifications Bell */}
           <button
             title="Notifications"
-            className="relative p-2 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 rounded-lg transition-colors"
+
+            className="relative  p-2 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 rounded-lg transition-colors"
           >
             <Bell className="w-4 h-4" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-[#090D16]" />
           </button>
 
-          {/* User Avatar */}
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-sm ring-2 ring-amber-500/30">
-            {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
-          </div>
+          {/* User Profile Menu with Interactive Dropdown & Modal */}
+          <UserProfileMenu showRoleBadge={false} />
 
           {/* New Project CTA */}
           {onNewProject && (

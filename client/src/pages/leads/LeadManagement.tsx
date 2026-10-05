@@ -30,6 +30,7 @@ import { RegisterClientModal } from '../../components/leads/RegisterClientModal'
 import { MarkDeadModal } from '../../components/leads/MarkDeadModal';
 import { useAuth } from '../../context/AuthContext';
 import { useImpersonation } from '../../context/ImpersonationContext';
+import { UserProfileMenu } from '../../components/profile/UserProfileMenu';
 
 export const LeadManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -256,17 +257,9 @@ export const LeadManagement: React.FC = () => {
             <Bell className="w-3.5 h-3.5" />
           </button>
 
-          {/* User profile capsule */}
-          <div className="flex items-center gap-2 pl-2 border-l border-[#1F293F]">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 text-slate-950 font-black text-xs flex items-center justify-center shadow-md">
-              {user?.email?.charAt(0).toUpperCase() || 'A'}
-            </div>
-            <div className="hidden md:block text-left">
-              <p className="text-[11px] font-semibold text-white leading-tight">
-                {user?.email || 'admin@lucknowbuilders.com'}
-              </p>
-              <p className="text-[9px] text-amber-400/90 font-medium">Master Admin</p>
-            </div>
+          {/* User profile capsule with full interactive profile section */}
+          <div className="pl-2 border-l border-[#1F293F]">
+            <UserProfileMenu />
           </div>
         </div>
       </div>
