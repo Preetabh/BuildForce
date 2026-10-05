@@ -1,411 +1,161 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
 import {
-  Wallet,
-  Coins,
-  BarChart3,
-  AlertTriangle,
-  TrendingUp,
-  Plus,
+  FolderKanban,
+  Users,
+  HardHat,
   Sparkles,
-  CheckCircle,
 } from 'lucide-react';
-import api from '../services/api';
-import { Project, ProjectStats } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { Header } from '../components/layout/Header';
-import { PortfolioHealthChart } from '../components/home/PortfolioHealthChart';
-import { ProjectsTable } from '../components/home/ProjectsTable';
-import { NeedsAttentionCard } from '../components/home/NeedsAttentionCard';
-import { RecentActivityCard } from '../components/home/RecentActivityCard';
-import { CreateProjectModal } from '../components/projects/CreateProjectModal';
-import { formatCurrency } from '../utils/formatters';
+
+// 100% Modular Dashboards separated by concern & permissions
+import { ProjectPortfolioDashboard } from '../components/dashboards/ProjectPortfolioDashboard';
+import { LeadManagementDashboard } from '../components/dashboards/LeadManagementDashboard';
+import { SiteEngineerDashboard } from '../components/dashboards/SiteEngineerDashboard';
 
 interface OutletContextType {
   setSidebarOpen: (open: boolean) => void;
   deletedCount: number;
 }
 
+export type DashboardTab = 'projects' | 'leads' | 'site';
+
 export const Home: React.FC = () => {
   const { setSidebarOpen } = useOutletContext<OutletContextType>();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const { canAccess, isModuleAllowed, isMasterAdmin } = usePermissions();
 
-  // Modal State
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
+  const userRoleCode = (user?.role || '').trim().toUpperCase();
 
-  // Notification Toast Message
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Active tab state - exclusively for Master Admin switching
+  const [activeTab, setActiveTab] = useState<DashboardTab>('projects');
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
-  };
-
-  // 1. Fetch Dynamic Statistics from MongoDB
-  const {
-    data: stats,
-    refetch: refetchStats,
-  } = useQuery<ProjectStats>({
-    queryKey: ['projectStats'],
-    queryFn: async () => {
-      const res = await api.get('/projects/stats');
-      return res.data?.data;
+  // Master Admin Switcher Tabs
+  const adminTabs = useMemo(() => [
+    {
+      id: 'projects' as DashboardTab,
+      label: 'Projects Portfolio',
+      icon: FolderKanban,
     },
-  });
-
-  // 2. Fetch Projects from MongoDB (Subprojects automatically filtered by backend)
-  const {
-    data: projectsData,
-    isLoading: isProjectsLoading,
-    refetch: refetchProjects,
-    isFetching,
-  } = useQuery<{ projects: Project[] }>({
-    queryKey: ['projects'],
-    queryFn: async () => {
-      const res = await api.get('/projects?limit=100');
-      return {
-        projects: res.data?.data || [],
-      };
+    {
+      id: 'leads' as DashboardTab,
+      label: 'Leads & Client CRM',
+      icon: Users,
     },
-  });
-
-  // STRICT REQUIREMENT: Only main projects are considered on Home Dashboard
-  const mainProjects = useMemo(() => {
-    const raw = projectsData?.projects || [];
-    return raw.filter((p) => {
-      if (p.parentId) return false;
-      if (/-SP\d+/i.test(p.code || '')) return false;
-      return true;
-    });
-  }, [projectsData?.projects]);
-
-  // Refresh All Data
-  const handleRefresh = async () => {
-    await Promise.all([refetchStats(), refetchProjects()]);
-    showToast('Dashboard refreshed with latest MongoDB records');
-  };
-
-  // Soft Delete Project Mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (projectId: string) => {
-      return api.delete(`/projects/${projectId}`);
+    {
+      id: 'site' as DashboardTab,
+      label: 'Site Operations & Field',
+      icon: HardHat,
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['projectStats'] });
-      queryClient.invalidateQueries({ queryKey: ['recycleBinCount'] });
-      showToast('Project moved to Recycle Bin');
-    },
-    onError: (err: unknown) => {
-      const e = err as { response?: { data?: { message?: string } } };
-      alert(e.response?.data?.message || 'Failed to delete project');
-    },
-  });
+  ], []);
 
-  // Archive Toggle Mutation
-  const archiveMutation = useMutation({
-    mutationFn: async (projectId: string) => {
-      return api.patch(`/projects/${projectId}/archive`);
-    },
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['projectStats'] });
-      showToast(res.data?.message || 'Project archive state updated');
-    },
-  });
-
-  const handleDelete = (projectId: string, projectName: string) => {
-    if (
-      window.confirm(
-        `Move project "${projectName}" to Recycle Bin?\n\nYou can restore it at any time from the Recycle Bin.`
-      )
-    ) {
-      deleteMutation.mutate(projectId);
+  // Determine fixed dashboard for non-admin users (STRICT REQUIREMENT: Only admin gets multiple tabs)
+  const currentDashboard = useMemo<DashboardTab>(() => {
+    // 1. If Master Admin, return the selected tab from activeTab state
+    if (isMasterAdmin) {
+      return activeTab;
     }
-  };
 
-  const handleArchive = (projectId: string) => {
-    archiveMutation.mutate(projectId);
-  };
+    // 2. Check Lead Management Access
+    const hasLeadAccess =
+      isModuleAllowed('lead_management') ||
+      canAccess('Admin/Management') ||
+      canAccess('Admin/Enquiry') ||
+      canAccess('Admin/Clients') ||
+      canAccess('lead.view') ||
+      canAccess('Admin/Dash_Inquiries') ||
+      userRoleCode === 'COUNSELLOR' ||
+      userRoleCode === 'BDM';
 
-  const handleEdit = (project: Project) => {
-    setProjectToEdit(project);
-    setIsCreateModalOpen(true);
-  };
+    // 3. Check Site Engineer Access
+    const hasSiteAccess =
+      isModuleAllowed('site_enginner') ||
+      userRoleCode === 'SITE_ENGINEER' ||
+      canAccess('Admin/SiteEngineersSection') ||
+      canAccess('measurement.view');
 
-  const handleOpenCreateModal = () => {
-    setProjectToEdit(null);
-    setIsCreateModalOpen(true);
-  };
+    // 4. Check Project / Planning Access
+    const hasProjectAccess =
+      isModuleAllowed('plannings') ||
+      isModuleAllowed('project_management') ||
+      canAccess('Admin/LibraryMgmt') ||
+      canAccess('Admin/ReportAnalytic') ||
+      canAccess('project.view') ||
+      userRoleCode === 'PROJECT_MANAGER' ||
+      userRoleCode === 'ESTIMATE_ENGINEER' ||
+      userRoleCode === 'ARCHITECT';
 
-  const handleModalSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['projects'] });
-    queryClient.invalidateQueries({ queryKey: ['projectStats'] });
-    showToast(
-      projectToEdit ? 'Project updated successfully' : 'New project created successfully'
-    );
-  };
-
-  // Real Dynamic Calculations from Database (NO Hardcoded Values!)
-  const totalValueNum = useMemo(() => {
-    return mainProjects.reduce((sum, p) => sum + (p.contractValue || p.estimatedValue || 0), 0);
-  }, [mainProjects]);
-
-  const portfolioBudgetText = useMemo(() => {
-    if (totalValueNum === 0) return '₹0.00';
-    if (totalValueNum >= 10000000) return `₹${(totalValueNum / 10000000).toFixed(2)} Cr`;
-    if (totalValueNum >= 100000) return `₹${(totalValueNum / 100000).toFixed(2)} L`;
-    return formatCurrency(totalValueNum, 'INR', true);
-  }, [totalValueNum]);
-
-  // Committed cost calculated from actual project progress & value
-  const committedCostNum = useMemo(() => {
-    if (totalValueNum === 0) return 0;
-    return mainProjects.reduce((sum, p) => {
-      const val = p.contractValue || p.estimatedValue || 0;
-      return sum + (val * (p.progress || 0)) / 100;
-    }, 0);
-  }, [mainProjects, totalValueNum]);
-
-  const committedCostText = useMemo(() => {
-    if (committedCostNum === 0) return '₹0.00';
-    if (committedCostNum >= 10000000) return `₹${(committedCostNum / 10000000).toFixed(2)} Cr`;
-    if (committedCostNum >= 100000) return `₹${(committedCostNum / 100000).toFixed(2)} L`;
-    return formatCurrency(committedCostNum, 'INR', true);
-  }, [committedCostNum]);
-
-  const committedPctText = totalValueNum > 0
-    ? `${((committedCostNum / totalValueNum) * 100).toFixed(0)}% of portfolio budget`
-    : '0% of portfolio budget';
-
-  // Forecast variance dynamically computed from estimates vs contracts
-  const forecastVarianceNum = useMemo(() => {
-    return mainProjects.reduce((diff, p) => {
-      const est = p.estimatedValue || 0;
-      const contract = p.contractValue || 0;
-      return diff + Math.abs(contract - est);
-    }, 0);
-  }, [mainProjects]);
-
-  const forecastVarianceText = useMemo(() => {
-    if (forecastVarianceNum === 0) return '₹0.00';
-    if (forecastVarianceNum >= 10000000) return `₹${(forecastVarianceNum / 10000000).toFixed(2)} Cr`;
-    if (forecastVarianceNum >= 100000) return `₹${(forecastVarianceNum / 100000).toFixed(2)} L`;
-    return formatCurrency(forecastVarianceNum, 'INR', true);
-  }, [forecastVarianceNum]);
-
-  // Dynamic projects at risk count
-  const atRiskCount = useMemo(() => {
-    return mainProjects.filter((p) => {
-      const isOverdue = p.endDate && new Date(p.endDate) < new Date() && (p.progress ?? 0) < 100;
-      return p.status === 'on_hold' || isOverdue;
-    }).length;
-  }, [mainProjects]);
-
-  const totalMainCount = mainProjects.length;
-  const onTrackCount = Math.max(0, totalMainCount - atRiskCount);
-
-  // Formatted date
-  const todayFormatted = new Intl.DateTimeFormat('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date());
-
-  // Dynamic Time-Based Greeting (Morning, Afternoon, Evening, Night)
-  const greeting = useMemo(() => {
-    const currentHour = new Date().getHours();
-    if (currentHour >= 4 && currentHour < 12) {
-      return 'Good morning';
-    } else if (currentHour >= 12 && currentHour < 17) {
-      return 'Good afternoon';
-    } else if (currentHour >= 17 && currentHour < 22) {
-      return 'Good evening';
-    } else {
-      return 'Good night';
+    // STRICT ROLE & PERMISSION MATCHING FOR NON-ADMINS:
+    // If user has Lead access and does NOT have Plannings / Project Management:
+    if (hasLeadAccess && !hasProjectAccess) {
+      return 'leads';
     }
-  }, []);
 
-  const displayName = useMemo(() => {
-    if (user?.name && user.name.trim()) {
-      return user.name.trim().split(' ')[0];
+    // If user is a Site Engineer:
+    if (hasSiteAccess && !hasProjectAccess) {
+      return 'site';
     }
-    if (user?.email) {
-      const emailPrefix = user.email.split('@')[0];
-      return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+
+    // If user has Project / Planning access:
+    if (hasProjectAccess) {
+      return 'projects';
     }
-    return '';
-  }, [user]);
+
+    // Default fallbacks based on available module
+    if (hasLeadAccess) return 'leads';
+    if (hasSiteAccess) return 'site';
+    return 'leads';
+  }, [isMasterAdmin, activeTab, isModuleAllowed, canAccess, userRoleCode]);
 
   return (
     <div className="min-h-screen bg-[#090D16] text-slate-100 transition-colors">
-      {/* Top Navigation Header - Single Breadcrumb */}
+      {/* Top Navigation Header */}
       <Header
         breadcrumbs={[{ label: 'Home' }]}
         onToggleSidebar={() => setSidebarOpen(true)}
-        onRefresh={handleRefresh}
-        isRefreshing={isFetching}
-        onNewProject={handleOpenCreateModal}
       />
 
-      {/* Floating Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 text-white border border-amber-500/40 px-4 py-2.5 rounded-xl shadow-lg text-sm flex items-center gap-2 backdrop-blur">
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          <span>{toastMessage}</span>
+      {/* Multiple Dashboard Tab Switcher - ONLY for Master Admin as requested */}
+      {isMasterAdmin && (
+        <div className="border-b border-slate-800 bg-[#0c121e]/90 px-4 sm:px-6 lg:px-8 py-2.5 sticky top-[57px] z-20 backdrop-blur-md">
+          <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-900/90 border border-slate-800 rounded-xl overflow-x-auto scrollbar-none">
+              {adminTabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-amber-500 text-slate-950 shadow-md font-bold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-400 font-medium">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Master Admin Multi-Dashboard Access</span>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Main Container */}
-      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6">
-        {/* Welcome Banner Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              {displayName ? `${greeting}, ${displayName}` : greeting}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Here's what's happening across your construction portfolio today.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4 self-start sm:self-auto">
-            <div className="text-right hidden sm:block">
-              <p className="text-xs font-semibold text-slate-300">
-                {todayFormatted}
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Build today for a better tomorrow.
-              </p>
-            </div>
-
-            <button
-              onClick={handleOpenCreateModal}
-              className="px-4 py-2 bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all hover:shadow cursor-pointer"
-            >
-              <Plus className="w-4 h-4 stroke-[3]" />
-              <span>New project</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 4 Top KPI Cards - 100% Dynamic */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Portfolio budget */}
-          <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
-            <div className="w-11 h-11 rounded-xl bg-amber-950/60 border border-amber-900/40 flex items-center justify-center text-amber-400 shrink-0">
-              <Wallet className="w-5 h-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-400">
-                Portfolio budget
-              </p>
-              <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
-                {portfolioBudgetText}
-              </h2>
-              <p className="text-xs font-medium text-emerald-400 flex items-center gap-1 mt-1">
-                <TrendingUp className="w-3.5 h-3.5" />
-                <span>{totalValueNum > 0 ? '+0% vs last baseline' : 'Active portfolio'}</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Card 2: Committed cost */}
-          <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
-            <div className="w-11 h-11 rounded-xl bg-emerald-950/60 border border-emerald-900/40 flex items-center justify-center text-emerald-400 shrink-0">
-              <Coins className="w-5 h-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-400">
-                Committed cost
-              </p>
-              <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
-                {committedCostText}
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                {committedPctText}
-              </p>
-            </div>
-          </div>
-
-          {/* Card 3: Forecast variance */}
-          <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
-            <div className="w-11 h-11 rounded-xl bg-amber-950/60 border border-amber-900/40 flex items-center justify-center text-amber-400 shrink-0">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-400">
-                Forecast variance
-              </p>
-              <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
-                {forecastVarianceText}
-              </h2>
-              <p className="text-xs font-medium text-emerald-400 flex items-center gap-1 mt-1">
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span>On target with estimate</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Card 4: Projects at risk */}
-          <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
-            <div className="w-11 h-11 rounded-xl bg-rose-950/60 border border-rose-900/40 flex items-center justify-center text-rose-400 shrink-0">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-400">
-                Projects at risk
-              </p>
-              <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
-                {atRiskCount} of {totalMainCount}
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                {onTrackCount} on track <span className="mx-1">|</span> {atRiskCount} at risk
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Two-Column Main Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column (Width: 8 cols out of 12) */}
-          <div className="lg:col-span-8 space-y-6">
-            {/* Portfolio Health Chart - 100% Dynamic */}
-            <PortfolioHealthChart projects={mainProjects} />
-
-            {/* Main Projects Table - 100% Dynamic */}
-            <ProjectsTable
-              projects={mainProjects}
-              isLoading={isProjectsLoading}
-              onNewProject={handleOpenCreateModal}
-              onEdit={handleEdit}
-              onArchive={handleArchive}
-              onDelete={handleDelete}
-            />
-          </div>
-
-          {/* Right Column (Width: 4 cols out of 12) */}
-          <div className="lg:col-span-4 space-y-6">
-            {/* Needs your attention card - 100% Dynamic from projects */}
-            <NeedsAttentionCard projects={mainProjects} />
-
-            {/* Recent activity card - 100% Dynamic from MongoDB auditlogs */}
-            <RecentActivityCard />
-          </div>
-        </div>
+      {/* Render the authorized modular dashboard */}
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto">
+        {currentDashboard === 'projects' && <ProjectPortfolioDashboard />}
+        {currentDashboard === 'leads' && <LeadManagementDashboard />}
+        {currentDashboard === 'site' && <SiteEngineerDashboard />}
       </div>
-
-      {/* Create / Edit Project Modal */}
-      <CreateProjectModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={handleModalSuccess}
-        projectToEdit={projectToEdit}
-      />
     </div>
   );
 };

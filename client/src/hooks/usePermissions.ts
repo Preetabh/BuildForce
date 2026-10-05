@@ -32,17 +32,19 @@ export function usePermissions() {
   });
 
   // Always use the authenticated logged-in user's role
-  const userRoleCode = (user?.role || 'MASTER_ADMIN').trim();
+  const userRoleCode = (user?.role || '').trim();
 
   // Master Admin has full unrestricted access by default unless explicitly overridden
   const isMasterAdmin =
-    userRoleCode === 'ADMIN' ||
-    userRoleCode === 'MASTER_ADMIN' ||
-    userRoleCode.toLowerCase() === 'master admin' ||
-    userRoleCode === 'SUPER_ADMIN';
+    Boolean(userRoleCode) &&
+    (userRoleCode === 'ADMIN' ||
+      userRoleCode === 'MASTER_ADMIN' ||
+      userRoleCode.toLowerCase() === 'master admin' ||
+      userRoleCode === 'SUPER_ADMIN');
 
   // Find the matching role definition for the logged-in user
   const activeRoleDoc = useMemo(() => {
+    if (!userRoleCode) return null;
     return (
       roles.find(
         (r) =>
@@ -78,20 +80,70 @@ export function usePermissions() {
       return true;
     }
 
-    // 4. Plannings / Library fallback: if user has general Admin/LibraryMgmt permission, allow sub-items
-    if (
-      keyOrRoute === '/planning/quantity-master' ||
-      keyOrRoute === 'Quantity Master' ||
-      keyOrRoute === '/sor' ||
-      keyOrRoute === 'Schedule of Rates (SOR)'
-    ) {
-      const parentOverrides = (user as any)?.permissions?.['Admin/LibraryMgmt'];
-      if (typeof parentOverrides === 'boolean') {
-        return parentOverrides;
+    // 4. Module entry point fallback: if user has general access to the module, allow sub-items
+    const parentFallbackMap: Record<string, string[]> = {
+      // Plannings
+      '/planning/quantity-master': ['Admin/LibraryMgmt', 'Plannings / Library Access', '/planning', 'Plannings'],
+      'Quantity Master': ['Admin/LibraryMgmt', 'Plannings / Library Access', '/planning', 'Plannings'],
+      '/sor': ['Admin/LibraryMgmt', 'Plannings / Library Access', '/planning', 'Plannings'],
+      'Schedule of Rates (SOR)': ['Admin/LibraryMgmt', 'Plannings / Library Access', '/planning', 'Plannings'],
+      '/planning/qc-master': ['Admin/LibraryMgmt', 'Plannings / Library Access', '/planning', 'Plannings'],
+      'QC Master & Checklists': ['Admin/LibraryMgmt', 'Plannings / Library Access', '/planning', 'Plannings'],
+      '/planning': ['Admin/LibraryMgmt', 'Plannings / Library Access', 'Plannings'],
+      'Project Schedule & WBS': ['Admin/LibraryMgmt', 'Plannings / Library Access', '/planning', 'Plannings'],
+
+      // Lead Management
+      'Admin/Enquiry': ['Admin/Management'],
+      'Admin/Clients': ['Admin/Management'],
+      'Admin/PaymentHistory': ['Admin/Management'],
+      'Admin/CollectPayment': ['Admin/Management'],
+      'Admin/ReferencePartners': ['Admin/Management'],
+      'Admin/CommissionReport': ['Admin/Management'],
+
+      // Service
+      'Admin/ManageServices': ['Admin/Service'],
+      'Admin/Modules': ['Admin/Service'],
+
+      // All Teams
+      'Admin/MyTeams': ['Admin/MyTeamsAccess'],
+
+      // Site Engineer
+      'Admin/SiteEngineers_List': ['Admin/SiteEngineersSection'],
+      'Admin/ManageSiteEngineers': ['Admin/SiteEngineersSection'],
+
+      // Vendor Management
+      'Admin/Vendors_Suppliers': ['Admin/Venders'],
+      'Admin/Vendors_Workers': ['Admin/Venders'],
+
+      // Project Management
+      'Admin/DailyReportList': ['Admin/ReportAnalytic'],
+      'Admin/MeasurementBook': ['Admin/ReportAnalytic'],
+      'Admin/DPR': ['Admin/ReportAnalytic'],
+      'Admin/EVM': ['Admin/ReportAnalytic'],
+      'Admin/Inspections': ['Admin/ReportAnalytic'],
+
+      // Settings
+      'RBAC/ManageMenus': ['Admin/Settings'],
+      'RBAC/ManageRoles': ['Admin/Settings'],
+      'RBAC/UserOverrides': ['Admin/Settings'],
+      'Home/ManageEmployees': ['Admin/Settings'],
+    };
+
+    const parentKeys = parentFallbackMap[keyOrRoute];
+    if (parentKeys) {
+      // Check user overrides for parent keys
+      if (userOverrides && typeof userOverrides === 'object') {
+        for (const pk of parentKeys) {
+          if (typeof userOverrides[pk] === 'boolean') {
+            return userOverrides[pk];
+          }
+        }
       }
+
+      // Check role permissions for parent keys
       if (activeRoleDoc && Array.isArray(activeRoleDoc.permissions)) {
         const parentMatch = (activeRoleDoc.permissions as any[]).find(
-          (p: any) => p.menuRoute === 'Admin/LibraryMgmt' || p.menuTitle === 'Library Mgmt Access'
+          (p: any) => parentKeys.includes(p.menuRoute) || parentKeys.includes(p.menuTitle)
         );
         if (parentMatch) {
           return Boolean(parentMatch.allow);
@@ -112,10 +164,16 @@ export function usePermissions() {
     const moduleMapping: Record<string, string[]> = {
       plannings: [
         'Admin/LibraryMgmt',
-        '/planning/quantity-master',
-        'Quantity Master',
+        'Plannings / Library Access',
+        'Library Mgmt Access',
+        '/planning',
+        'Plannings',
         '/sor',
         'Schedule of Rates (SOR)',
+        '/planning/quantity-master',
+        'Quantity Master',
+        '/planning/qc-master',
+        'QC Master & Checklists',
       ],
       lead_management: ['Admin/Management'],
       service_catalog: ['Admin/Service'],

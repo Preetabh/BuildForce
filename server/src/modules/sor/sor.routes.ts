@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { SorController } from './sor.controller';
 import { authenticate } from '../../middleware/auth.middleware';
-import { requirePermission } from '../../middleware/rbac.middleware';
+import { requirePermission, requireApiPermission } from '../../middleware/rbac.middleware';
 import { env } from '../../config/env';
 
 const router = Router();
@@ -50,6 +50,16 @@ router.get('/config', SorController.getConfig);
 
 // Authentication on all remaining SOR endpoints
 router.use(authenticate);
+router.use(
+  requireApiPermission([
+    'Admin/LibraryMgmt',
+    '/sor',
+    'Schedule of Rates (SOR)',
+    '/planning',
+    'Plannings',
+    'sor.view',
+  ])
+);
 
 // 2. Rate Master Queries
 router.get('/items/smart-search', requirePermission('sor.view'), SorController.smartSearchSorItems);

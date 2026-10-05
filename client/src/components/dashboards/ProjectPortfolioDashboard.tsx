@@ -1,0 +1,358 @@
+import React, { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Wallet,
+  Coins,
+  BarChart3,
+  AlertTriangle,
+  TrendingUp,
+  Plus,
+  Sparkles,
+  CheckCircle,
+} from 'lucide-react';
+import api from '../../services/api';
+import { Project, ProjectStats } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import { PortfolioHealthChart } from '../home/PortfolioHealthChart';
+import { ProjectsTable } from '../home/ProjectsTable';
+import { NeedsAttentionCard } from '../home/NeedsAttentionCard';
+import { RecentActivityCard } from '../home/RecentActivityCard';
+import { CreateProjectModal } from '../projects/CreateProjectModal';
+import { formatCurrency } from '../../utils/formatters';
+
+interface ProjectPortfolioDashboardProps {
+  onRefresh?: () => void;
+  showWelcomeHeader?: boolean;
+}
+
+export const ProjectPortfolioDashboard: React.FC<ProjectPortfolioDashboardProps> = ({
+  showWelcomeHeader = true,
+}) => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Modal State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
+
+  // Notification Toast Message
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // 1. Fetch Dynamic Statistics from MongoDB
+  const { data: stats } = useQuery<ProjectStats>({
+    queryKey: ['projectStats'],
+    queryFn: async () => {
+      const res = await api.get('/projects/stats');
+      return res.data?.data;
+    },
+  });
+
+  // 2. Fetch Projects from MongoDB
+  const {
+    data: projectsData,
+    isLoading: isProjectsLoading,
+  } = useQuery<{ projects: Project[] }>({
+    queryKey: ['projects'],
+    queryFn: async () => {
+      const res = await api.get('/projects?limit=100');
+      return {
+        projects: res.data?.data || [],
+      };
+    },
+  });
+
+  // STRICT REQUIREMENT: Only main projects are considered on Home Dashboard
+  const mainProjects = useMemo(() => {
+    const raw = projectsData?.projects || [];
+    return raw.filter((p) => {
+      if (p.parentId) return false;
+      if (/-SP\d+/i.test(p.code || '')) return false;
+      return true;
+    });
+  }, [projectsData?.projects]);
+
+  // Soft Delete Project Mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      return api.delete(`/projects/${projectId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['projectStats'] });
+      queryClient.invalidateQueries({ queryKey: ['recycleBinCount'] });
+      showToast('Project moved to Recycle Bin');
+    },
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { message?: string } } };
+      alert(e.response?.data?.message || 'Failed to delete project');
+    },
+  });
+
+  // Archive Toggle Mutation
+  const archiveMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      return api.patch(`/projects/${projectId}/archive`);
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['projectStats'] });
+      showToast(res.data?.message || 'Project archive state updated');
+    },
+  });
+
+  const handleDelete = (projectId: string, projectName: string) => {
+    if (
+      window.confirm(
+        `Move project "${projectName}" to Recycle Bin?\n\nYou can restore it at any time from the Recycle Bin.`
+      )
+    ) {
+      deleteMutation.mutate(projectId);
+    }
+  };
+
+  const handleArchive = (projectId: string) => {
+    archiveMutation.mutate(projectId);
+  };
+
+  const handleEdit = (project: Project) => {
+    setProjectToEdit(project);
+    setIsCreateModalOpen(true);
+  };
+
+  const handleOpenCreateModal = () => {
+    setProjectToEdit(null);
+    setIsCreateModalOpen(true);
+  };
+
+  const handleModalSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['projects'] });
+    queryClient.invalidateQueries({ queryKey: ['projectStats'] });
+    showToast(
+      projectToEdit ? 'Project updated successfully' : 'New project created successfully'
+    );
+  };
+
+  // Real Dynamic Calculations from Database
+  const totalValueNum = useMemo(() => {
+    return mainProjects.reduce((sum, p) => sum + (p.contractValue || p.estimatedValue || 0), 0);
+  }, [mainProjects]);
+
+  const portfolioBudgetText = useMemo(() => {
+    if (totalValueNum === 0) return '₹0.00';
+    if (totalValueNum >= 10000000) return `₹${(totalValueNum / 10000000).toFixed(2)} Cr`;
+    if (totalValueNum >= 100000) return `₹${(totalValueNum / 100000).toFixed(2)} L`;
+    return formatCurrency(totalValueNum, 'INR', true);
+  }, [totalValueNum]);
+
+  const committedCostNum = useMemo(() => {
+    if (totalValueNum === 0) return 0;
+    return mainProjects.reduce((sum, p) => {
+      const val = p.contractValue || p.estimatedValue || 0;
+      return sum + (val * (p.progress || 0)) / 100;
+    }, 0);
+  }, [mainProjects, totalValueNum]);
+
+  const committedCostText = useMemo(() => {
+    if (committedCostNum === 0) return '₹0.00';
+    if (committedCostNum >= 10000000) return `₹${(committedCostNum / 10000000).toFixed(2)} Cr`;
+    if (committedCostNum >= 100000) return `₹${(committedCostNum / 100000).toFixed(2)} L`;
+    return formatCurrency(committedCostNum, 'INR', true);
+  }, [committedCostNum]);
+
+  const committedPctText = totalValueNum > 0
+    ? `${((committedCostNum / totalValueNum) * 100).toFixed(0)}% of portfolio budget`
+    : '0% of portfolio budget';
+
+  const forecastVarianceNum = useMemo(() => {
+    return mainProjects.reduce((diff, p) => {
+      const est = p.estimatedValue || 0;
+      const contract = p.contractValue || 0;
+      return diff + Math.abs(contract - est);
+    }, 0);
+  }, [mainProjects]);
+
+  const forecastVarianceText = useMemo(() => {
+    if (forecastVarianceNum === 0) return '₹0.00';
+    if (forecastVarianceNum >= 10000000) return `₹${(forecastVarianceNum / 10000000).toFixed(2)} Cr`;
+    if (forecastVarianceNum >= 100000) return `₹${(forecastVarianceNum / 100000).toFixed(2)} L`;
+    return formatCurrency(forecastVarianceNum, 'INR', true);
+  }, [forecastVarianceNum]);
+
+  const atRiskCount = useMemo(() => {
+    return mainProjects.filter((p) => {
+      const isOverdue = p.endDate && new Date(p.endDate) < new Date() && (p.progress ?? 0) < 100;
+      return p.status === 'on_hold' || isOverdue;
+    }).length;
+  }, [mainProjects]);
+
+  const totalMainCount = mainProjects.length;
+  const onTrackCount = Math.max(0, totalMainCount - atRiskCount);
+
+  const todayFormatted = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date());
+
+  const greeting = useMemo(() => {
+    const currentHour = new Date().getHours();
+    if (currentHour >= 4 && currentHour < 12) return 'Good morning';
+    if (currentHour >= 12 && currentHour < 17) return 'Good afternoon';
+    if (currentHour >= 17 && currentHour < 22) return 'Good evening';
+    return 'Good night';
+  }, []);
+
+  const displayName = useMemo(() => {
+    if (user?.name && user.name.trim()) return user.name.trim().split(' ')[0];
+    if (user?.email) {
+      const prefix = user.email.split('@')[0];
+      return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    }
+    return '';
+  }, [user]);
+
+  return (
+    <div className="space-y-6">
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 text-white border border-amber-500/40 px-4 py-2.5 rounded-xl shadow-lg text-sm flex items-center gap-2 backdrop-blur">
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Welcome Banner Row */}
+      {showWelcomeHeader && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              {displayName ? `${greeting}, ${displayName}` : greeting}
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+              Here's what's happening across your construction portfolio today.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4 self-start sm:self-auto">
+            <div className="text-right hidden sm:block">
+              <p className="text-xs font-semibold text-slate-300">{todayFormatted}</p>
+              <p className="text-[11px] text-slate-500">Build today for a better tomorrow.</p>
+            </div>
+
+            <button
+              onClick={handleOpenCreateModal}
+              className="px-4 py-2 bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all hover:shadow cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>New project</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4 Top KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Portfolio budget */}
+        <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
+          <div className="w-11 h-11 rounded-xl bg-amber-950/60 border border-amber-900/40 flex items-center justify-center text-amber-400 shrink-0">
+            <Wallet className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-slate-400">Portfolio budget</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
+              {portfolioBudgetText}
+            </h2>
+            <p className="text-xs font-medium text-emerald-400 flex items-center gap-1 mt-1">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>{totalValueNum > 0 ? '+0% vs last baseline' : 'Active portfolio'}</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Card 2: Committed cost */}
+        <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
+          <div className="w-11 h-11 rounded-xl bg-emerald-950/60 border border-emerald-900/40 flex items-center justify-center text-emerald-400 shrink-0">
+            <Coins className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-slate-400">Committed cost</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
+              {committedCostText}
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">{committedPctText}</p>
+          </div>
+        </div>
+
+        {/* Card 3: Forecast variance */}
+        <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
+          <div className="w-11 h-11 rounded-xl bg-amber-950/60 border border-amber-900/40 flex items-center justify-center text-amber-400 shrink-0">
+            <BarChart3 className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-slate-400">Forecast variance</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
+              {forecastVarianceText}
+            </h2>
+            <p className="text-xs font-medium text-emerald-400 flex items-center gap-1 mt-1">
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>On target with estimate</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Card 4: Projects at risk */}
+        <div className="bg-[#111726] border border-slate-800 rounded-xl p-5 shadow-sm transition-colors flex items-start gap-4">
+          <div className="w-11 h-11 rounded-xl bg-rose-950/60 border border-rose-900/40 flex items-center justify-center text-rose-400 shrink-0">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-slate-400">Projects at risk</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-white mt-0.5 tracking-tight truncate">
+              {atRiskCount} of {totalMainCount}
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              {onTrackCount} on track <span className="mx-1">|</span> {atRiskCount} at risk
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Two-Column Main Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column (Width: 8 cols out of 12) */}
+        <div className="lg:col-span-8 space-y-6">
+          <PortfolioHealthChart projects={mainProjects} />
+
+          <ProjectsTable
+            projects={mainProjects}
+            isLoading={isProjectsLoading}
+            onNewProject={handleOpenCreateModal}
+            onEdit={handleEdit}
+            onArchive={handleArchive}
+            onDelete={handleDelete}
+          />
+        </div>
+
+        {/* Right Column (Width: 4 cols out of 12) */}
+        <div className="lg:col-span-4 space-y-6">
+          <NeedsAttentionCard projects={mainProjects} />
+          <RecentActivityCard />
+        </div>
+      </div>
+
+      {/* Create / Edit Project Modal */}
+      <CreateProjectModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleModalSuccess}
+        projectToEdit={projectToEdit}
+      />
+    </div>
+  );
+};

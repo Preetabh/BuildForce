@@ -37,6 +37,7 @@ export interface IDailyProgressReport {
 
 export interface IClientAccount extends Document {
   companyId: mongoose.Types.ObjectId;
+  createdBy?: mongoose.Types.ObjectId;
   leadId?: mongoose.Types.ObjectId;
   partnerId?: mongoose.Types.ObjectId;
   partnerName?: string;
@@ -121,6 +122,11 @@ const clientAccountSchema = new Schema<IClientAccount>(
       type: Schema.Types.ObjectId,
       ref: 'Company',
       required: true,
+      index: true,
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
       index: true,
     },
     leadId: {

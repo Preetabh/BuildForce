@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, X } from 'lucide-react';
+import { Shield, X, Check } from 'lucide-react';
 import { RbacRole } from '../../types/rbac';
 import { APP_CONFIG } from '../../config/app.config';
 
@@ -114,19 +114,40 @@ export const RoleModal: React.FC<RoleModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Color Accent</label>
-            <div className="flex items-center gap-2">
-              {APP_CONFIG.ROLE_ACCENT_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
-                    color === c ? 'border-white scale-110 shadow-lg' : 'border-transparent'
-                  }`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-slate-300 font-semibold">Color Accent</label>
+              <div
+                className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono font-bold"
+                style={{
+                  backgroundColor: `${color}22`,
+                  color: color,
+                  border: `1px solid ${color}55`,
+                }}
+              >
+                <span className="w-2.5 h-2.5 rounded-full inline-block shadow-sm" style={{ backgroundColor: color }} />
+                <span>{color.toUpperCase()}</span>
+              </div>
+            </div>
+            <div className="flex items-center flex-wrap gap-2.5 p-3 rounded-xl bg-[#141B2D] border border-[#232F4A]">
+              {APP_CONFIG.ROLE_ACCENT_COLORS.map((c) => {
+                const isSelected = color.toLowerCase() === c.toLowerCase();
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    className={`w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center cursor-pointer ${
+                      isSelected
+                        ? 'border-white scale-110 shadow-lg ring-2 ring-white/40'
+                        : 'border-transparent hover:scale-105 opacity-75 hover:opacity-100'
+                    }`}
+                    style={{ backgroundColor: c }}
+                    title={c}
+                  >
+                    {isSelected && <Check className="w-3.5 h-3.5 text-slate-950 stroke-[3]" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

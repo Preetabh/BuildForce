@@ -172,7 +172,15 @@ export class LeadService {
         .skip(skip)
         .limit(limit)
         .lean(),
-      this.getLeadStats(companyId),
+      this.getLeadStats(
+        companyId,
+        userOrConditions.length > 0
+          ? {
+              userId: effectiveTargetUserId,
+              userName: params.userName,
+            }
+          : undefined
+      ),
     ]);
 
     // Calculate Today's Activity Stats for the specified user
@@ -238,34 +246,92 @@ export class LeadService {
   }
 
   /**
-   * Get stats for leads summary header
+   * Get stats for leads summary header (supports user scoping)
    */
-  static async getLeadStats(companyId: string) {
+  static async getLeadStats(
+    companyId: string,
+    filterUser?: { userId?: string; userName?: string }
+  ) {
     const compId = new mongoose.Types.ObjectId(companyId);
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
+    const userOrConditions: any[] = [];
+    if (filterUser?.userId && mongoose.Types.ObjectId.isValid(filterUser.userId)) {
+      userOrConditions.push({ createdBy: new mongoose.Types.ObjectId(filterUser.userId) });
+    }
+    if (filterUser?.userName && filterUser.userName.trim()) {
+      const safeName = filterUser.userName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const nameRegex = new RegExp(`^${safeName}$`, 'i');
+      userOrConditions.push({ 'referenceDetails.employeeName': nameRegex });
+      userOrConditions.push({ 'followUps.createdByName': nameRegex });
+    }
+
+    const hasUserFilter = userOrConditions.length > 0;
+
     const [totalActive, totalDead, totalClients, todayDueCount] = await Promise.all([
-      Lead.countDocuments({
-        companyId: compId,
-        isDead: false,
-        isRegisteredClient: { $ne: true },
-        stage: { $ne: 'Client' },
-      }),
-      Lead.countDocuments({ companyId: compId, isDead: true }),
-      Lead.countDocuments({
-        companyId: compId,
-        $or: [{ stage: 'Client' }, { isRegisteredClient: true }],
-      }),
-      Lead.countDocuments({
-        companyId: compId,
-        isDead: false,
-        isRegisteredClient: { $ne: true },
-        stage: { $ne: 'Client' },
-        'latestFollowUp.date': { $lte: endOfDay },
-      }),
+      Lead.countDocuments(
+        hasUserFilter
+          ? {
+              companyId: compId,
+              isDead: false,
+              isRegisteredClient: { $ne: true },
+              stage: { $ne: 'Client' },
+              $or: userOrConditions,
+            }
+          : {
+              companyId: compId,
+              isDead: false,
+              isRegisteredClient: { $ne: true },
+              stage: { $ne: 'Client' },
+            }
+      ),
+      Lead.countDocuments(
+        hasUserFilter
+          ? {
+              companyId: compId,
+              isDead: true,
+              $or: userOrConditions,
+            }
+          : {
+              companyId: compId,
+              isDead: true,
+            }
+      ),
+      Lead.countDocuments(
+        hasUserFilter
+          ? {
+              companyId: compId,
+              $and: [
+                { $or: userOrConditions },
+                { $or: [{ stage: 'Client' }, { isRegisteredClient: true }] },
+              ],
+            }
+          : {
+              companyId: compId,
+              $or: [{ stage: 'Client' }, { isRegisteredClient: true }],
+            }
+      ),
+      Lead.countDocuments(
+        hasUserFilter
+          ? {
+              companyId: compId,
+              isDead: false,
+              isRegisteredClient: { $ne: true },
+              stage: { $ne: 'Client' },
+              'latestFollowUp.date': { $lte: endOfDay },
+              $or: userOrConditions,
+            }
+          : {
+              companyId: compId,
+              isDead: false,
+              isRegisteredClient: { $ne: true },
+              stage: { $ne: 'Client' },
+              'latestFollowUp.date': { $lte: endOfDay },
+            }
+      ),
     ]);
 
     return {
@@ -280,11 +346,33 @@ export class LeadService {
   /**
    * Get single lead by ID
    */
-  static async getLeadById(companyId: string, leadId: string) {
-    const lead = await Lead.findOne({
+  static async getLeadById(
+    companyId: string,
+    leadId: string,
+    filterUser?: { userId?: string; userName?: string }
+  ) {
+    const query: any = {
       _id: new mongoose.Types.ObjectId(leadId),
       companyId: new mongoose.Types.ObjectId(companyId),
-    }).lean();
+    };
+
+    if (filterUser) {
+      const userOr: any[] = [];
+      if (filterUser.userId && mongoose.Types.ObjectId.isValid(filterUser.userId)) {
+        userOr.push({ createdBy: new mongoose.Types.ObjectId(filterUser.userId) });
+      }
+      if (filterUser.userName && filterUser.userName.trim()) {
+        const safeName = filterUser.userName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const nameRegex = new RegExp(`^${safeName}$`, 'i');
+        userOr.push({ 'referenceDetails.employeeName': nameRegex });
+        userOr.push({ 'followUps.createdByName': nameRegex });
+      }
+      if (userOr.length > 0) {
+        query.$or = userOr;
+      }
+    }
+
+    const lead = await Lead.findOne(query).lean();
 
     if (!lead) {
       throw new Error('Lead not found');
@@ -296,7 +384,12 @@ export class LeadService {
   /**
    * Create a new Lead
    */
-  static async createLead(companyId: string, leadData: Partial<ILead>, userId?: string) {
+  static async createLead(
+    companyId: string,
+    leadData: Partial<ILead>,
+    userId?: string,
+    userName?: string
+  ) {
     // Generate auto-increment 6 digit lead code e.g. "001262"
     const latestLead = await Lead.findOne({ companyId: new mongoose.Types.ObjectId(companyId) })
       .sort({ leadCode: -1 })
@@ -334,8 +427,17 @@ export class LeadService {
       targetCompanyName = 'Lucknow Builders';
     }
 
+    // Default reference employee name to current user if referenceType is Employee or unset
+    let referenceDetails = leadData.referenceDetails ? { ...leadData.referenceDetails } : {};
+    if (!referenceDetails.employeeName && userName) {
+      if (leadData.referenceType === 'Employee' || !leadData.referenceType) {
+        referenceDetails.employeeName = userName;
+      }
+    }
+
     const newLead = new Lead({
       ...leadData,
+      referenceDetails,
       companyId: new mongoose.Types.ObjectId(companyId),
       leadCode,
       targetCompanyName,
@@ -585,7 +687,8 @@ export class LeadService {
       meetingDateTime?: string | Date;
       serviceItems?: Array<{ service: string; specificItems?: string[] }>;
       priority?: string;
-    }
+    },
+    userId?: string
   ) {
     const lead = await Lead.findOne({
       _id: new mongoose.Types.ObjectId(leadId),
@@ -679,6 +782,8 @@ export class LeadService {
         registrationDate: new Date(),
         status: 'Active',
         notes: clientData.notes || '',
+        createdBy: lead.createdBy || (userId ? new mongoose.Types.ObjectId(userId) : undefined),
+        handlerName: (clientData as any).handlerName || lead.referenceDetails?.employeeName || '',
       });
       await client.save();
     } else {
@@ -694,6 +799,12 @@ export class LeadService {
         client.partnerName = partner.name;
       }
       if (clientData.notes) client.notes = clientData.notes;
+      if ((clientData as any).handlerName || lead.referenceDetails?.employeeName) {
+        client.handlerName = (clientData as any).handlerName || lead.referenceDetails?.employeeName;
+      }
+      if (!client.createdBy && (lead.createdBy || userId)) {
+        client.createdBy = lead.createdBy || (userId ? new mongoose.Types.ObjectId(userId) : undefined);
+      }
       await client.save();
     }
 
@@ -734,17 +845,22 @@ export class LeadService {
   /**
    * Helper to ensure client account exists for a lead transitioned to Client stage
    */
-  static async ensureClientAccount(companyId: string, lead: any, extraData: any = {}) {
-    return await this.convertToClient(companyId, lead._id.toString(), {
-      agreedAmount: lead.finances?.budget || 0,
-      paidAmount: 0,
-      siteLocation: lead.siteLocation || 'Site',
-      notes: extraData.notes || lead.notes || '',
-    });
+  static async ensureClientAccount(companyId: string, lead: any, extraData: any = {}, userId?: string) {
+    return await this.convertToClient(
+      companyId,
+      lead._id.toString(),
+      {
+        agreedAmount: lead.finances?.budget || 0,
+        paidAmount: 0,
+        siteLocation: lead.siteLocation || 'Site',
+        notes: extraData.notes || lead.notes || '',
+      },
+      userId || (lead.createdBy ? lead.createdBy.toString() : undefined)
+    );
   }
 
   /**
-   * Get all clients with comprehensive filtering
+   * Get all clients with comprehensive filtering (supports user scoping)
    */
   static async getClients(
     companyId: string,
@@ -756,74 +872,114 @@ export class LeadService {
       service?: string;
       startDate?: string;
       endDate?: string;
+      userId?: string;
+      viewingUserId?: string;
+      selectedUserId?: string;
+      userName?: string;
     } = {}
   ) {
     const compId = new mongoose.Types.ObjectId(companyId);
-    const filter: any = { companyId: compId };
+    const andConditions: any[] = [{ companyId: compId }];
 
     // Dead / NonDead filter
     if (query.statusMode === 'Dead') {
-      filter.isDead = true;
+      andConditions.push({ isDead: true });
     } else if (query.statusMode === 'NonDead' || !query.statusMode) {
-      filter.isDead = { $ne: true };
+      andConditions.push({ isDead: { $ne: true } });
     }
 
     // Fee filter
     if (query.feeStatus === 'Paid') {
-      filter.balanceAmount = { $lte: 0 };
-      filter.agreedAmount = { $gt: 0 };
+      andConditions.push({ balanceAmount: { $lte: 0 }, agreedAmount: { $gt: 0 } });
     } else if (query.feeStatus === 'Pending') {
-      filter.balanceAmount = { $gt: 0 };
+      andConditions.push({ balanceAmount: { $gt: 0 } });
     }
 
     // Company filter
     if (query.company && query.company !== 'All Companies') {
-      filter.$or = [
-        { companyName: new RegExp(query.company, 'i') },
-        { subBadge: new RegExp(query.company, 'i') },
-      ];
+      andConditions.push({
+        $or: [
+          { companyName: new RegExp(query.company, 'i') },
+          { subBadge: new RegExp(query.company, 'i') },
+        ],
+      });
     }
 
     // Service filter
     if (query.service && query.service !== 'All Services') {
-      filter.services = new RegExp(query.service, 'i');
+      andConditions.push({ services: new RegExp(query.service, 'i') });
     }
 
     // Date range filter (Registration date)
     if (query.startDate || query.endDate) {
-      filter.registrationDate = {};
+      const dateCond: any = {};
       if (query.startDate) {
-        filter.registrationDate.$gte = new Date(query.startDate);
+        dateCond.$gte = new Date(query.startDate);
       }
       if (query.endDate) {
         const end = new Date(query.endDate);
         end.setHours(23, 59, 59, 999);
-        filter.registrationDate.$lte = end;
+        dateCond.$lte = end;
       }
+      andConditions.push({ registrationDate: dateCond });
+    }
+
+    // User Scoping filter
+    const effectiveUserId = query.viewingUserId || query.selectedUserId || query.userId;
+    const userClientConditions: any[] = [];
+
+    if (effectiveUserId && mongoose.Types.ObjectId.isValid(effectiveUserId)) {
+      const userObjId = new mongoose.Types.ObjectId(effectiveUserId);
+      userClientConditions.push({ createdBy: userObjId });
+
+      // Find all leads belonging to this user
+      const leadMatchOr: any[] = [{ createdBy: userObjId }];
+      if (query.userName && query.userName.trim()) {
+        const safeName = query.userName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const nameRegex = new RegExp(`^${safeName}$`, 'i');
+        leadMatchOr.push({ 'referenceDetails.employeeName': nameRegex });
+        leadMatchOr.push({ 'followUps.createdByName': nameRegex });
+      }
+      const userLeadIds = await Lead.find({
+        companyId: compId,
+        $or: leadMatchOr,
+      }).distinct('_id');
+
+      if (userLeadIds.length > 0) {
+        userClientConditions.push({ leadId: { $in: userLeadIds } });
+      }
+    }
+
+    if (query.userName && query.userName.trim()) {
+      const safeName = query.userName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const nameRegex = new RegExp(`^${safeName}$`, 'i');
+      userClientConditions.push({ handlerName: nameRegex });
+      userClientConditions.push({ 'followUps.createdByName': nameRegex });
+    }
+
+    if (userClientConditions.length > 0) {
+      andConditions.push({ $or: userClientConditions });
     }
 
     // Free text search
     if (query.search && query.search.trim()) {
       const regex = new RegExp(query.search.trim(), 'i');
-      const searchConditions = [
-        { name: regex },
-        { clientCode: regex },
-        { phone: regex },
-        { siteLocation: regex },
-        { associate: regex },
-        { handlerName: regex },
-        { services: regex },
-        { companyName: regex },
-        { subBadge: regex },
-      ];
-
-      if (filter.$or) {
-        filter.$and = [{ $or: filter.$or }, { $or: searchConditions }];
-        delete filter.$or;
-      } else {
-        filter.$or = searchConditions;
-      }
+      andConditions.push({
+        $or: [
+          { name: regex },
+          { clientCode: regex },
+          { phone: regex },
+          { siteLocation: regex },
+          { associate: regex },
+          { handlerName: regex },
+          { services: regex },
+          { companyName: regex },
+          { subBadge: regex },
+        ],
+      });
     }
+
+    const filter = andConditions.length === 1 ? andConditions[0] : { $and: andConditions };
 
     const clients = await ClientAccount.find(filter)
       .sort({ registrationDate: -1, createdAt: -1 })
@@ -832,13 +988,57 @@ export class LeadService {
   }
 
   /**
-   * Get single client by ID
+   * Get single client by ID (supports user scoping)
    */
-  static async getClientById(companyId: string, id: string) {
-    const client = await ClientAccount.findOne({
-      _id: new mongoose.Types.ObjectId(id),
-      companyId: new mongoose.Types.ObjectId(companyId),
-    }).lean();
+  static async getClientById(
+    companyId: string,
+    id: string,
+    filterUser?: { userId?: string; userName?: string }
+  ) {
+    const compId = new mongoose.Types.ObjectId(companyId);
+    const andConditions: any[] = [
+      { _id: new mongoose.Types.ObjectId(id) },
+      { companyId: compId },
+    ];
+
+    if (filterUser) {
+      const effectiveUserId = filterUser.userId;
+      const userClientConditions: any[] = [];
+      if (effectiveUserId && mongoose.Types.ObjectId.isValid(effectiveUserId)) {
+        const userObjId = new mongoose.Types.ObjectId(effectiveUserId);
+        userClientConditions.push({ createdBy: userObjId });
+
+        const leadMatchOr: any[] = [{ createdBy: userObjId }];
+        if (filterUser.userName && filterUser.userName.trim()) {
+          const safeName = filterUser.userName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const nameRegex = new RegExp(`^${safeName}$`, 'i');
+          leadMatchOr.push({ 'referenceDetails.employeeName': nameRegex });
+          leadMatchOr.push({ 'followUps.createdByName': nameRegex });
+        }
+        const userLeadIds = await Lead.find({
+          companyId: compId,
+          $or: leadMatchOr,
+        }).distinct('_id');
+
+        if (userLeadIds.length > 0) {
+          userClientConditions.push({ leadId: { $in: userLeadIds } });
+        }
+      }
+
+      if (filterUser.userName && filterUser.userName.trim()) {
+        const safeName = filterUser.userName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const nameRegex = new RegExp(`^${safeName}$`, 'i');
+        userClientConditions.push({ handlerName: nameRegex });
+        userClientConditions.push({ 'followUps.createdByName': nameRegex });
+      }
+
+      if (userClientConditions.length > 0) {
+        andConditions.push({ $or: userClientConditions });
+      }
+    }
+
+    const filter = andConditions.length === 1 ? andConditions[0] : { $and: andConditions };
+    const client = await ClientAccount.findOne(filter).lean();
     return client;
   }
 

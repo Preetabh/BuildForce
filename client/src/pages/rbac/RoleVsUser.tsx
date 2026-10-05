@@ -196,22 +196,34 @@ export const RoleVsUser: React.FC = () => {
 
                       {/* Assigned Role Dropdown */}
                       <td className="py-3.5 px-4">
-                        <select
-                          value={user.role === 'ADMIN' ? 'MASTER_ADMIN' : user.role}
-                          onChange={(e) =>
-                            updateRoleMutation.mutate({
-                              userId: user._id,
-                              role: e.target.value,
-                            })
-                          }
-                          className="px-3 py-1.5 rounded-xl bg-[#131B2D] border border-[#232F4A] text-white text-xs font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
-                        >
-                          {availableRoles.map((r: any) => (
-                            <option key={r._id || r.code} value={r.code}>
-                              {r.name}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                            style={{
+                              backgroundColor:
+                                (roles || availableRoles).find(
+                                  (r: any) =>
+                                    r.code === (user.role === 'ADMIN' ? 'MASTER_ADMIN' : user.role)
+                                )?.color || '#F59E0B',
+                            }}
+                          />
+                          <select
+                            value={user.role === 'ADMIN' ? 'MASTER_ADMIN' : user.role}
+                            onChange={(e) =>
+                              updateRoleMutation.mutate({
+                                userId: user._id,
+                                role: e.target.value,
+                              })
+                            }
+                            className="px-3 py-1.5 rounded-xl bg-[#131B2D] border border-[#232F4A] text-white text-xs font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
+                          >
+                            {availableRoles.map((r: any) => (
+                              <option key={r._id || r.code} value={r.code}>
+                                {r.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </td>
 
                       {/* Status Allow / Decline Toggle */}

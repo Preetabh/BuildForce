@@ -14,7 +14,9 @@ export const updateMenuSchema = createMenuSchema.partial();
 
 export const createRoleSchema = z.object({
   name: z.string().min(1, 'Role name is required').max(100),
+  code: z.string().min(1, 'Role code is required').max(100).optional(),
   description: z.string().max(500).optional(),
+  color: z.string().max(50).optional(),
   isSystem: z.boolean().optional(),
   permissions: z
     .array(

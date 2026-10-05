@@ -120,7 +120,14 @@ export const AppRouter: React.FC = () => {
           <Route path="/recycle-bin" element={<RecycleBin />} />
 
           {/* PLANNING */}
-          <Route path="/planning" element={<ComingSoonModule />} />
+          <Route
+            path="/planning"
+            element={
+              <PermissionRoute permission={['Admin/LibraryMgmt', '/planning', 'Project Schedule & WBS', 'Plannings']}>
+                <ComingSoonModule />
+              </PermissionRoute>
+            }
+          />
           <Route
             path="/planning/quantity-master"
             element={
@@ -137,7 +144,14 @@ export const AppRouter: React.FC = () => {
               </PermissionRoute>
             }
           />
-          <Route path="/planning/qc-master" element={<ComingSoonModule />} />
+          <Route
+            path="/planning/qc-master"
+            element={
+              <PermissionRoute permission={['Admin/LibraryMgmt', '/planning/qc-master', 'QC Master & Checklists']}>
+                <ComingSoonModule />
+              </PermissionRoute>
+            }
+          />
 
           {/* EXECUTION */}
           <Route path="/execution" element={<ComingSoonModule />} />

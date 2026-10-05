@@ -100,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isHovered, setIsHovered] = useState(false);
 
   // Group accordion state (only ONE section open at a time: "jab ek section open ho dusra close")
-  const [openGroupId, setOpenGroupId] = useState<string | null>('plannings');
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
 
   // Dedicated Settings Accordion state
   const [isSettingsOpen, setIsSettingsOpen] = useState(() => {
@@ -131,8 +131,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { label: 'Schedule of Rates (SOR)', path: '/sor', icon: BookOpen, isComingSoon: false, permissionKey: '/sor' },
         { label: 'Quantity Master', path: '/planning/quantity-master', icon: Calculator, isComingSoon: false, permissionKey: '/planning/quantity-master' },
-        { label: 'QC Master & Checklists', path: '/planning/qc-master', icon: ClipboardCheck, isComingSoon: true },
-        { label: 'Project Schedule & WBS', path: '/planning', icon: Layers, isComingSoon: true },
+        { label: 'QC Master & Checklists', path: '/planning/qc-master', icon: ClipboardCheck, isComingSoon: true, permissionKey: '/planning/qc-master' },
+        { label: 'Project Schedule & WBS', path: '/planning', icon: Layers, isComingSoon: true, permissionKey: '/planning' },
       ],
     },
     {
@@ -168,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Site Enginner',
       icon: HardHat,
       items: [
-        { label: 'Detailed Site Engineers', path: '/admin/site-engineers', icon: Users, isComingSoon: false },
+        { label: 'Detailed Site Engineers', path: '/admin/site-engineers', icon: Users, isComingSoon: false, permissionKey: 'Admin/SiteEngineers_List' },
         { label: 'AddSiteEnginner', path: '/admin/add-site-engineer', icon: Compass, isComingSoon: false, permissionKey: 'Admin/ManageSiteEngineers' },
       ],
     },
@@ -177,8 +177,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'VENDOR MANAGEMENT',
       icon: Truck,
       items: [
-        { label: 'Suppliers', path: '/vendors/suppliers', icon: Truck, isComingSoon: true },
-        { label: 'Workers', path: '/vendors/workers', icon: HardHat, isComingSoon: true },
+        { label: 'Suppliers', path: '/vendors/suppliers', icon: Truck, isComingSoon: true, permissionKey: 'Admin/Vendors_Suppliers' },
+        { label: 'Workers', path: '/vendors/workers', icon: HardHat, isComingSoon: true, permissionKey: 'Admin/Vendors_Workers' },
       ],
     },
     {
@@ -186,11 +186,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'PROJECT MANAGEMENT',
       icon: FolderKanban,
       items: [
-        { label: 'Projects Workspace', path: '/', icon: FolderKanban, isComingSoon: false },
-        { label: 'Measurement Book (e-MB)', path: '/execution/measurement-book', icon: Layers, isComingSoon: true },
-        { label: 'Daily Progress Report (DPR)', path: '/execution/dpr', icon: FileSpreadsheet, isComingSoon: true },
-        { label: 'Cost Control & EVM', path: '/project-control/evm', icon: TrendingUp, isComingSoon: true },
-        { label: 'Site Inspection Checklist', path: '/execution/inspections', icon: ClipboardCheck, isComingSoon: true },
+        { label: 'Projects Workspace', path: '/', icon: FolderKanban, isComingSoon: false, permissionKey: 'Admin/DailyReportList' },
+        { label: 'Measurement Book (e-MB)', path: '/execution/measurement-book', icon: Layers, isComingSoon: true, permissionKey: 'Admin/MeasurementBook' },
+        { label: 'Daily Progress Report (DPR)', path: '/execution/dpr', icon: FileSpreadsheet, isComingSoon: true, permissionKey: 'Admin/DPR' },
+        { label: 'Cost Control & EVM', path: '/project-control/evm', icon: TrendingUp, isComingSoon: true, permissionKey: 'Admin/EVM' },
+        { label: 'Site Inspection Checklist', path: '/execution/inspections', icon: ClipboardCheck, isComingSoon: true, permissionKey: 'Admin/Inspections' },
       ],
     },
   ];
@@ -204,7 +204,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if (!item.permissionKey) return true;
         return canAccess(item.permissionKey);
       }),
-    }));
+    }))
+    .filter((group) => group.id === 'all_teams' || group.items.length > 0);
 
   // Auto-expand group that contains current path on initial mount or route change
   useEffect(() => {

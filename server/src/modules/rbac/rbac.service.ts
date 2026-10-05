@@ -49,10 +49,11 @@ export class RbacService {
         children: [
           { title: 'Leads Directory', route: '/leads', icon: 'UserPlus', sort: 1, isVisible: true },
           { title: 'Client Management', route: '/leads/clients', icon: 'Contact', sort: 2, isVisible: true },
-          { title: 'Payment Management', route: '/leads/payments', icon: 'CreditCard', sort: 3, isVisible: true },
-          { title: 'Pay Amount', route: '/leads/pay-amount', icon: 'Coins', sort: 4, isVisible: true },
-          { title: 'Reference Partners', route: '/leads/partners', icon: 'Handshake', sort: 5, isVisible: true },
-          { title: 'Commission Report', route: '/leads/commission-reports', icon: 'FileSpreadsheet', sort: 6, isVisible: true },
+          { title: 'View All Organization Leads & Clients (Admin Oversight)', route: 'Admin/ViewAllLeads', icon: 'Shield', sort: 3, isVisible: false },
+          { title: 'Payment Management', route: '/leads/payments', icon: 'CreditCard', sort: 4, isVisible: true },
+          { title: 'Pay Amount', route: '/leads/pay-amount', icon: 'Coins', sort: 5, isVisible: true },
+          { title: 'Reference Partners', route: '/leads/partners', icon: 'Handshake', sort: 6, isVisible: true },
+          { title: 'Commission Report', route: '/leads/commission-reports', icon: 'FileSpreadsheet', sort: 7, isVisible: true },
         ],
       },
       {

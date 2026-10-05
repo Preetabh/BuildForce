@@ -1,10 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import { LeadService } from './lead.service';
+import { checkUserPermission } from '../../middleware/rbac.middleware';
 
 export class LeadController {
   static async getLeads(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
+      const canViewAll = await checkUserPermission(
+        req.user!.userId,
+        companyId,
+        req.user!.role,
+        ['Admin/ViewAllLeads', 'lead.view_all', 'Admin/Management_All']
+      );
+
       const {
         search,
         statusMode,
@@ -25,7 +33,17 @@ export class LeadController {
         todayOnly,
       } = req.query;
 
-      const targetUserId = (viewingUserId || selectedUserId || userId) as string;
+      // If user lacks permission to view all organization leads, enforce scoping to their own identity
+      let targetUserId: string | undefined;
+      let targetUserName: string | undefined;
+
+      if (canViewAll) {
+        targetUserId = (viewingUserId || selectedUserId || userId) as string;
+        targetUserName = userName as string;
+      } else {
+        targetUserId = req.user!.userId;
+        targetUserName = req.user!.name;
+      }
 
       const result = await LeadService.getLeads(companyId, {
         search: search as string,
@@ -43,8 +61,8 @@ export class LeadController {
         userId: targetUserId,
         viewingUserId: targetUserId,
         selectedUserId: targetUserId,
-        userName: userName as string,
-        todayOnly: todayOnly === 'true' || todayOnly === true,
+        userName: targetUserName,
+        todayOnly: todayOnly === 'true' || (todayOnly as any) === true,
       });
 
       res.status(200).json({ success: true, ...result });
@@ -56,7 +74,29 @@ export class LeadController {
   static async getLeadStats(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const stats = await LeadService.getLeadStats(companyId);
+      const canViewAll = await checkUserPermission(
+        req.user!.userId,
+        companyId,
+        req.user!.role,
+        ['Admin/ViewAllLeads', 'lead.view_all', 'Admin/Management_All']
+      );
+
+      let targetUserId: string | undefined;
+      let targetUserName: string | undefined;
+
+      if (canViewAll) {
+        targetUserId = (req.query.viewingUserId || req.query.selectedUserId || req.query.userId) as string;
+        targetUserName = req.query.userName as string;
+      } else {
+        targetUserId = req.user!.userId;
+        targetUserName = req.user!.name;
+      }
+
+      const filterUser = (targetUserId || targetUserName)
+        ? { userId: targetUserId, userName: targetUserName }
+        : undefined;
+
+      const stats = await LeadService.getLeadStats(companyId, filterUser);
       res.status(200).json({ success: true, data: stats });
     } catch (error) {
       next(error);
@@ -66,7 +106,18 @@ export class LeadController {
   static async getLeadById(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const lead = await LeadService.getLeadById(companyId, req.params.id);
+      const canViewAll = await checkUserPermission(
+        req.user!.userId,
+        companyId,
+        req.user!.role,
+        ['Admin/ViewAllLeads', 'lead.view_all', 'Admin/Management_All']
+      );
+
+      const filterUser = canViewAll
+        ? undefined
+        : { userId: req.user!.userId, userName: req.user?.name };
+
+      const lead = await LeadService.getLeadById(companyId, req.params.id, filterUser);
       res.status(200).json({ success: true, data: lead });
     } catch (error) {
       next(error);
@@ -77,7 +128,8 @@ export class LeadController {
     try {
       const companyId = req.user!.companyId;
       const userId = req.user!.userId;
-      const lead = await LeadService.createLead(companyId, req.body, userId);
+      const userName = req.user?.name;
+      const lead = await LeadService.createLead(companyId, req.body, userId, userName);
       res.status(201).json({ success: true, message: 'Lead created successfully', data: lead });
     } catch (error) {
       next(error);
@@ -177,7 +229,8 @@ export class LeadController {
   static async convertToClient(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const result = await LeadService.convertToClient(companyId, req.params.id, req.body);
+      const userId = req.user?.userId;
+      const result = await LeadService.convertToClient(companyId, req.params.id, req.body, userId);
       res.status(200).json({ success: true, message: 'Lead converted to Client successfully', data: result });
     } catch (error) {
       next(error);
@@ -187,7 +240,38 @@ export class LeadController {
   static async getClients(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const { search, statusMode, feeStatus, company, service, startDate, endDate } = req.query as any;
+      const canViewAll = await checkUserPermission(
+        req.user!.userId,
+        companyId,
+        req.user!.role,
+        ['Admin/ViewAllLeads', 'lead.view_all', 'Admin/Management_All']
+      );
+
+      const {
+        search,
+        statusMode,
+        feeStatus,
+        company,
+        service,
+        startDate,
+        endDate,
+        userId,
+        viewingUserId,
+        selectedUserId,
+        userName,
+      } = req.query as any;
+
+      let targetUserId: string | undefined;
+      let targetUserName: string | undefined;
+
+      if (canViewAll) {
+        targetUserId = viewingUserId || selectedUserId || userId;
+        targetUserName = userName;
+      } else {
+        targetUserId = req.user!.userId;
+        targetUserName = req.user!.name;
+      }
+
       const clients = await LeadService.getClients(companyId, {
         search,
         statusMode,
@@ -196,6 +280,10 @@ export class LeadController {
         service,
         startDate,
         endDate,
+        userId: targetUserId,
+        viewingUserId: targetUserId,
+        selectedUserId: targetUserId,
+        userName: targetUserName,
       });
       res.status(200).json({ success: true, data: clients });
     } catch (error) {
@@ -206,7 +294,18 @@ export class LeadController {
   static async getClientById(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      const client = await LeadService.getClientById(companyId, req.params.id);
+      const canViewAll = await checkUserPermission(
+        req.user!.userId,
+        companyId,
+        req.user!.role,
+        ['Admin/ViewAllLeads', 'lead.view_all', 'Admin/Management_All']
+      );
+
+      const filterUser = canViewAll
+        ? undefined
+        : { userId: req.user!.userId, userName: req.user?.name };
+
+      const client = await LeadService.getClientById(companyId, req.params.id, filterUser);
       if (!client) {
         return res.status(404).json({ success: false, message: 'Client not found' });
       }

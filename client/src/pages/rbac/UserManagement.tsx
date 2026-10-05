@@ -284,10 +284,28 @@ export const UserManagement: React.FC = () => {
 
                       {/* Role Badge */}
                       <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-bold bg-[#141C2E] border border-amber-500/30 text-amber-400">
-                          <Shield className="w-3 h-3 text-amber-400" />
-                          <span>{getRoleDisplayName(user.role)}</span>
-                        </span>
+                        {(() => {
+                          const roleObj = (roles || availableRoles).find(
+                            (r: any) => r.code === (user.role === 'ADMIN' ? 'MASTER_ADMIN' : user.role)
+                          );
+                          const rColor = roleObj?.color || '#F59E0B';
+                          return (
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-bold"
+                              style={{
+                                backgroundColor: `${rColor}18`,
+                                color: rColor,
+                                border: `1px solid ${rColor}40`,
+                              }}
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0 shadow-sm"
+                                style={{ backgroundColor: rColor }}
+                              />
+                              <span>{getRoleDisplayName(user.role)}</span>
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* Contact */}

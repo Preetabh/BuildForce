@@ -14,6 +14,8 @@ import {
   Clock,
   BookOpen,
   Settings,
+  CalendarRange,
+  FolderKanban,
   Circle,
   Edit2,
   ChevronRight,
@@ -231,6 +233,10 @@ export const ManageRoles: React.FC = () => {
         return Clock;
       case 'BookOpen':
         return BookOpen;
+      case 'CalendarRange':
+        return CalendarRange;
+      case 'FolderKanban':
+        return FolderKanban;
       case 'Settings':
         return Settings;
       default:
@@ -290,6 +296,7 @@ export const ManageRoles: React.FC = () => {
             ) : (
               roles.map((role) => {
                 const isActive = activeRole?._id === role._id;
+                const roleColor = role.color || '#F59E0B';
 
                 return (
                   <div
@@ -297,22 +304,41 @@ export const ManageRoles: React.FC = () => {
                     onClick={() => setSelectedRoleId(role._id)}
                     className={`w-full group rounded-xl px-4 py-3 flex items-center justify-between transition-all duration-150 cursor-pointer ${
                       isActive
-                        ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.35)]'
+                        ? 'font-bold shadow-lg text-slate-950 scale-[1.01]'
                         : 'bg-[#0E1424] hover:bg-[#141E34] text-slate-200 border border-[#1A253B]'
                     }`}
+                    style={
+                      isActive
+                        ? {
+                            backgroundColor: roleColor,
+                            boxShadow: `0 0 20px ${roleColor}55`,
+                            color: '#070A10',
+                          }
+                        : {
+                            borderLeft: `4px solid ${roleColor}`,
+                          }
+                    }
                   >
-                    <span className="text-sm tracking-wide truncate">{role.name}</span>
+                    <div className="flex items-center gap-2.5 truncate">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                        style={{
+                          backgroundColor: isActive ? '#070A10' : roleColor,
+                        }}
+                      />
+                      <span className="text-sm tracking-wide truncate">{role.name}</span>
+                    </div>
 
                     <div className="flex items-center gap-2 shrink-0 ml-2">
                       <button
                         type="button"
                         onClick={(e) => handleOpenEditRole(e, role)}
-                        className={`p-1 rounded-md transition-colors ${
+                        className={`p-1.5 rounded-lg transition-colors ${
                           isActive
-                            ? 'text-slate-900 hover:bg-black/15'
-                            : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
+                            ? 'text-slate-950 hover:bg-black/15'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
                         }`}
-                        title="Edit Role details"
+                        title="Edit Role details & Color Accent"
                       >
                         <Edit2 className="w-3.5 h-3.5 stroke-[2.5]" />
                       </button>
@@ -337,10 +363,31 @@ export const ManageRoles: React.FC = () => {
           {/* Top Bar: Title & Apply Changes */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-[#18233A]">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                {activeRole ? activeRole.name : 'Select a Role'}
-              </h1>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="w-3.5 h-3.5 rounded-full shrink-0 shadow-md ring-2 ring-white/20"
+                  style={{
+                    backgroundColor: activeRole?.color || '#F59E0B',
+                    boxShadow: `0 0 12px ${activeRole?.color || '#F59E0B'}80`,
+                  }}
+                />
+                <h1 className="text-2xl font-bold tracking-tight text-white">
+                  {activeRole ? activeRole.name : 'Select a Role'}
+                </h1>
+                {activeRole && (
+                  <span
+                    className="text-[10.5px] font-mono px-2 py-0.5 rounded-md font-bold tracking-wider"
+                    style={{
+                      backgroundColor: `${activeRole.color || '#F59E0B'}22`,
+                      color: activeRole.color || '#F59E0B',
+                      border: `1px solid ${activeRole.color || '#F59E0B'}55`,
+                    }}
+                  >
+                    {activeRole.code}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
                 {activeRole?.description || 'Configure granular module access and operational authorities'}
               </p>
             </div>

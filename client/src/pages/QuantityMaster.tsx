@@ -1916,7 +1916,8 @@ export const QuantityMaster: React.FC = () => {
                     ) : (
                       rateListsData.map((rl, idx) => {
                         const isFileAdmin = rl.isAdminFile || !rl.createdBy;
-                        const canDelete = isMasterAdmin || (!isFileAdmin && rl.createdBy === user?._id);
+                        const userId = user?.id || (user as any)?._id;
+                        const canDelete = isMasterAdmin || (!isFileAdmin && rl.createdBy === userId);
 
                         return (
                           <tr key={rl._id} className="hover:bg-slate-800/40 transition-colors">
