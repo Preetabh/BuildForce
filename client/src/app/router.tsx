@@ -5,6 +5,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { AppLayout } from '../components/layout/AppLayout';
 import { Login } from '../pages/Login';
 import { Register } from '../pages/Register';
+import { RegisterAdmin } from '../pages/RegisterAdmin';
 import { Home } from '../pages/Home';
 import { ProjectWorkspace } from '../pages/ProjectWorkspace';
 import { RateMaster } from '../pages/RateMaster';
@@ -98,6 +99,18 @@ export const AppRouter: React.FC = () => {
               <Register />
             </PublicRoute>
           }
+        />
+        <Route
+          path="/registerAdmin"
+          element={
+            <PublicRoute>
+              <RegisterAdmin />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register-admin"
+          element={<Navigate to="/registerAdmin" replace />}
         />
 
         {/* Protected ERP Shell Routes */}

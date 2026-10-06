@@ -178,3 +178,38 @@ body,
   scrollbar-width: none !important;  /* Firefox */
 }
 
+/* VIP Animation & Vault Styling */
+@keyframes vipShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+.animate-shake {
+  animation: vipShake 0.4s ease-in-out;
+}
+
+@keyframes vipPulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.25), inset 0 0 15px rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 45px rgba(245, 158, 11, 0.5), inset 0 0 25px rgba(245, 158, 11, 0.25);
+    border-color: rgba(245, 158, 11, 0.9);
+  }
+}
+
+.vip-glow-box {
+  animation: vipPulseGlow 2.5s infinite ease-in-out;
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(1000%); }
+}
+
+.vip-scanline {
+  animation: scanline 3s linear infinite;
+}
+

@@ -4,11 +4,133 @@ import { User, IUser } from '../../models/User';
 import { Company, ICompany } from '../../models/Company';
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/error.middleware';
-import { RegisterInput, LoginInput } from './auth.validation';
+import { RegisterInput, LoginInput, RegisterAdminInput } from './auth.validation';
 import { AuditService } from '../audit/audit.service';
 
 export class AuthService {
+  /**
+   * Check if any administrator already exists in the database.
+   * Public registration is ONLY permitted if there is no Admin in the DB.
+   */
+  public static async getSetupStatus() {
+    const adminExists = Boolean(
+      await User.exists({
+        role: { $in: ['ADMIN', 'MASTER_ADMIN', 'SUPER_ADMIN'] },
+      })
+    );
+    return {
+      adminExists,
+      canRegister: !adminExists,
+    };
+  }
+
+  /**
+   * Dedicated Admin Account Provisioning with Security Key verification.
+   * Guarantees the account role is strictly 'ADMIN'.
+   */
+  public static async registerAdmin(input: RegisterAdminInput, req?: any) {
+    const expectedKey = env.ADMIN_REGISTRATION_KEY || 'Z5K9N2';
+    if (!input.adminKey || input.adminKey.trim() !== expectedKey.trim()) {
+      throw new AppError('Invalid Admin Verification Key. Authorization denied.', 401);
+    }
+
+    const existingUser = await User.findOne({ email: input.email.toLowerCase() });
+    if (existingUser) {
+      throw new AppError('An account with this email already exists', 400);
+    }
+
+    // Determine Company: create if provided, or associate with first company
+    let company: any;
+    if (input.companyName && input.companyName.trim()) {
+      const compName = input.companyName.trim();
+      const compCode = input.companyCode
+        ? input.companyCode.toUpperCase().replace(/\s+/g, '')
+        : compName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || 'COMP';
+
+      let finalCode = compCode;
+      const existingCompany = await Company.findOne({ code: finalCode });
+      if (existingCompany) {
+        finalCode = `${compCode}-${Math.floor(100 + Math.random() * 900)}`;
+      }
+
+      company = await Company.create({
+        name: compName,
+        code: finalCode,
+        contactEmail: input.email.toLowerCase(),
+      });
+    } else {
+      company = await Company.findOne();
+      if (!company) {
+        company = await Company.create({
+          name: 'InfraPilot Enterprise',
+          code: 'INFRA-01',
+          contactEmail: input.email.toLowerCase(),
+        });
+      }
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(input.password, salt);
+
+    const user = await User.create({
+      name: input.name,
+      email: input.email.toLowerCase(),
+      passwordHash,
+      role: 'ADMIN', // Guaranteed Admin post
+      companyId: company._id,
+      isActive: true,
+    });
+
+    const token = this.generateToken(user);
+
+    await AuditService.log({
+      companyId: company._id,
+      userId: user._id,
+      userSnapshot: { name: user.name, email: user.email, role: 'ADMIN' },
+      action: 'CREATE',
+      module: 'AUTH',
+      entity: 'User',
+      entityId: user._id.toString(),
+      entityName: user.name,
+      summary: `Administrator account registered via Security Key verification: ${user.name} (${user.email})`,
+      severity: 'SECURITY',
+      status: 'SUCCESS',
+      newValue: { name: user.name, email: user.email, role: 'ADMIN' },
+      req,
+    });
+
+    return {
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        companyId: company._id,
+        permissions: user.permissions || {},
+      },
+      company: {
+        id: company._id,
+        name: company.name,
+        code: company.code,
+      },
+    };
+  }
+
   public static async register(input: RegisterInput) {
+    // Guard: Only allow registration if no Admin currently exists in the DB
+    const adminExists = Boolean(
+      await User.exists({
+        role: { $in: ['ADMIN', 'MASTER_ADMIN', 'SUPER_ADMIN'] },
+      })
+    );
+    if (adminExists) {
+      throw new AppError(
+        'Registration is closed. An Administrator already exists in this database. New user accounts must be created by the Administrator.',
+        403
+      );
+    }
+
     const existingUser = await User.findOne({ email: input.email.toLowerCase() });
     if (existingUser) {
       throw new AppError('An account with this email already exists', 400);

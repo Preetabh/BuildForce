@@ -3,6 +3,31 @@ import { AuthService } from './auth.service';
 import { AuditService } from '../audit/audit.service';
 
 export class AuthController {
+  public static async getSetupStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await AuthService.getSetupStatus();
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async registerAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await AuthService.registerAdmin(req.body, req);
+      res.status(201).json({
+        success: true,
+        message: 'Administrator account registered successfully with Master Key',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public static async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await AuthService.register(req.body);

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { HardHat, Lock, Mail, ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
+import { HardHat, Lock, Mail, ArrowRight, AlertCircle, Sparkles, Shield, ShieldCheck } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -13,6 +13,24 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [canRegister, setCanRegister] = useState(false);
+
+  useEffect(() => {
+    // Check if initial admin setup is required (no admin exists in DB)
+    api
+      .get('/auth/setup-status')
+      .then((res) => {
+        if (res.data?.data?.canRegister) {
+          setCanRegister(true);
+        } else {
+          setCanRegister(false);
+        }
+      })
+      .catch(() => {
+        // Fallback: registration remains closed if API error
+        setCanRegister(false);
+      });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,12 +149,33 @@ export const Login: React.FC = () => {
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-erp-text-muted">
-            Don't have an enterprise account?{' '}
-            <Link to="/register" className="text-amber-400 hover:underline font-medium">
-              Create one now
-            </Link>
-          </div>
+          {/* Initial Setup Banner ONLY if zero admins exist in database */}
+          {canRegister ? (
+            <div className="mt-6 pt-4 border-t border-white/[0.08] text-center">
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                <p className="text-xs font-bold mb-1 flex items-center justify-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  Initial Administrator Setup
+                </p>
+                <p className="text-[11px] text-slate-300 mb-2.5">
+                  No administrator account exists in this database. Initialize the workspace by creating the Master Admin account.
+                </p>
+                <Link
+                  to="/register"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-md transition-all active:scale-95"
+                >
+                  Create Master Admin Account →
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-6 pt-4 border-t border-white/[0.06] text-center">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/90 border border-slate-800 text-[10.5px] font-medium text-slate-400">
+                <Shield className="w-3 h-3 text-amber-400/80" />
+                <span>Enterprise Portal • User accounts provisioned by Administrator</span>
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

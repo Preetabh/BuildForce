@@ -13,4 +13,5 @@ export const env = {
   MAX_SOR_FILE_SIZE_MB: parseInt(process.env.MAX_SOR_FILE_SIZE_MB || '250', 10),
   PDF_BATCH_SIZE: parseInt(process.env.PDF_BATCH_SIZE || '25', 10),
   SOR_UPLOAD_DIR: process.env.SOR_UPLOAD_DIR || 'uploads/sor',
+  ADMIN_REGISTRATION_KEY: process.env.ADMIN_REGISTRATION_KEY ,
 };
