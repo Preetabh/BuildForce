@@ -149,33 +149,21 @@ export const Login: React.FC = () => {
             </Button>
           </form>
 
-          {/* Initial Setup Banner ONLY if zero admins exist in database */}
-          {canRegister ? (
-            <div className="mt-6 pt-4 border-t border-white/[0.08] text-center">
-              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300">
-                <p className="text-xs font-bold mb-1 flex items-center justify-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-amber-400" />
-                  Initial Administrator Setup
-                </p>
-                <p className="text-[11px] text-slate-300 mb-2.5">
-                  No administrator account exists in this database. Initialize the workspace by creating the Master Admin account.
-                </p>
-                <Link
-                  to="/register"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-md transition-all active:scale-95"
-                >
-                  Create Master Admin Account →
-                </Link>
-              </div>
+          <div className="mt-6 pt-4 border-t border-white/[0.08] text-center space-y-2">
+            <p className="text-xs text-slate-400">
+              Need to register as an Administrator?{' '}
+              <Link
+                to="/register"
+                className="text-amber-400 hover:text-amber-300 hover:underline font-bold transition-colors"
+              >
+                Register with Master Key
+              </Link>
+            </p>
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
+              <Shield className="w-3 h-3 text-amber-500/70" />
+              <span>Protected by 6-Character Master Security Key</span>
             </div>
-          ) : (
-            <div className="mt-6 pt-4 border-t border-white/[0.06] text-center">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/90 border border-slate-800 text-[10.5px] font-medium text-slate-400">
-                <Shield className="w-3 h-3 text-amber-400/80" />
-                <span>Enterprise Portal • User accounts provisioned by Administrator</span>
-              </span>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
