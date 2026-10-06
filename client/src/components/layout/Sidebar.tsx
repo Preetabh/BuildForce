@@ -40,6 +40,7 @@ import {
   User as UserIcon,
   Eye,
   Lock,
+  History,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { rbacService } from '../../services/rbac.service';
@@ -818,6 +819,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         )}
                       </NavLink>
                     )}
+
+                    {/* Enterprise Audit Logs */}
+                    <NavLink
+                      to="/settings/audit-logs"
+                      onClick={() => onClose()}
+                      className={({ isActive }) =>
+                        cn(
+                          'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
+                          isActive
+                            ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
+                            : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                        )
+                      }
+                    >
+                      {({ isActive }) => (
+                        <div className="flex items-center gap-2 min-w-0">
+                          <History
+                            className={cn(
+                              'w-3.5 h-3.5 shrink-0 transition-colors',
+                              isActive ? 'text-slate-950' : 'text-amber-400'
+                            )}
+                          />
+                          <span className="truncate">Audit Logs</span>
+                        </div>
+                      )}
+                    </NavLink>
                   </div>
                 )}
               </div>

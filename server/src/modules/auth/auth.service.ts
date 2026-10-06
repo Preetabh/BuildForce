@@ -73,18 +73,52 @@ export class AuthService {
     };
   }
 
-  public static async login(input: LoginInput) {
+  public static async login(input: LoginInput, req?: any) {
     const user = await User.findOne({ email: input.email.toLowerCase() });
     if (!user) {
       throw new AppError('Invalid email or password', 401);
     }
 
     if (!user.isActive) {
+      if (user.companyId) {
+        await AuditService.log({
+          companyId: user.companyId,
+          userId: user._id,
+          userSnapshot: { name: user.name, email: user.email, role: user.role },
+          action: 'LOGIN',
+          module: 'AUTH',
+          entity: 'User',
+          entityId: user._id.toString(),
+          entityName: user.name,
+          summary: `Deactivated user ${user.email} attempted login`,
+          severity: 'SECURITY',
+          status: 'FAILURE',
+          failureReason: 'Account deactivated',
+          req,
+        });
+      }
       throw new AppError('This account has been deactivated. Please contact support.', 403);
     }
 
     const isMatch = await bcrypt.compare(input.password, user.passwordHash);
     if (!isMatch) {
+      if (user.companyId) {
+        await AuditService.log({
+          companyId: user.companyId,
+          userId: user._id,
+          userSnapshot: { name: user.name, email: user.email, role: user.role },
+          action: 'LOGIN',
+          module: 'AUTH',
+          entity: 'User',
+          entityId: user._id.toString(),
+          entityName: user.name,
+          summary: `Failed login attempt for ${user.email} (incorrect credentials)`,
+          severity: 'SECURITY',
+          status: 'FAILURE',
+          failureReason: 'Invalid password',
+          req,
+        });
+      }
       throw new AppError('Invalid email or password', 401);
     }
 
@@ -94,6 +128,22 @@ export class AuthService {
     }
 
     const token = this.generateToken(user);
+
+    // Record successful login in audit trail
+    await AuditService.log({
+      companyId: company._id,
+      userId: user._id,
+      userSnapshot: { name: user.name, email: user.email, role: user.role },
+      action: 'LOGIN',
+      module: 'AUTH',
+      entity: 'User',
+      entityId: user._id.toString(),
+      entityName: user.name,
+      summary: `User ${user.name} (${user.email}) logged in successfully`,
+      severity: 'INFO',
+      status: 'SUCCESS',
+      req,
+    });
 
     return {
       token,
@@ -141,12 +191,19 @@ export class AuthService {
 
   public static async updateProfile(
     userId: string,
-    data: { name?: string; mobile?: string; expertise?: string; currentPassword?: string; newPassword?: string }
+    data: { name?: string; mobile?: string; expertise?: string; currentPassword?: string; newPassword?: string },
+    req?: any
   ) {
     const user = await User.findById(userId);
     if (!user) {
       throw new AppError('User not found', 404);
     }
+
+    const oldSnapshot = {
+      name: user.name,
+      mobile: user.mobile,
+      expertise: user.expertise,
+    };
 
     if (data.name && data.name.trim()) {
       user.name = data.name.trim();
@@ -158,18 +215,42 @@ export class AuthService {
       user.expertise = data.expertise.trim();
     }
 
-    if (data.currentPassword && data.newPassword) {
-      const isMatch = await bcrypt.compare(data.currentPassword, user.passwordHash);
+    const hasPasswordChange = !!(data.currentPassword && data.newPassword);
+    if (hasPasswordChange) {
+      const isMatch = await bcrypt.compare(data.currentPassword!, user.passwordHash);
       if (!isMatch) {
         throw new AppError('Incorrect current password', 400);
       }
-      if (data.newPassword.length < 6) {
+      if (data.newPassword!.length < 6) {
         throw new AppError('New password must be at least 6 characters', 400);
       }
-      user.passwordHash = await bcrypt.hash(data.newPassword, 10);
+      user.passwordHash = await bcrypt.hash(data.newPassword!, 10);
     }
 
     await user.save();
+
+    await AuditService.log({
+      companyId: user.companyId,
+      userId: user._id,
+      userSnapshot: { name: user.name, email: user.email, role: user.role },
+      action: hasPasswordChange ? 'PERMISSION_CHANGE' : 'UPDATE',
+      module: 'USERS',
+      entity: 'User',
+      entityId: user._id.toString(),
+      entityName: user.name,
+      oldValue: oldSnapshot,
+      newValue: {
+        name: user.name,
+        mobile: user.mobile,
+        expertise: user.expertise,
+        securityPasswordUpdated: hasPasswordChange,
+      },
+      severity: hasPasswordChange ? 'SECURITY' : 'INFO',
+      summary: hasPasswordChange
+        ? `User ${user.email} updated profile and changed password`
+        : `User ${user.email} updated profile details`,
+      req,
+    });
 
     const company = await Company.findById(user.companyId);
     return {

@@ -16,11 +16,13 @@ import {
   Trash2,
   Power,
   Bell,
+  History,
 } from 'lucide-react';
 import { VendorItem, VendorType, VendorStatus } from '../../types/vendor';
 import vendorService from '../../services/vendor.service';
 import { AddVendorModal } from '../../components/vendors/AddVendorModal';
 import { UserProfileMenu } from '../../components/profile/UserProfileMenu';
+import { EntityAuditHistoryModal } from '../../components/audit/EntityAuditHistoryModal';
 
 export const VendorManagement: React.FC = () => {
   const [vendors, setVendors] = useState<VendorItem[]>([]);
@@ -35,6 +37,7 @@ export const VendorManagement: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [vendorToEdit, setVendorToEdit] = useState<VendorItem | null>(null);
   const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
+  const [auditHistoryVendor, setAuditHistoryVendor] = useState<VendorItem | null>(null);
 
   useEffect(() => {
     fetchVendors();
@@ -427,6 +430,18 @@ export const VendorManagement: React.FC = () => {
                                 <span>{vendor.status === 'Active' ? 'Deactivate' : 'Activate'}</span>
                               </button>
 
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActionMenuOpenId(null);
+                                  setAuditHistoryVendor(vendor);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
+                              >
+                                <History className="w-3.5 h-3.5 text-sky-400" />
+                                <span>Audit History</span>
+                              </button>
+
                               <div className="my-1 border-t border-slate-800" />
 
                               <button
@@ -460,6 +475,17 @@ export const VendorManagement: React.FC = () => {
         onSubmit={handleCreateOrUpdate}
         vendorToEdit={vendorToEdit}
       />
+
+      {/* Entity Audit History Modal */}
+      {auditHistoryVendor && (
+        <EntityAuditHistoryModal
+          isOpen={Boolean(auditHistoryVendor)}
+          onClose={() => setAuditHistoryVendor(null)}
+          entity="Vendor"
+          entityId={auditHistoryVendor._id}
+          entityTitle={auditHistoryVendor.name}
+        />
+      )}
     </div>
   );
 };

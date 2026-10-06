@@ -14,11 +14,13 @@ import {
   Power,
   Bell,
   Wrench,
+  History,
 } from 'lucide-react';
 import { WorkerItem, WorkerTrade, WorkerStatus } from '../../types/vendor';
 import vendorService from '../../services/vendor.service';
 import { AddWorkerModal } from '../../components/vendors/AddWorkerModal';
 import { UserProfileMenu } from '../../components/profile/UserProfileMenu';
+import { EntityAuditHistoryModal } from '../../components/audit/EntityAuditHistoryModal';
 
 export const WorkerManagement: React.FC = () => {
   const [workers, setWorkers] = useState<WorkerItem[]>([]);
@@ -33,6 +35,7 @@ export const WorkerManagement: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [workerToEdit, setWorkerToEdit] = useState<WorkerItem | null>(null);
   const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
+  const [auditHistoryWorker, setAuditHistoryWorker] = useState<WorkerItem | null>(null);
 
   useEffect(() => {
     fetchWorkers();
@@ -415,6 +418,18 @@ export const WorkerManagement: React.FC = () => {
                                 <span>{worker.status === 'Active' ? 'Deactivate' : 'Activate'}</span>
                               </button>
 
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActionMenuOpenId(null);
+                                  setAuditHistoryWorker(worker);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
+                              >
+                                <History className="w-3.5 h-3.5 text-sky-400" />
+                                <span>Audit History</span>
+                              </button>
+
                               <div className="my-1 border-t border-slate-800" />
 
                               <button
@@ -457,6 +472,17 @@ export const WorkerManagement: React.FC = () => {
         onSubmit={handleCreateOrUpdate}
         workerToEdit={workerToEdit}
       />
+
+      {/* Entity Audit History Modal */}
+      {auditHistoryWorker && (
+        <EntityAuditHistoryModal
+          isOpen={Boolean(auditHistoryWorker)}
+          onClose={() => setAuditHistoryWorker(null)}
+          entity="Worker"
+          entityId={auditHistoryWorker._id}
+          entityTitle={auditHistoryWorker.name}
+        />
+      )}
     </div>
   );
 };

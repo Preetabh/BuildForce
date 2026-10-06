@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from './auth.service';
+import { AuditService } from '../audit/audit.service';
 
 export class AuthController {
   public static async register(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -17,11 +18,37 @@ export class AuthController {
 
   public static async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await AuthService.login(req.body);
+      const result = await AuthService.login(req.body, req);
       res.status(200).json({
         success: true,
         message: 'Authentication successful',
         data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (req.user) {
+        await AuditService.log({
+          companyId: req.user.companyId,
+          userId: req.user.userId,
+          action: 'LOGOUT',
+          module: 'AUTH',
+          entity: 'User',
+          entityId: req.user.userId,
+          entityName: req.user.name,
+          summary: `User ${req.user.name} signed out`,
+          severity: 'INFO',
+          status: 'SUCCESS',
+          req,
+        });
+      }
+      res.status(200).json({
+        success: true,
+        message: 'Logged out successfully',
       });
     } catch (error) {
       next(error);
@@ -50,7 +77,7 @@ export class AuthController {
         res.status(401).json({ success: false, message: 'Unauthorized' });
         return;
       }
-      const result = await AuthService.updateProfile(req.user.userId, req.body);
+      const result = await AuthService.updateProfile(req.user.userId, req.body, req);
       res.status(200).json({
         success: true,
         message: 'Profile updated successfully',

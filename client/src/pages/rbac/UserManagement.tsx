@@ -14,6 +14,7 @@ import {
   Phone,
   Mail,
   UserPlus,
+  History,
 } from 'lucide-react';
 import { Header } from '../../components/layout/Header';
 import { Button } from '../../components/common/Button';
@@ -21,6 +22,7 @@ import { rbacService } from '../../services/rbac.service';
 import { RbacUserItem, RbacRole } from '../../types/rbac';
 import { useImpersonation } from '../../context/ImpersonationContext';
 import { useAuth } from '../../context/AuthContext';
+import { EntityAuditHistoryModal } from '../../components/audit/EntityAuditHistoryModal';
 
 interface OutletContextType {
   setSidebarOpen: (open: boolean) => void;
@@ -37,6 +39,7 @@ export const UserManagement: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<RbacUserItem | null>(null);
+  const [auditUser, setAuditUser] = useState<RbacUserItem | null>(null);
 
   // Form State for Edit
   const [formName, setFormName] = useState('');
@@ -378,6 +381,16 @@ export const UserManagement: React.FC = () => {
 
                           <button
                             type="button"
+                            onClick={() => setAuditUser(user)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 text-[11px] font-bold transition-all active:scale-95 cursor-pointer"
+                            title="View user activity audit trail"
+                          >
+                            <History className="w-3 h-3" />
+                            <span>Activity</span>
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={() => openEditModal(user)}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                             title="Edit User"
@@ -587,6 +600,17 @@ export const UserManagement: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* User Activity History Modal */}
+      {auditUser && (
+        <EntityAuditHistoryModal
+          isOpen={Boolean(auditUser)}
+          onClose={() => setAuditUser(null)}
+          entity="User"
+          entityId={auditUser._id}
+          entityTitle={`${auditUser.name} (${auditUser.email})`}
+        />
       )}
     </div>
   );

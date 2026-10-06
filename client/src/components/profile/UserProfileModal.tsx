@@ -23,15 +23,17 @@ import {
   ExternalLink,
   Laptop,
   CheckCheck,
+  History,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import api from '../../services/api';
+import { UserActivityTab } from '../audit/UserActivityTab';
 
 interface UserProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'details' | 'permissions' | 'security';
+  initialTab?: 'details' | 'permissions' | 'security' | 'activity';
 }
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
@@ -42,7 +44,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const { user, company, updateUser, logout } = useAuth();
   const { roleDisplayName, isMasterAdmin, isModuleAllowed } = usePermissions();
 
-  const [activeTab, setActiveTab] = useState<'details' | 'permissions' | 'security'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'details' | 'permissions' | 'security' | 'activity'>(initialTab);
 
   // Sync initialTab when modal opens
   useEffect(() => {
@@ -350,6 +352,22 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             >
               <KeyRound className="w-3.5 h-3.5" />
               <span>Security & Pass</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('activity');
+                setStatusMessage(null);
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                activeTab === 'activity'
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>Activity Log</span>
             </button>
           </div>
         </div>
@@ -714,6 +732,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </button>
               </div>
             </div>
+          )}
+
+          {/* TAB 4: Profile Activity History & Audit Trail */}
+          {activeTab === 'activity' && (
+            <UserActivityTab userId={user?.id} userName={user?.name} />
           )}
 
         </div>

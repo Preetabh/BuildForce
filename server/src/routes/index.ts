@@ -60,27 +60,8 @@ router.use('/site-engineers', siteEngineerRoutes);
 import vendorRoutes from '../modules/vendors/vendor.routes';
 router.use('/', vendorRoutes);
 
-// Audit Trail Routes
-router.get('/audit/recent', authenticate, async (req, res, next) => {
-  try {
-    const companyId = req.user!.companyId;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const logs = await AuditService.getRecentLogs(companyId, limit);
-    res.status(200).json({ success: true, data: logs });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.get('/audit/:entity/:entityId', authenticate, async (req, res, next) => {
-  try {
-    const { entity, entityId } = req.params;
-    const companyId = req.user!.companyId;
-    const logs = await AuditService.getLogsForEntity(companyId, entity, entityId);
-    res.status(200).json({ success: true, data: logs });
-  } catch (error) {
-    next(error);
-  }
-});
+// Enterprise Audit Trail & Security Routes
+import auditRoutes from '../modules/audit/audit.routes';
+router.use('/audit', auditRoutes);
 
 export default router;

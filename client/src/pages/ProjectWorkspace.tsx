@@ -37,7 +37,9 @@ import {
   Calculator,
   FolderTree,
   ArrowRight,
+  History,
 } from 'lucide-react';
+import { EntityAuditHistoryModal } from '../components/audit/EntityAuditHistoryModal';
 import api from '../services/api';
 import {
   Project,
@@ -136,6 +138,7 @@ export const ProjectWorkspace: React.FC = () => {
   // Measurement Reversal Modal State
   const [reversalModalMeasurement, setReversalModalMeasurement] = useState<Measurement | null>(null);
   const [reversalReason, setReversalReason] = useState('');
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
 
   // Measurement Book Filters & Expansion (Matching Screenshot)
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -792,7 +795,17 @@ export const ProjectWorkspace: React.FC = () => {
               </div>
 
               {/* Action Buttons from Screenshot 1 */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setIsAuditModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="View complete project revision history and audit trail"
+                >
+                  <History className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Audit Trail</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => alert('Exporting Project Excel workbook...')}
@@ -3031,6 +3044,17 @@ export const ProjectWorkspace: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Project Audit Trail History Modal */}
+      {isAuditModalOpen && (
+        <EntityAuditHistoryModal
+          isOpen={isAuditModalOpen}
+          onClose={() => setIsAuditModalOpen(false)}
+          entity="Project"
+          entityId={project._id}
+          entityTitle={`${project.name} (${project.code})`}
+        />
+      )}
     </div>
   );
 };

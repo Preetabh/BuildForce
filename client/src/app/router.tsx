@@ -29,6 +29,7 @@ import { UserManagement } from '../pages/rbac/UserManagement';
 import { DetailedSiteEngineers } from '../pages/siteEngineers/DetailedSiteEngineers';
 import { VendorManagement } from '../pages/vendors/VendorManagement';
 import { WorkerManagement } from '../pages/vendors/WorkerManagement';
+import { AuditLogsPage } from '../pages/audit/AuditLogsPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -546,6 +547,28 @@ export const AppRouter: React.FC = () => {
                 <UserManagement />
               </PermissionRoute>
             }
+          />
+
+          {/* Enterprise Audit & Security Logs */}
+          <Route
+            path="/settings/audit-logs"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'AuditLogs', 'audit_logs']}>
+                <AuditLogsPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/audit-logs"
+            element={
+              <PermissionRoute permission={['Admin/Settings', 'AuditLogs', 'audit_logs']}>
+                <AuditLogsPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/audit"
+            element={<Navigate to="/settings/audit-logs" replace />}
           />
 
           {/* Utilities */}

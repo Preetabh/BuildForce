@@ -28,6 +28,7 @@ import {
   Shield,
   Trash2,
   SlidersHorizontal,
+  History,
 } from 'lucide-react';
 import { Header } from '../../components/layout/Header';
 import { Button } from '../../components/common/Button';
@@ -35,6 +36,7 @@ import { GoldToggleSwitch } from '../../components/common/GoldToggleSwitch';
 import { rbacService } from '../../services/rbac.service';
 import { RbacRole } from '../../types/rbac';
 import { RoleModal } from '../../components/rbac';
+import { EntityAuditHistoryModal } from '../../components/audit/EntityAuditHistoryModal';
 import {
   ROLE_PERMISSION_MODULES,
   PermissionModuleConfig,
@@ -57,6 +59,7 @@ export const ManageRoles: React.FC = () => {
   const [permMap, setPermMap] = useState<Record<string, boolean>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [auditRole, setAuditRole] = useState<{ id: string; name: string } | null>(null);
 
   const { data: roles = [], isLoading: isLoadingRoles } = useQuery({
     queryKey: ['rbacRoles'],
@@ -399,6 +402,19 @@ export const ManageRoles: React.FC = () => {
                 <span>2026–2027 Session Active</span>
               </div>
 
+              {/* Role Audit Trail Button */}
+              {activeRole && (
+                <button
+                  type="button"
+                  onClick={() => setAuditRole({ id: activeRole._id, name: activeRole.name })}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#0D1526] hover:bg-[#152038] text-slate-300 hover:text-white border border-[#1E293B] shadow-sm active:scale-95 transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                  title="View full audit trail and historical changes for this role"
+                >
+                  <History className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Audit Trail</span>
+                </button>
+              )}
+
               {/* Apply Changes Button */}
               <button
                 type="button"
@@ -549,6 +565,17 @@ export const ManageRoles: React.FC = () => {
         onSubmit={handleRoleModalSubmit}
         isSubmitting={createRoleMutation.isPending || updateRoleMutation.isPending}
       />
+
+      {/* Role Audit Trail Modal */}
+      {auditRole && (
+        <EntityAuditHistoryModal
+          isOpen={!!auditRole}
+          onClose={() => setAuditRole(null)}
+          entity="Role"
+          entityId={auditRole.id}
+          entityTitle={`Role: ${auditRole.name}`}
+        />
+      )}
     </div>
   );
 };

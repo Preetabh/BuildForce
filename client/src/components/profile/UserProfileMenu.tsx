@@ -9,6 +9,7 @@ import {
   Settings,
   Sparkles,
   ExternalLink,
+  History,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -28,7 +29,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
   const { roleDisplayName, isMasterAdmin, canAccess } = usePermissions();
 
   const [isOpen, setIsOpen] = useState(false);
-  const [modalTab, setModalTab] = useState<'details' | 'permissions' | 'security'>('details');
+  const [modalTab, setModalTab] = useState<'details' | 'permissions' | 'security' | 'activity'>('details');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const menuRef = useRef<HTMLDivElement>(null);
@@ -48,7 +49,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
     };
   }, [isOpen]);
 
-  const openProfileWithTab = (tab: 'details' | 'permissions' | 'security') => {
+  const openProfileWithTab = (tab: 'details' | 'permissions' | 'security' | 'activity') => {
     setModalTab(tab);
     setIsModalOpen(true);
     setIsOpen(false);
@@ -161,22 +162,52 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
               </div>
             </button>
 
+            <button
+              type="button"
+              onClick={() => openProfileWithTab('activity')}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/70 rounded-xl transition-all cursor-pointer text-left"
+            >
+              <History className="w-4 h-4 text-amber-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="block font-semibold">Activity & Audit History</span>
+                <span className="text-[10px] text-slate-400">View your session changes</span>
+              </div>
+            </button>
+
             {canAccessSettings && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsOpen(false);
-                  navigate('/Admin/ManageRoles');
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/70 rounded-xl transition-all cursor-pointer text-left"
-              >
-                <Settings className="w-4 h-4 text-blue-400 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <span className="block font-semibold">Role Management (RBAC)</span>
-                  <span className="text-[10px] text-slate-400">Configure system authorities</span>
-                </div>
-                <ExternalLink className="w-3 h-3 text-slate-500" />
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    navigate('/settings/audit-logs');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/70 rounded-xl transition-all cursor-pointer text-left"
+                >
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="block font-semibold">Audit Logs Stream</span>
+                    <span className="text-[10px] text-slate-400">Company-wide audit records</span>
+                  </div>
+                  <ExternalLink className="w-3 h-3 text-slate-500" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    navigate('/Admin/ManageRoles');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/70 rounded-xl transition-all cursor-pointer text-left"
+                >
+                  <Settings className="w-4 h-4 text-blue-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="block font-semibold">Role Management (RBAC)</span>
+                    <span className="text-[10px] text-slate-400">Configure system authorities</span>
+                  </div>
+                  <ExternalLink className="w-3 h-3 text-slate-500" />
+                </button>
+              </>
             )}
           </div>
 

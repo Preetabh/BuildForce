@@ -8,6 +8,7 @@ const router = Router();
 
 router.post('/register', validateBody(registerSchema), AuthController.register);
 router.post('/login', validateBody(loginSchema), AuthController.login);
+router.post('/logout', authenticate, AuthController.logout);
 router.get('/me', authenticate, AuthController.getCurrentUser);
 router.patch('/profile', authenticate, AuthController.updateProfile);
 
