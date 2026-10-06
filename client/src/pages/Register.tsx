@@ -39,6 +39,18 @@ export const Register: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
 
+  // Prefill workspace company name from existing setup
+  useEffect(() => {
+    api
+      .get('/auth/setup-status')
+      .then((res) => {
+        if (res.data?.data?.companyName) {
+          setCompanyName(res.data.data.companyName);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Focus the first key input when switching to step 2
   useEffect(() => {
     if (step === 2) {

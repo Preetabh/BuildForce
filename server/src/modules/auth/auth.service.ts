@@ -18,9 +18,11 @@ export class AuthService {
         role: { $in: ['ADMIN', 'MASTER_ADMIN', 'SUPER_ADMIN'] },
       })
     );
+    const company = (await Company.findById('6ab4b3c1129e946cfbaccb5c')) || (await Company.findOne());
     return {
       adminExists,
       canRegister: !adminExists,
+      companyName: company?.name || 'Lucknow Builders',
     };
   }
 
@@ -39,34 +41,19 @@ export class AuthService {
       throw new AppError('An account with this email already exists', 400);
     }
 
-    // Determine Company: create if provided, or associate with first company
-    let company: any;
-    if (input.companyName && input.companyName.trim()) {
-      const compName = input.companyName.trim();
+    // Unify under the primary workspace so all admins and staff share the same schema/workspace
+    let company = (await Company.findById('6ab4b3c1129e946cfbaccb5c')) || (await Company.findOne());
+    if (!company) {
+      const compName = input.companyName?.trim() || 'Lucknow Builders';
       const compCode = input.companyCode
         ? input.companyCode.toUpperCase().replace(/\s+/g, '')
-        : compName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || 'COMP';
-
-      let finalCode = compCode;
-      const existingCompany = await Company.findOne({ code: finalCode });
-      if (existingCompany) {
-        finalCode = `${compCode}-${Math.floor(100 + Math.random() * 900)}`;
-      }
+        : compName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || 'LB';
 
       company = await Company.create({
         name: compName,
-        code: finalCode,
+        code: compCode,
         contactEmail: input.email.toLowerCase(),
       });
-    } else {
-      company = await Company.findOne();
-      if (!company) {
-        company = await Company.create({
-          name: 'InfraPilot Enterprise',
-          code: 'INFRA-01',
-          contactEmail: input.email.toLowerCase(),
-        });
-      }
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -137,22 +124,19 @@ export class AuthService {
     }
 
     // Auto-generate company code if not provided
-    const compCode = input.companyCode
-      ? input.companyCode.toUpperCase().replace(/\s+/g, '')
-      : input.companyName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || 'COMP';
+    let company = (await Company.findById('6ab4b3c1129e946cfbaccb5c')) || (await Company.findOne());
+    if (!company) {
+      const compName = input.companyName?.trim() || 'Lucknow Builders';
+      const compCode = input.companyCode
+        ? input.companyCode.toUpperCase().replace(/\s+/g, '')
+        : compName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() || 'LB';
 
-    // Check if company code exists, append random if collision
-    let finalCode = compCode;
-    const existingCompany = await Company.findOne({ code: finalCode });
-    if (existingCompany) {
-      finalCode = `${compCode}-${Math.floor(100 + Math.random() * 900)}`;
+      company = await Company.create({
+        name: compName,
+        code: compCode,
+        contactEmail: input.email.toLowerCase(),
+      });
     }
-
-    const company = await Company.create({
-      name: input.companyName,
-      code: finalCode,
-      contactEmail: input.email.toLowerCase(),
-    });
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(input.password, salt);
