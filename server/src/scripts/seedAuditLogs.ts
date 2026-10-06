@@ -14,34 +14,35 @@ export const seedAuditLogs = async () => {
       await mongoose.connect(env.MONGODB_URI);
     }
 
-    const company = await Company.findOne();
-    if (!company) {
+    const companies = await Company.find();
+    if (!companies || companies.length === 0) {
       logger.error('No company found to seed audit logs.');
       return;
     }
 
-    const users = await User.find({ companyId: company._id }).limit(10);
-    const primaryUser = users[0] || {
-      _id: new Types.ObjectId(),
-      name: 'System Admin',
-      email: 'admin@civilguruji.com',
-      role: 'ADMIN',
-    };
-    const secondaryUser = users[1] || {
-      _id: new Types.ObjectId(),
-      name: 'Er. Priya Patel',
-      email: 'manager@civilguruji.com',
-      role: 'MANAGER',
-    };
+    for (const company of companies) {
+      const users = await User.find({ companyId: company._id }).limit(10);
+      const primaryUser = users[0] || {
+        _id: new Types.ObjectId(),
+        name: 'System Admin',
+        email: 'admin@civilguruji.com',
+        role: 'ADMIN',
+      };
+      const secondaryUser = users[1] || {
+        _id: new Types.ObjectId(),
+        name: 'Er. Priya Patel',
+        email: 'manager@civilguruji.com',
+        role: 'MANAGER',
+      };
 
-    const project = await Project.findOne({ companyId: company._id });
-    const vendor = await Vendor.findOne({ companyId: company._id });
+      const project = await Project.findOne({ companyId: company._id });
+      const vendor = await Vendor.findOne({ companyId: company._id });
 
-    const now = Date.now();
-    const hoursAgo = (h: number) => new Date(now - h * 3600 * 1000);
-    const daysAgo = (d: number) => new Date(now - d * 24 * 3600 * 1000);
+      const now = Date.now();
+      const hoursAgo = (h: number) => new Date(now - h * 3600 * 1000);
+      const daysAgo = (d: number) => new Date(now - d * 24 * 3600 * 1000);
 
-    const logsToCreate = [
+      const logsToCreate = [
       // 1. Login success
       {
         companyId: company._id,
@@ -450,13 +451,14 @@ export const seedAuditLogs = async () => {
       },
     ];
 
-    // Delete existing and insert fresh rich audit records (bypass middleware with collection.insertMany)
-    await AuditLog.collection.deleteMany({ companyId: company._id });
-    await AuditLog.collection.insertMany(logsToCreate as any);
-    logger.info(`Successfully seeded ${logsToCreate.length} enterprise audit logs.`);
-  } catch (error) {
-    logger.error('Failed to seed audit logs:', error);
-  }
+        // Delete existing and insert fresh rich audit records (bypass middleware with collection.insertMany)
+        await AuditLog.collection.deleteMany({ companyId: company._id });
+        await AuditLog.collection.insertMany(logsToCreate as any);
+        logger.info(`Successfully seeded ${logsToCreate.length} enterprise audit logs for company: ${company.name} (${company._id})`);
+      }
+    } catch (error) {
+      logger.error('Failed to seed audit logs:', error);
+    }
 };
 
 // If run directly
