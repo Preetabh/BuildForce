@@ -34,7 +34,7 @@ export const AuditTimelineView: React.FC<AuditTimelineViewProps> = ({
   }
 
   return (
-    <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 sm:before:left-4 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-800">
+    <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 sm:before:left-4 before:top-3 before:bottom-3 before:w-0.5 before:bg-white/[0.1]">
       {logs.map((log) => {
         const userName =
           (typeof log.userId === 'object' && log.userId?.name) ||
@@ -51,12 +51,12 @@ export const AuditTimelineView: React.FC<AuditTimelineViewProps> = ({
         return (
           <div key={log._id} className="relative group">
             {/* Timeline Dot Indicator */}
-            <div className="absolute -left-6 sm:-left-8 top-3.5 w-6 h-6 rounded-full bg-[#0B101D] border-2 border-amber-500/60 flex items-center justify-center shadow-md ring-4 ring-[#0B101D] group-hover:border-amber-400 group-hover:scale-110 transition-all">
+            <div className="absolute -left-6 sm:-left-8 top-3.5 w-6 h-6 rounded-full bg-[#080D18] border-2 border-amber-500/60 flex items-center justify-center shadow-lg ring-4 ring-[#080D18] group-hover:border-amber-400 group-hover:scale-110 transition-all">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
             </div>
 
             {/* Event Card */}
-            <div className="p-4 rounded-2xl bg-[#10172A] border border-slate-800 hover:border-slate-700/80 transition-all shadow-sm space-y-3 group-hover:shadow-lg group-hover:shadow-black/40">
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#0D1424] border border-white/[0.08] hover:border-amber-500/30 transition-all shadow-xl space-y-3 group-hover:shadow-2xl group-hover:shadow-black/50">
               {/* Top Header of the event */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -130,7 +130,7 @@ export const AuditTimelineView: React.FC<AuditTimelineViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onSelectLog(log)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-700/80 hover:border-amber-500/50 flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-sm"
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#121B2F] hover:bg-amber-400 hover:text-slate-950 text-amber-300 border border-amber-500/30 hover:border-amber-400 flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-sm active:scale-95 group-hover:scale-105"
                 >
                   <Eye className="w-3.5 h-3.5" />
                   <span>Inspect</span>

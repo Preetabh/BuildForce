@@ -95,46 +95,46 @@ export const AuditDiffViewer: React.FC<AuditDiffViewerProps> = ({
         </div>
 
         {/* View Mode Switcher */}
-        <div className="flex items-center gap-1 p-0.5 bg-slate-900 border border-slate-800 rounded-lg text-xs">
+        <div className="flex items-center gap-1 p-1 bg-[#080D18] border border-white/[0.08] rounded-xl text-xs shadow-inner">
           <button
             type="button"
             onClick={() => setViewMode('cards')}
-            className={`px-2 py-1 rounded flex items-center gap-1 text-[11px] font-medium transition-colors ${
+            className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-[11px] font-semibold transition-all cursor-pointer ${
               viewMode === 'cards'
-                ? 'bg-amber-500 text-slate-950 font-bold'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-amber-400 text-slate-950 font-bold shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
             }`}
             title="Field-by-field diff cards"
           >
-            <LayoutList className="w-3 h-3" />
+            <LayoutList className="w-3.5 h-3.5" />
             <span>Cards</span>
           </button>
 
           <button
             type="button"
             onClick={() => setViewMode('side-by-side')}
-            className={`px-2 py-1 rounded flex items-center gap-1 text-[11px] font-medium transition-colors ${
+            className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-[11px] font-semibold transition-all cursor-pointer ${
               viewMode === 'side-by-side'
-                ? 'bg-amber-500 text-slate-950 font-bold'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-amber-400 text-slate-950 font-bold shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
             }`}
             title="Side-by-side Before & After comparison"
           >
-            <Columns className="w-3 h-3" />
+            <Columns className="w-3.5 h-3.5" />
             <span>Side-by-Side</span>
           </button>
 
           <button
             type="button"
             onClick={() => setViewMode('raw')}
-            className={`px-2 py-1 rounded flex items-center gap-1 text-[11px] font-medium transition-colors ${
+            className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-[11px] font-semibold transition-all cursor-pointer ${
               viewMode === 'raw'
-                ? 'bg-amber-500 text-slate-950 font-bold'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-amber-400 text-slate-950 font-bold shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
             }`}
             title="Inspect raw JSON object"
           >
-            <Code2 className="w-3 h-3" />
+            <Code2 className="w-3.5 h-3.5" />
             <span>JSON</span>
           </button>
         </div>
@@ -146,36 +146,39 @@ export const AuditDiffViewer: React.FC<AuditDiffViewerProps> = ({
           {computedDiffs.map((item, idx) => (
             <div
               key={item.field || idx}
-              className="p-3 rounded-xl bg-[#090D18] border border-slate-800/90 hover:border-slate-700/80 transition-all text-xs"
+              className="p-3.5 rounded-2xl bg-[#090D18] border border-white/[0.08] hover:border-amber-500/30 transition-all text-xs shadow-md"
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-slate-200">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="font-bold text-slate-100 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                   {item.label || item.field}
                 </span>
-                <span className="font-mono text-[10px] text-slate-500">{item.field}</span>
+                <span className="font-mono text-[10.5px] px-2 py-0.5 rounded-md bg-white/[0.04] text-slate-400 border border-white/[0.06]">
+                  {item.field}
+                </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr,auto,1fr] items-center gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr,auto,1fr] items-center gap-2.5">
                 {/* Before Value (Red removal box) */}
-                <div className="p-2.5 rounded-lg bg-rose-950/25 border border-rose-900/50 text-rose-300 font-mono text-[11px] break-all flex items-start justify-between gap-1.5">
+                <div className="p-3 rounded-xl bg-rose-950/25 border border-rose-500/25 text-rose-300 font-mono text-[11px] break-all flex items-start justify-between gap-2 shadow-inner">
                   <div>
-                    <span className="text-[9px] font-sans font-bold uppercase tracking-wider text-rose-400/80 block mb-0.5">
-                      Before
+                    <span className="text-[9px] font-sans font-extrabold uppercase tracking-wider text-rose-400/90 block mb-1">
+                      Previous Value
                     </span>
                     {formatValue(item.oldValue)}
                   </div>
                 </div>
 
                 {/* Transition Arrow */}
-                <div className="hidden sm:flex items-center justify-center text-slate-500">
+                <div className="hidden sm:flex items-center justify-center text-slate-500 p-1 rounded-full bg-white/[0.03]">
                   <ArrowRight className="w-4 h-4 text-amber-400 shrink-0" />
                 </div>
 
                 {/* After Value (Green addition box) */}
-                <div className="p-2.5 rounded-lg bg-emerald-950/25 border border-emerald-900/50 text-emerald-300 font-mono text-[11px] break-all flex items-start justify-between gap-1.5">
+                <div className="p-3 rounded-xl bg-emerald-950/25 border border-emerald-500/25 text-emerald-300 font-mono text-[11px] break-all flex items-start justify-between gap-2 shadow-inner">
                   <div>
-                    <span className="text-[9px] font-sans font-bold uppercase tracking-wider text-emerald-400/80 block mb-0.5">
-                      After
+                    <span className="text-[9px] font-sans font-extrabold uppercase tracking-wider text-emerald-400/90 block mb-1">
+                      Updated Value
                     </span>
                     {formatValue(item.newValue)}
                   </div>

@@ -99,18 +99,18 @@ export const AuditFiltersBar: React.FC<AuditFiltersBarProps> = ({
   ].filter(Boolean).length;
 
   return (
-    <div className="bg-[#10172A] border border-slate-800 rounded-2xl p-4 space-y-3.5 shadow-sm">
+    <div className="bg-[#0D1424] border border-white/[0.08] rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-xl backdrop-blur-xl">
       {/* Primary Row: Search Bar, Module Dropdown, Action Dropdown, Advanced Toggle */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
         {/* Search Input */}
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+        <div className="relative flex-1 group">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-amber-400 transition-colors pointer-events-none" />
           <input
             type="text"
             value={filters.search || ''}
             onChange={(e) => onFilterChange({ ...filters, search: e.target.value, page: 1 })}
             placeholder="Search audit trail by entity, actor, IP, summary..."
-            className="w-full pl-9 pr-8 py-2 text-xs bg-[#090E1A] border border-slate-700/80 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
+            className="w-full pl-9 pr-8 py-2 text-xs bg-[#080D18] border border-white/[0.08] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/60 transition-all shadow-inner"
           />
           {filters.search && (
             <button
@@ -135,10 +135,10 @@ export const AuditFiltersBar: React.FC<AuditFiltersBarProps> = ({
                 page: 1,
               });
             }}
-            className="w-full px-3 py-2 text-xs bg-[#090E1A] border border-slate-700/80 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+            className="w-full px-3 py-2 text-xs bg-[#080D18] border border-white/[0.08] rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/60 cursor-pointer"
           >
             {modulesList.map((m) => (
-              <option key={m.value} value={m.value}>
+              <option key={m.value} value={m.value} className="bg-[#0D1424] text-slate-200">
                 {m.label}
               </option>
             ))}
@@ -157,10 +157,10 @@ export const AuditFiltersBar: React.FC<AuditFiltersBarProps> = ({
                 page: 1,
               });
             }}
-            className="w-full px-3 py-2 text-xs bg-[#090E1A] border border-slate-700/80 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+            className="w-full px-3 py-2 text-xs bg-[#080D18] border border-white/[0.08] rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500/60 cursor-pointer"
           >
             {actionsList.map((a) => (
-              <option key={a.value} value={a.value}>
+              <option key={a.value} value={a.value} className="bg-[#0D1424] text-slate-200">
                 {a.label}
               </option>
             ))}
@@ -174,7 +174,7 @@ export const AuditFiltersBar: React.FC<AuditFiltersBarProps> = ({
           className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shrink-0 ${
             showAdvanced || activeFiltersCount > 0
               ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-              : 'bg-[#090E1A] border-slate-700/80 text-slate-400 hover:text-white'
+              : 'bg-[#080D18] border-white/[0.08] text-slate-400 hover:text-white hover:bg-[#121B2F]'
           }`}
         >
           <Filter className="w-3.5 h-3.5" />

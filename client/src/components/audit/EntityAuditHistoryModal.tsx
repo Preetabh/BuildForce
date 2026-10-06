@@ -136,13 +136,13 @@ export const EntityAuditHistoryModal: React.FC<EntityAuditHistoryModalProps> = (
               return (
                 <div
                   key={log._id}
-                  className="p-4 rounded-2xl bg-[#10172A] border border-slate-800 hover:border-slate-700/80 transition-all space-y-3 shadow-sm"
+                  className="p-4 sm:p-5 rounded-2xl bg-[#0D1424] border border-white/[0.08] hover:border-amber-500/30 transition-all space-y-3.5 shadow-xl"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <AuditActionBadge action={log.action} size="sm" />
                       <AuditSeverityBadge severity={log.severity} size="sm" />
-                      <span className="text-[10px] text-slate-400 font-mono">
+                      <span className="text-[10.5px] text-slate-400 font-mono">
                         {new Date(log.timestamp).toLocaleString('en-IN', {
                           dateStyle: 'medium',
                           timeStyle: 'short',
@@ -153,7 +153,7 @@ export const EntityAuditHistoryModal: React.FC<EntityAuditHistoryModalProps> = (
                     <button
                       type="button"
                       onClick={() => setSelectedLog(log)}
-                      className="self-end sm:self-auto px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-700 flex items-center gap-1 transition-all cursor-pointer"
+                      className="self-end sm:self-auto px-3 py-1.5 rounded-xl text-xs font-bold bg-[#121B2F] hover:bg-amber-400 hover:text-slate-950 text-amber-300 border border-amber-500/30 hover:border-amber-400 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95 group-hover:scale-105"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Inspect</span>

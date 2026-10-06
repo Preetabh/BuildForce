@@ -47,7 +47,7 @@ export const UserActivityTab: React.FC<UserActivityTabProps> = ({
   return (
     <div className="space-y-4">
       {/* Header bar with Refresh and Quick Filter */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-[#10172A] border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-[#0D1424] border border-white/[0.08] shadow-xl backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
             <History className="w-4 h-4" />
@@ -67,7 +67,7 @@ export const UserActivityTab: React.FC<UserActivityTabProps> = ({
           <select
             value={filterAction}
             onChange={(e) => setFilterAction(e.target.value)}
-            className="px-2.5 py-1.5 text-xs bg-[#090E1A] border border-slate-700/80 rounded-xl text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+            className="px-2.5 py-1.5 text-xs bg-[#080D18] border border-white/[0.08] rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
           >
             <option value="all">All Operations</option>
             <option value="LOGIN">Logins Only</option>
@@ -81,7 +81,7 @@ export const UserActivityTab: React.FC<UserActivityTabProps> = ({
             type="button"
             onClick={loadUserLogs}
             disabled={isLoading}
-            className="p-1.5 text-slate-400 hover:text-white bg-[#090E1A] border border-slate-700/80 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50"
+            className="p-1.5 text-slate-400 hover:text-white bg-[#080D18] border border-white/[0.08] rounded-xl hover:bg-[#121B2F] transition-colors disabled:opacity-50 cursor-pointer active:scale-95"
             title="Refresh logs"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-amber-400' : ''}`} />

@@ -67,22 +67,22 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 pl-2 pr-1.5 py-1 rounded-xl hover:bg-slate-800/60 border border-transparent hover:border-slate-800 transition-all cursor-pointer select-none group"
+        className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-full bg-[#0E1524]/90 hover:bg-[#152035] border border-white/[0.08] hover:border-amber-500/40 shadow-sm transition-all duration-200 cursor-pointer select-none group"
         title="Click to view profile & options"
       >
         <div className="relative">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 text-slate-950 font-black text-xs flex items-center justify-center shadow-md ring-2 ring-amber-500/30 group-hover:ring-amber-400 transition-all">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 text-slate-950 font-black text-xs flex items-center justify-center shadow-md ring-2 ring-amber-500/40 group-hover:ring-amber-400 transition-all">
             {userInitial}
           </div>
-          <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-[#0c121e]" />
+          <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#070A12] animate-pulse" />
         </div>
 
         <div className="hidden md:block text-left min-w-0 max-w-[170px]">
-          <p className="text-[11px] font-semibold text-white leading-tight truncate group-hover:text-amber-300 transition-colors">
-            {userEmail}
+          <p className="text-[11px] font-bold text-slate-200 leading-tight truncate group-hover:text-amber-300 transition-colors">
+            {displayName}
           </p>
           {showRoleBadge && (
-            <p className="text-[9px] text-amber-400 font-semibold tracking-wide truncate">
+            <p className="text-[9.5px] text-amber-400 font-semibold tracking-wide truncate">
               {roleDisplayName}
             </p>
           )}
@@ -97,7 +97,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
 
       {/* Floating Profile Dropdown Card */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-[#0f172a] border border-slate-800/90 shadow-2xl shadow-black/80 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 backdrop-blur-xl">
+        <div className="absolute right-0 mt-2 w-76 rounded-2xl bg-[#0D1424] border border-white/10 shadow-2xl shadow-black/95 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 backdrop-blur-2xl">
           {/* Header Card */}
           <div className="px-4 py-3 border-b border-slate-800/80 bg-gradient-to-b from-[#141d33] to-[#0f172a]">
             <div className="flex items-center gap-3">

@@ -108,8 +108,8 @@ export const AuditAnalyticsPanel: React.FC<AuditAnalyticsPanelProps> = ({
       {/* Middle Row: Module Distribution & Action Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Module Distribution Bar Cards */}
-        <div className="p-4 rounded-2xl bg-[#10172A] border border-slate-800 space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#0D1424] border border-white/[0.08] space-y-3.5 shadow-xl backdrop-blur-xl">
+          <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <Layers className="w-4 h-4 text-amber-400" />
               <span>Activity by Module</span>
@@ -141,8 +141,8 @@ export const AuditAnalyticsPanel: React.FC<AuditAnalyticsPanelProps> = ({
         </div>
 
         {/* Action Type Breakdown */}
-        <div className="p-4 rounded-2xl bg-[#10172A] border border-slate-800 space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#0D1424] border border-white/[0.08] space-y-3.5 shadow-xl backdrop-blur-xl">
+          <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-emerald-400" />
               <span>Activity by Action Category</span>
@@ -154,7 +154,7 @@ export const AuditAnalyticsPanel: React.FC<AuditAnalyticsPanelProps> = ({
             {stats.byAction?.map((act) => (
               <div
                 key={act.action}
-                className="p-2.5 rounded-xl bg-[#090E1A] border border-slate-800/80 flex flex-col justify-between"
+                className="p-2.5 rounded-xl bg-[#080D18] border border-white/[0.08] flex flex-col justify-between shadow-inner"
               >
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
                   {act.action.replace('_', ' ')}
@@ -170,8 +170,8 @@ export const AuditAnalyticsPanel: React.FC<AuditAnalyticsPanelProps> = ({
 
       {/* Bottom Row: Daily Activity Volume Visualization */}
       {stats.timeline && stats.timeline.length > 0 && (
-        <div className="p-4 rounded-2xl bg-[#10172A] border border-slate-800 space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#0D1424] border border-white/[0.08] space-y-3.5 shadow-xl backdrop-blur-xl">
+          <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <Calendar className="w-4 h-4 text-sky-400" />
               <span>Daily Event Velocity Timeline</span>

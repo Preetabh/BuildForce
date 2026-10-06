@@ -254,20 +254,23 @@ export const AuditLogsPage: React.FC = () => {
       {/* TAB 1: Enterprise Audit Stream (Data Table) */}
       {activeTab === 'stream' && (
         <div className="space-y-4">
-          <div className="bg-[#10172A] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="bg-[#0D1424] border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl backdrop-blur-xl">
             {/* Table Header / Counter info */}
-            <div className="px-5 py-3 border-b border-slate-800 bg-[#0C1222] flex items-center justify-between text-xs text-slate-400">
-              <span className="font-semibold text-slate-300">
-                Displaying {logs.length} of {pagination.total} recorded events
-              </span>
+            <div className="px-5 py-3.5 border-b border-white/[0.08] bg-[#090E1A]/80 flex items-center justify-between text-xs text-slate-400">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-500">Rows per page:</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-bold text-slate-200">
+                  Displaying {logs.length} of {pagination.total} recorded events
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-400">Rows per page:</span>
                 <select
                   value={filters.limit}
                   onChange={(e) =>
                     setFilters({ ...filters, limit: Number(e.target.value), page: 1 })
                   }
-                  className="px-2 py-1 text-xs bg-slate-900 border border-slate-700/80 rounded-lg text-slate-300 focus:outline-none"
+                  className="px-2.5 py-1 text-xs bg-[#080D18] border border-white/[0.1] rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -281,16 +284,16 @@ export const AuditLogsPage: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-800/80 bg-[#0A0F1D] text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
-                    <th className="py-3 px-4">Timestamp</th>
-                    <th className="py-3 px-4">Actor / Profile</th>
-                    <th className="py-3 px-4">Action</th>
-                    <th className="py-3 px-4">Module</th>
-                    <th className="py-3 px-4">Target Entity</th>
-                    <th className="py-3 px-4">Changes</th>
-                    <th className="py-3 px-4">Severity</th>
-                    <th className="py-3 px-4">Network & Client</th>
-                    <th className="py-3 px-4 text-right">Inspect</th>
+                  <tr className="border-b border-white/[0.08] bg-[#070A12] text-slate-400 text-[10.5px] uppercase tracking-wider font-semibold">
+                    <th className="py-3.5 px-4">Timestamp</th>
+                    <th className="py-3.5 px-4">Actor / Profile</th>
+                    <th className="py-3.5 px-4">Action</th>
+                    <th className="py-3.5 px-4">Module</th>
+                    <th className="py-3.5 px-4">Target Entity</th>
+                    <th className="py-3.5 px-4">Changes</th>
+                    <th className="py-3.5 px-4">Severity</th>
+                    <th className="py-3.5 px-4">Network & Client</th>
+                    <th className="py-3.5 px-4 text-right">Inspect</th>
                   </tr>
                 </thead>
 
@@ -429,10 +432,10 @@ export const AuditLogsPage: React.FC = () => {
                                 e.stopPropagation();
                                 setSelectedLog(log);
                               }}
-                              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-700/80 hover:border-amber-500/50 inline-flex items-center gap-1 transition-all"
+                              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#121B2F] hover:bg-amber-400 hover:text-slate-950 text-amber-300 border border-amber-500/30 hover:border-amber-400 inline-flex items-center gap-1.5 shadow-sm transition-all group-hover:scale-105 active:scale-95 cursor-pointer"
                             >
-                              <Eye className="w-3 h-3" />
-                              <span>View</span>
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Inspect</span>
                             </button>
                           </td>
                         </tr>
@@ -445,19 +448,19 @@ export const AuditLogsPage: React.FC = () => {
 
             {/* Pagination Controls Footer */}
             {pagination.totalPages > 1 && (
-              <div className="px-5 py-3.5 border-t border-slate-800 bg-[#0C1222] flex items-center justify-between gap-4 text-xs">
-                <span className="text-slate-400">
-                  Page <strong className="text-white">{pagination.page}</strong> of{' '}
-                  <strong className="text-white">{pagination.totalPages}</strong> (
-                  {pagination.total} events)
+              <div className="px-5 py-3.5 border-t border-white/[0.08] bg-[#090E1A]/90 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <span className="text-slate-400 font-medium">
+                  Showing page <strong className="text-amber-400 font-bold">{pagination.page}</strong> of{' '}
+                  <strong className="text-white font-bold">{pagination.totalPages}</strong> (
+                  {pagination.total} total events)
                 </span>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setFilters({ ...filters, page: 1 })}
                     disabled={pagination.page <= 1}
-                    className="p-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white border border-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
+                    className="p-2 rounded-xl bg-[#0E1524] text-slate-400 hover:text-white hover:bg-[#162238] border border-white/[0.08] disabled:opacity-30 transition-all cursor-pointer shadow-sm active:scale-95"
                     title="First Page"
                   >
                     <ChevronsLeft className="w-4 h-4" />
@@ -467,21 +470,21 @@ export const AuditLogsPage: React.FC = () => {
                     type="button"
                     onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
                     disabled={pagination.page <= 1}
-                    className="p-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white border border-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
+                    className="p-2 rounded-xl bg-[#0E1524] text-slate-400 hover:text-white hover:bg-[#162238] border border-white/[0.08] disabled:opacity-30 transition-all cursor-pointer shadow-sm active:scale-95"
                     title="Previous Page"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
 
-                  <span className="px-3 py-1 font-mono font-bold text-amber-400 bg-slate-900 rounded-lg border border-slate-800">
-                    {pagination.page}
+                  <span className="px-3.5 py-1.5 font-mono font-bold text-amber-300 bg-amber-500/10 rounded-xl border border-amber-500/30 shadow-inner">
+                    {pagination.page} / {pagination.totalPages}
                   </span>
 
                   <button
                     type="button"
                     onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
                     disabled={pagination.page >= pagination.totalPages}
-                    className="p-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-white border border-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
+                    className="p-2 rounded-xl bg-[#0E1524] text-slate-400 hover:text-white hover:bg-[#162238] border border-white/[0.08] disabled:opacity-30 transition-all cursor-pointer shadow-sm active:scale-95"
                     title="Next Page"
                   >
                     <ChevronRight className="w-4 h-4" />
