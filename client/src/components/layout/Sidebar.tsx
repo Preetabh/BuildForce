@@ -5,7 +5,6 @@ import {
   CalendarRange,
   Target,
   Truck,
-  FolderKanban,
   BookOpen,
   Calculator,
   ClipboardCheck,
@@ -13,7 +12,6 @@ import {
   BadgePercent,
   Layers,
   Wrench,
-  TrendingUp,
   LogOut,
   X,
   ChevronDown,
@@ -183,18 +181,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { label: 'Supplier', path: '/vendors/suppliers', icon: Truck, isComingSoon: false, permissionKey: 'Admin/Vendors_Suppliers' },
         { label: 'Workers', path: '/vendors/workers', icon: HardHat, isComingSoon: false, permissionKey: 'Admin/Vendors_Workers' },
-      ],
-    },
-    {
-      id: 'project_management',
-      label: 'PROJECT MANAGEMENT',
-      icon: FolderKanban,
-      items: [
-        { label: 'Projects Workspace', path: '/', icon: FolderKanban, isComingSoon: false, permissionKey: 'Admin/DailyReportList' },
-        { label: 'Measurement Book (e-MB)', path: '/execution/measurement-book', icon: Layers, isComingSoon: true, permissionKey: 'Admin/MeasurementBook' },
-        { label: 'Daily Progress Report (DPR)', path: '/execution/dpr', icon: FileSpreadsheet, isComingSoon: true, permissionKey: 'Admin/DPR' },
-        { label: 'Cost Control & EVM', path: '/project-control/evm', icon: TrendingUp, isComingSoon: true, permissionKey: 'Admin/EVM' },
-        { label: 'Site Inspection Checklist', path: '/execution/inspections', icon: ClipboardCheck, isComingSoon: true, permissionKey: 'Admin/Inspections' },
       ],
     },
   ];
