@@ -1,5 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import api from '../../services/api';
 import {
   Menu,
   RefreshCw,
@@ -43,6 +45,35 @@ export const Header: React.FC<HeaderProps> = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const projectRef = useRef<HTMLDivElement>(null);
 
+  // Fetch real projects dynamically from backend database
+  const { data: projectsData, isLoading: isLoadingProjects } = useQuery({
+    queryKey: ['headerProjectsList'],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/projects?limit=50');
+        return res.data?.data || [];
+      } catch (err) {
+        console.error('Error fetching projects in header:', err);
+        return [];
+      }
+    },
+    staleTime: 60 * 1000,
+  });
+
+  const availableProjects = useMemo(() => {
+    const list = [{ id: 'all', name: 'All Projects', code: 'GLOBAL' }];
+    if (Array.isArray(projectsData)) {
+      projectsData.forEach((p: any) => {
+        list.push({
+          id: p._id || p.id,
+          name: p.name,
+          code: p.code || 'PRJ',
+        });
+      });
+    }
+    return list;
+  }, [projectsData]);
+
   // Keyboard shortcut listener for Cmd+K / Ctrl+K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -65,13 +96,6 @@ export const Header: React.FC<HeaderProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const dummyProjects = [
-    { id: 'all', name: 'All Projects', code: 'GLOBAL', status: 'ACTIVE' },
-    { id: '1', name: 'Skyline Commercial Towers', code: 'SCT-01', status: 'IN_PROGRESS' },
-    { id: '2', name: 'Green Valley Villas Ph-2', code: 'GVV-02', status: 'ON_TRACK' },
-    { id: '3', name: 'Metro Flyover Expansion', code: 'MFE-09', status: 'REVIEW' },
-  ];
 
   return (
     <header className="sticky top-0 z-30 bg-[#070A12]/90 backdrop-blur-xl border-b border-white/[0.08] px-4 sm:px-6 py-2.5 transition-all shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
@@ -113,11 +137,12 @@ export const Header: React.FC<HeaderProps> = ({
 
             {isProjectDropdownOpen && (
               <div className="absolute left-0 mt-2 w-64 rounded-2xl bg-[#0D1424] border border-white/10 shadow-2xl shadow-black/90 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 backdrop-blur-2xl">
-                <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/[0.06]">
-                  Active Workspace Scope
+                <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/[0.06] flex items-center justify-between">
+                  <span>Active Workspace Scope</span>
+                  {isLoadingProjects && <span className="text-[9px] text-amber-400 animate-pulse font-normal">Loading...</span>}
                 </div>
-                <div className="mt-1 space-y-1">
-                  {dummyProjects.map((proj) => {
+                <div className="mt-1 space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
+                  {availableProjects.map((proj) => {
                     const isSelected = activeProjectName === proj.name;
                     return (
                       <button
@@ -126,6 +151,11 @@ export const Header: React.FC<HeaderProps> = ({
                         onClick={() => {
                           setActiveProjectName(proj.name);
                           setIsProjectDropdownOpen(false);
+                          if (proj.id !== 'all') {
+                            navigate(`/projects/${proj.id}`);
+                          } else {
+                            navigate('/');
+                          }
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs text-left transition-all cursor-pointer ${
                           isSelected

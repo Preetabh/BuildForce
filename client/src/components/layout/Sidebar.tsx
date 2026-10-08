@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home,
   CalendarRange,
@@ -293,9 +293,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             /* Minimized Brand Header with Prominent Logo */
             <div className="w-full flex flex-col items-center gap-2">
               {/* Clickable Logo with glow */}
-              <button
-                onClick={onToggleMinimize}
-                title="InfraPilot (Click or hover to expand sidebar)"
+              <Link
+                to="/"
+                onClick={() => onClose()}
+                title="InfraPilot Home (Go to /)"
                 className="w-11 h-11 rounded-xl overflow-hidden shadow-lg shadow-amber-500/25 border border-amber-500/40 bg-gradient-to-br from-[#161F30] via-[#0E1528] to-black p-1 flex items-center justify-center hover:scale-105 hover:border-amber-400 transition-all cursor-pointer group"
               >
                 <img
@@ -307,7 +308,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   alt="InfraPilot Logo"
                   className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(245,158,11,0.7)] group-hover:drop-shadow-[0_0_12px_rgba(245,158,11,1)] transition-all"
                 />
-              </button>
+              </Link>
 
               {/* Expand Toggle Button */}
               <button
@@ -321,8 +322,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             /* Full Expanded Brand Header (also shown when hovered!) */
             <>
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-amber-500/25 shrink-0 border border-amber-500/40 bg-gradient-to-br from-[#161F30] via-[#0E1528] to-black p-1 flex items-center justify-center">
+              <Link
+                to="/"
+                onClick={() => onClose()}
+                title="InfraPilot Home (Go to /)"
+                className="flex items-center gap-2.5 min-w-0 group cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-amber-500/25 shrink-0 border border-amber-500/40 bg-gradient-to-br from-[#161F30] via-[#0E1528] to-black p-1 flex items-center justify-center group-hover:scale-105 group-hover:border-amber-400 transition-all">
                   <img
                     src="/logo-dark.png"
                     onError={(e) => {
@@ -330,20 +336,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       if (!target.src.includes('logo.png')) target.src = '/logo.png';
                     }}
                     alt="InfraPilot Logo"
-                    className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]"
+                    className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(245,158,11,0.7)] group-hover:drop-shadow-[0_0_12px_rgba(245,158,11,1)] transition-all"
                   />
                 </div>
                 <div className="min-w-0">
                   <h1 className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5 font-mono truncate">
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-amber-100 to-amber-300">
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-amber-100 to-amber-300 group-hover:from-white group-hover:to-amber-400 transition-all">
                       InfraPilot
                     </span>
                   </h1>
-                  <p className="text-[10px] font-medium tracking-wider uppercase text-amber-400/90 truncate">
+                  <p className="text-[10px] font-medium tracking-wider uppercase text-amber-400/90 truncate group-hover:text-amber-300 transition-colors">
                     Plan • Build • Control
                   </p>
                 </div>
-              </div>
+              </Link>
 
               {/* Minimize & Mobile Close Buttons */}
               <div className="flex items-center gap-1 shrink-0">
