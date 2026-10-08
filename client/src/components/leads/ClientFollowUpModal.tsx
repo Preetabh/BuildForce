@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, AlertCircle } from 'lucide-react';
 import { ClientRecord } from '../../types';
 import leadService from '../../services/lead.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface ClientFollowUpModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ export const ClientFollowUpModal: React.FC<ClientFollowUpModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [nextDueDate, setNextDueDate] = useState('');
   const [remark, setRemark] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

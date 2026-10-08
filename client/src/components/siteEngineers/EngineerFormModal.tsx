@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { HardHat, X } from 'lucide-react';
 import { SiteEngineerItem } from '../../types/rbac';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface EngineerFormModalProps {
   isOpen: boolean;
@@ -17,6 +18,8 @@ export const EngineerFormModal: React.FC<EngineerFormModalProps> = ({
   onSubmit,
   isSubmitting,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [name, setName] = useState('');
   const [loginId, setLoginId] = useState('');
   const [mobile, setMobile] = useState('-');
@@ -61,6 +64,8 @@ export const EngineerFormModal: React.FC<EngineerFormModalProps> = ({
       walletBalance: Number(walletBalance) || 0,
     });
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">

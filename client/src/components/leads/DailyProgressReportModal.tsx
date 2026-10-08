@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ClientRecord, ClientDprReport } from '../../types';
 import leadService from '../../services/lead.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface DailyProgressReportModalProps {
   isOpen: boolean;
@@ -29,6 +30,8 @@ export const DailyProgressReportModal: React.FC<DailyProgressReportModalProps> =
   onClose,
   onSuccess,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [workCompletedToday, setWorkCompletedToday] = useState('');
   const [materialsUsed, setMaterialsUsed] = useState('');
   const [nextDayPlan, setNextDayPlan] = useState('');
@@ -103,6 +106,8 @@ export const DailyProgressReportModal: React.FC<DailyProgressReportModalProps> =
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen || !client) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">

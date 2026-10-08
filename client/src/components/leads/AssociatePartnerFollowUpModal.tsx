@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, Phone, Mail, User, Save, CheckCircle2 } from 'lucide-react';
 import { PartnerItem } from '../../types';
 import leadService from '../../services/lead.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface AssociatePartnerFollowUpModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ export const AssociatePartnerFollowUpModal: React.FC<AssociatePartnerFollowUpMod
   onClose,
   onSuccess,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [dueDate, setDueDate] = useState('');
   const [remark, setRemark] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

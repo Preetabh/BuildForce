@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, AlertTriangle, RotateCcw, Skull } from 'lucide-react';
 import { ClientRecord } from '../../types';
 import leadService from '../../services/lead.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface ClientDeadModalProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ export const ClientDeadModal: React.FC<ClientDeadModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');

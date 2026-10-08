@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { UserProfileModal } from './UserProfileModal';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface UserProfileMenuProps {
   className?: string;
@@ -31,6 +32,9 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [modalTab, setModalTab] = useState<'details' | 'permissions' | 'security' | 'activity'>('details');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Close profile dropdown on Escape key
+  useEscapeKey(() => setIsOpen(false), isOpen);
 
   const menuRef = useRef<HTMLDivElement>(null);
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Save } from 'lucide-react';
 import { WorkerItem, WorkerTrade, WorkerStatus } from '../../types/vendor';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface AddWorkerModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ export const AddWorkerModal: React.FC<AddWorkerModalProps> = ({
   onSubmit,
   workerToEdit,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [name, setName] = useState('');
   const [trade, setTrade] = useState<string>('Mason');
   const [contactPhone, setContactPhone] = useState('');
@@ -98,6 +101,8 @@ export const AddWorkerModal: React.FC<AddWorkerModalProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">

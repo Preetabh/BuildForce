@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Printer, CheckCircle2, Building2, ShieldCheck } from 'lucide-react';
 import { PaymentItem } from '../../types';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface PaymentReceiptModalProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ export const PaymentReceiptModal: React.FC<PaymentReceiptModalProps> = ({
   onClose,
   payment,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   if (!isOpen || !payment) return null;
 
   const handlePrint = () => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, Coins, X } from 'lucide-react';
 import { SiteEngineerItem } from '../../types/rbac';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface EngineerWalletModalProps {
   engineer: SiteEngineerItem | null;
@@ -20,6 +21,8 @@ export const EngineerWalletModal: React.FC<EngineerWalletModalProps> = ({
   onSubmit,
   isSubmitting,
 }) => {
+  useEscapeKey(onClose, !!engineer);
+
   const [walletAmount, setWalletAmount] = useState<number>(5000);
   const [walletOperation, setWalletOperation] = useState<'add' | 'deduct' | 'set'>('add');
   const [walletNotes, setWalletNotes] = useState('');

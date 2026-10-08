@@ -29,6 +29,7 @@ import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import api from '../../services/api';
 import { UserActivityTab } from '../audit/UserActivityTab';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -41,6 +42,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onClose,
   initialTab = 'details',
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const { user, company, updateUser, logout } = useAuth();
   const { roleDisplayName, isMasterAdmin, isModuleAllowed } = usePermissions();
 

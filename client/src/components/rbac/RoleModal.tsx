@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, X, Check } from 'lucide-react';
 import { RbacRole } from '../../types/rbac';
 import { APP_CONFIG } from '../../config/app.config';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface RoleModalProps {
   isOpen: boolean;
@@ -18,6 +19,8 @@ export const RoleModal: React.FC<RoleModalProps> = ({
   isSubmitting,
   onSubmit,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [description, setDescription] = useState('');

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { ClientRecord } from '../../types';
 import leadService from '../../services/lead.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface ClientEditModalProps {
   isOpen: boolean;
@@ -27,6 +28,8 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   // Project & Site Details
   const [siteLocation, setSiteLocation] = useState('');
   const [propertyType, setPropertyType] = useState('Residential');
@@ -176,6 +179,8 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen || !client) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">

@@ -3,6 +3,7 @@ import { X, Plus, Check, Info } from 'lucide-react';
 import { LeadItem, PartnerItem } from '../../types';
 import leadService from '../../services/lead.service';
 import catalogService from '../../services/catalog.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface AddLeadModalProps {
   isOpen: boolean;
@@ -41,6 +42,8 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
   onSuccess,
   leadToEdit,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -282,6 +285,8 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">

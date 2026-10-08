@@ -7,6 +7,7 @@ import { AuditActionBadge } from './AuditActionBadge';
 import { AuditSeverityBadge } from './AuditSeverityBadge';
 import { AuditDiffViewer } from './AuditDiffViewer';
 import { AuditLogDrawer } from './AuditLogDrawer';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface EntityAuditHistoryModalProps {
   isOpen: boolean;
@@ -27,6 +28,9 @@ export const EntityAuditHistoryModal: React.FC<EntityAuditHistoryModalProps> = (
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+
+  useEscapeKey(onClose, isOpen && !selectedLog);
+  useEscapeKey(() => setSelectedLog(null), !!selectedLog);
 
   useEffect(() => {
     if (isOpen && entity && entityId) {

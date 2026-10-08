@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { ClientRecord, ClientDossier } from '../../types';
 import leadService from '../../services/lead.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface ClientReportModalProps {
   isOpen: boolean;
@@ -32,6 +33,8 @@ export const ClientReportModal: React.FC<ClientReportModalProps> = ({
   client,
   onClose,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [dossier, setDossier] = useState<ClientDossier | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 

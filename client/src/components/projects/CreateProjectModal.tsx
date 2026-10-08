@@ -4,6 +4,7 @@ import api from '../../services/api';
 import { X, Calendar, Ruler, ShieldCheck, AlertCircle, Check, FolderKanban } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useQuery } from '@tanstack/react-query';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 export interface CreateProjectModalProps {
   isOpen: boolean;
@@ -18,6 +19,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   onSuccess,
   projectToEdit,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const isEditing = !!projectToEdit;
 
   // Form Fields matching screenshot
@@ -147,6 +150,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-in fade-in duration-200">

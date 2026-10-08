@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { Bot, X, Sparkles, Send, BookOpen, Calculator, Layers, HelpCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 export const AiAssistantWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+
+  // Close AI Assistant on Escape key
+  useEscapeKey(() => setIsOpen(false), isOpen);
   const [messages, setMessages] = useState<Array<{ role: 'ai' | 'user'; text: string; time: string }>>([
     {
       role: 'ai',

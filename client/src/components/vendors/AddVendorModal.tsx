@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Save } from 'lucide-react';
 import { VendorItem, VendorType, VendorStatus } from '../../types/vendor';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface AddVendorModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ export const AddVendorModal: React.FC<AddVendorModalProps> = ({
   onSubmit,
   vendorToEdit,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [name, setName] = useState('');
   const [type, setType] = useState<VendorType>('Material');
   const [contactPhone, setContactPhone] = useState('');
@@ -107,6 +110,8 @@ export const AddVendorModal: React.FC<AddVendorModalProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, X } from 'lucide-react';
 import { PartnerItem } from '../../types';
 import leadService from '../../services/lead.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface AssociatePartnerModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ export const AssociatePartnerModal: React.FC<AssociatePartnerModalProps> = ({
   onSuccess,
   partnerToEdit,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [fullName, setFullName] = useState('');
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
@@ -100,6 +103,8 @@ export const AssociatePartnerModal: React.FC<AssociatePartnerModalProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">

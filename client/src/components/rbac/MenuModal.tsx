@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, X } from 'lucide-react';
 import { RbacMenuItem } from '../../types/rbac';
 import { APP_CONFIG } from '../../config/app.config';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface MenuModalProps {
   isOpen: boolean;
@@ -20,6 +21,8 @@ export const MenuModal: React.FC<MenuModalProps> = ({
   isSubmitting,
   onSubmit,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [title, setTitle] = useState('');
   const [route, setRoute] = useState('');
   const [icon, setIcon] = useState('Layers');

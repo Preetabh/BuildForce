@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar } from 'lucide-react';
 import { LeadItem } from '../../types';
 import leadService from '../../services/lead.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface FollowUpModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [isDead, setIsDead] = useState(false);
   const [dueDate, setDueDate] = useState('');
   const [stage, setStage] = useState('Meeting');

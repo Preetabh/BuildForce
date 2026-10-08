@@ -21,6 +21,7 @@ import { AuditLog } from '../../types/audit';
 import { AuditSeverityBadge } from './AuditSeverityBadge';
 import { AuditActionBadge } from './AuditActionBadge';
 import { AuditDiffViewer } from './AuditDiffViewer';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface AuditLogDrawerProps {
   log: AuditLog | null;
@@ -37,6 +38,8 @@ export const AuditLogDrawer: React.FC<AuditLogDrawerProps> = ({
   onSelectRelated,
   relatedActivities = [],
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [activeTab, setActiveTab] = useState<'details' | 'diff' | 'raw'>('details');
   const [copiedText, setCopiedText] = useState<string | null>(null);
 

@@ -16,6 +16,7 @@ import {
 import { BreadcrumbItem, Breadcrumb } from './Breadcrumb';
 import { useAuth } from '../../context/AuthContext';
 import { UserProfileMenu } from '../profile/UserProfileMenu';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 export interface HeaderProps {
   breadcrumbs?: BreadcrumbItem[];
@@ -41,6 +42,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const [activeProjectName, setActiveProjectName] = useState('All Projects');
+
+  // Close project dropdown on Escape key
+  useEscapeKey(() => setIsProjectDropdownOpen(false), isProjectDropdownOpen);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const projectRef = useRef<HTMLDivElement>(null);
@@ -153,8 +157,8 @@ export const Header: React.FC<HeaderProps> = ({
                           setIsProjectDropdownOpen(false);
                           if (proj.id !== 'all') {
                             navigate(`/projects/${proj.id}`);
-                          } else {
                             navigate('/');
+                          } else {
                           }
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs text-left transition-all cursor-pointer ${

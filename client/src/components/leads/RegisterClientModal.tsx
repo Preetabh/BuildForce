@@ -14,6 +14,7 @@ import {
 import { LeadItem } from '../../types';
 import leadService from '../../services/lead.service';
 import catalogService from '../../services/catalog.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface RegisterClientModalProps {
   isOpen: boolean;
@@ -85,6 +86,8 @@ export const RegisterClientModal: React.FC<RegisterClientModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [dynamicServices, setDynamicServices] = useState<string[]>([]);
 
   // Client Details

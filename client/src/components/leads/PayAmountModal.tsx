@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, CreditCard, IndianRupee, CheckCircle } from 'lucide-react';
 import { ClientRecord } from '../../types';
 import leadService from '../../services/lead.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface PayAmountModalProps {
   isOpen: boolean;
@@ -31,6 +32,8 @@ export const PayAmountModal: React.FC<PayAmountModalProps> = ({
   onSuccess,
   defaultClient,
 }) => {
+  useEscapeKey(onClose, isOpen);
+
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [clientName, setClientName] = useState('');
@@ -115,6 +118,8 @@ export const PayAmountModal: React.FC<PayAmountModalProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">

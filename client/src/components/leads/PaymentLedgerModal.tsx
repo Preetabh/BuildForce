@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { ClientRecord, ClientLedgerStage } from '../../types';
 import leadService from '../../services/lead.service';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface PaymentLedgerModalProps {
   isOpen: boolean;
@@ -58,6 +59,11 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  // Escape key handling with priority
+  useEscapeKey(onClose, isOpen && !activePayStage && !showHistoryModal);
+  useEscapeKey(() => setActivePayStage(null), !!activePayStage);
+  useEscapeKey(() => setShowHistoryModal(false), showHistoryModal);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
