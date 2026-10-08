@@ -192,15 +192,19 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
       {/* Top Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Today's Inquiries */}
-        <div className="bg-[#101625] border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-amber-500/30 transition-all">
+        <div
+          onClick={() => navigate('/leads?todayOnly=true')}
+          title="Click to view Today's Inquiries"
+          className="bg-[#101625] border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-amber-500/60 hover:bg-[#141B2D] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer group"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Today's Inquiries</span>
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <span className="text-xs font-semibold text-slate-400 group-hover:text-amber-300 transition-colors">Today's Inquiries</span>
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
               <UserPlus className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <h2 className="text-2xl font-black text-white tracking-tight">
+            <h2 className="text-2xl font-black text-white tracking-tight group-hover:text-amber-200 transition-colors">
               {userTodayStats?.leadsCreatedToday ?? leads.filter((l) => {
                 const d = new Date(l.leadDate || l.createdAt);
                 const t = new Date();
@@ -215,15 +219,19 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
         </div>
 
         {/* Card 2: Today Due Follow-ups */}
-        <div className="bg-[#101625] border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-rose-500/30 transition-all">
+        <div
+          onClick={() => navigate('/leads?view=today-due')}
+          title="Click to view Follow-ups Due Today"
+          className="bg-[#101625] border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-rose-500/60 hover:bg-[#141B2D] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer group"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Follow-ups Due Today</span>
-            <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+            <span className="text-xs font-semibold text-slate-400 group-hover:text-rose-300 transition-colors">Follow-ups Due Today</span>
+            <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform">
               <Clock className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <h2 className="text-2xl font-black text-rose-400 tracking-tight">
+            <h2 className="text-2xl font-black text-rose-400 tracking-tight group-hover:text-rose-300 transition-colors">
               {stats?.todayDueCount ?? todayDueLeads.length}
             </h2>
             <p className="text-xs text-slate-400 mt-1">Requires call or meeting today</p>
@@ -231,15 +239,19 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
         </div>
 
         {/* Card 3: Active Leads in Funnel */}
-        <div className="bg-[#101625] border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-blue-500/30 transition-all">
+        <div
+          onClick={() => navigate('/leads?view=process')}
+          title="Click to open Active Pipeline Kanban"
+          className="bg-[#101625] border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-blue-500/60 hover:bg-[#141B2D] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer group"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Active Pipeline</span>
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+            <span className="text-xs font-semibold text-slate-400 group-hover:text-blue-300 transition-colors">Active Pipeline</span>
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
               <Users className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <h2 className="text-2xl font-black text-white tracking-tight">
+            <h2 className="text-2xl font-black text-white tracking-tight group-hover:text-blue-200 transition-colors">
               {stats?.totalActive ?? leads.filter((l) => !l.isDead && l.stage !== 'Client').length}
             </h2>
             <p className="text-xs text-blue-400 mt-1">Ongoing discussions</p>
@@ -247,15 +259,19 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
         </div>
 
         {/* Card 4: Converted Clients */}
-        <div className="bg-[#101625] border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-emerald-500/30 transition-all">
+        <div
+          onClick={() => navigate('/leads/clients')}
+          title="Click to view Converted Clients"
+          className="bg-[#101625] border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-emerald-500/60 hover:bg-[#141B2D] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer group"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Converted Clients</span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <span className="text-xs font-semibold text-slate-400 group-hover:text-emerald-300 transition-colors">Converted Clients</span>
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <h2 className="text-2xl font-black text-emerald-400 tracking-tight">
+            <h2 className="text-2xl font-black text-emerald-400 tracking-tight group-hover:text-emerald-300 transition-colors">
               {stats?.totalClients ?? clients.length}
             </h2>
             <p className="text-xs text-slate-400 mt-1">
@@ -267,44 +283,56 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
 
       {/* Secondary Financial KPI Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#0C1220] border border-slate-800/80 rounded-xl p-4 flex items-center justify-between">
+        <div
+          onClick={() => navigate('/leads/payments')}
+          title="Click to view Payment Collections & History"
+          className="bg-[#0C1220] border border-slate-800/80 rounded-xl p-4 flex items-center justify-between hover:border-emerald-500/60 hover:bg-[#10192C] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer group"
+        >
           <div>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <p className="text-[11px] font-semibold text-slate-400 group-hover:text-emerald-300 uppercase tracking-wider transition-colors">
               Total Fee Collection
             </p>
             <p className="text-lg font-bold text-emerald-400 mt-0.5">
               {totalCollected > 0 ? formatCurrency(totalCollected, 'INR', true) : '₹0.00'}
             </p>
           </div>
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
             <IndianRupee className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="bg-[#0C1220] border border-slate-800/80 rounded-xl p-4 flex items-center justify-between">
+        <div
+          onClick={() => navigate('/leads/pay-amount')}
+          title="Click to view Pending Collections & Record Payments"
+          className="bg-[#0C1220] border border-slate-800/80 rounded-xl p-4 flex items-center justify-between hover:border-amber-500/60 hover:bg-[#10192C] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer group"
+        >
           <div>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <p className="text-[11px] font-semibold text-slate-400 group-hover:text-amber-300 uppercase tracking-wider transition-colors">
               Pending Collections
             </p>
             <p className="text-lg font-bold text-amber-400 mt-0.5">
               {totalPending > 0 ? formatCurrency(totalPending, 'INR', true) : '₹0.00'}
             </p>
           </div>
-          <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
             <Clock className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="bg-[#0C1220] border border-slate-800/80 rounded-xl p-4 flex items-center justify-between">
+        <div
+          onClick={() => navigate('/leads/clients')}
+          title="Click to view All Client Accounts"
+          className="bg-[#0C1220] border border-slate-800/80 rounded-xl p-4 flex items-center justify-between hover:border-blue-500/60 hover:bg-[#10192C] hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer group"
+        >
           <div>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <p className="text-[11px] font-semibold text-slate-400 group-hover:text-blue-300 uppercase tracking-wider transition-colors">
               Total Booked Value
             </p>
-            <p className="text-lg font-bold text-white mt-0.5">
+            <p className="text-lg font-bold text-white mt-0.5 group-hover:text-blue-200 transition-colors">
               {totalAgreed > 0 ? formatCurrency(totalAgreed, 'INR', true) : '₹0.00'}
             </p>
           </div>
-          <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
             <Building2 className="w-4 h-4" />
           </div>
         </div>
@@ -322,19 +350,21 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { label: 'Initial Inquiry', stage: 'Lead', color: '#3B82F6', icon: Users },
-            { label: 'Meeting Scheduled', stage: 'Meeting', color: '#8B5CF6', icon: Calendar },
-            { label: 'Site Inspection', stage: 'Site Visit', color: '#06B6D4', icon: Building2 },
-            { label: 'Quotation Sent', stage: 'Quotation', color: '#F59E0B', icon: IndianRupee },
-            { label: 'Negotiation', stage: 'Negotiation', color: '#EC4899', icon: MessageSquare },
-            { label: 'Converted Client', stage: 'Client', color: '#10B981', icon: CheckCircle2 },
+            { label: 'Initial Inquiry', stage: 'Lead', color: '#3B82F6', icon: Users, path: '/leads?stage=Lead' },
+            { label: 'Meeting Scheduled', stage: 'Meeting', color: '#8B5CF6', icon: Calendar, path: '/leads?stage=Meeting' },
+            { label: 'Site Inspection', stage: 'Site Visit', color: '#06B6D4', icon: Building2, path: '/leads?stage=Site Visit' },
+            { label: 'Quotation Sent', stage: 'Quotation', color: '#F59E0B', icon: IndianRupee, path: '/leads?stage=Quotation' },
+            { label: 'Negotiation', stage: 'Negotiation', color: '#EC4899', icon: MessageSquare, path: '/leads?stage=Negotiation' },
+            { label: 'Converted Client', stage: 'Client', color: '#10B981', icon: CheckCircle2, path: '/leads/clients' },
           ].map((item) => {
             const count = stagesCount[item.stage] || 0;
             const pct = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
             return (
               <div
                 key={item.stage}
-                className="bg-[#12192B] border border-slate-800 rounded-xl p-3 flex flex-col justify-between hover:border-slate-700 transition-colors"
+                onClick={() => navigate(item.path)}
+                title={`Click to view ${item.label} leads`}
+                className="bg-[#12192B] border border-slate-800 rounded-xl p-3 flex flex-col justify-between hover:border-amber-400/60 hover:bg-[#16213A] hover:scale-[1.03] active:scale-[0.98] transition-all cursor-pointer group shadow-sm"
               >
                 <div>
                   <div className="flex items-center justify-between">
@@ -342,14 +372,14 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
                       className="w-2 h-2 rounded-full"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="text-[10px] font-bold text-slate-400">{pct}%</span>
+                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-300 transition-colors">{pct}%</span>
                   </div>
-                  <p className="text-xs font-semibold text-slate-300 mt-2 truncate">
+                  <p className="text-xs font-semibold text-slate-300 group-hover:text-white mt-2 truncate transition-colors">
                     {item.label}
                   </p>
                 </div>
                 <div className="mt-3 flex items-baseline justify-between">
-                  <span className="text-xl font-bold text-white">{count}</span>
+                  <span className="text-xl font-bold text-white group-hover:text-amber-300 transition-colors">{count}</span>
                   <span className="text-[10px] text-slate-500 font-mono">leads</span>
                 </div>
               </div>
