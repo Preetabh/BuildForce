@@ -47,15 +47,46 @@ export const LeadManagement: React.FC = () => {
   const activeUserRole = viewingUser?.role || (activeUserName ? 'Team Member' : '');
 
   // Active view: 'list' | 'today-due' | 'process'
-  const [activeView, setActiveView] = useState<'list' | 'today-due' | 'process'>('list');
+  const paramView = (searchParams.get('view') as 'list' | 'today-due' | 'process') || 'list';
+  const paramToday = searchParams.get('todayOnly') === 'true' || searchParams.get('today') === 'true';
+  const paramSearch = searchParams.get('search') || '';
+  const paramDate = searchParams.get('date') || '';
+  const paramStage = searchParams.get('stage') || 'All Stages';
+
+  const [activeView, setActiveView] = useState<'list' | 'today-due' | 'process'>(paramView);
 
   // Filter States matching Screenshot 2
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
+  const [searchQuery, setSearchQuery] = useState(paramSearch);
+  const [selectedDate, setSelectedDate] = useState(paramDate);
   const [statusMode, setStatusMode] = useState<'Active' | 'Dead' | 'All'>('Active');
   const [companyFilter, setCompanyFilter] = useState('All Companies');
   const [serviceFilter, setServiceFilter] = useState('All Services');
-  const [todayOnly, setTodayOnly] = useState(false);
+  const [stageFilter, setStageFilter] = useState(paramStage);
+  const [todayOnly, setTodayOnly] = useState(paramToday);
+
+  // Sync state when URL search params change
+  useEffect(() => {
+    const v = searchParams.get('view');
+    if (v === 'list' || v === 'today-due' || v === 'process') {
+      setActiveView(v);
+    }
+    if (searchParams.has('todayOnly') || searchParams.has('today')) {
+      const t = searchParams.get('todayOnly') === 'true' || searchParams.get('today') === 'true';
+      setTodayOnly(t);
+    }
+    const s = searchParams.get('search');
+    if (s !== null) {
+      setSearchQuery(s);
+    }
+    const st = searchParams.get('stage');
+    if (st !== null) {
+      setStageFilter(st);
+    }
+    const d = searchParams.get('date');
+    if (d !== null) {
+      setSelectedDate(d);
+    }
+  }, [searchParams]);
 
   // Leads & Pagination
   const [leads, setLeads] = useState<LeadItem[]>([]);
@@ -91,6 +122,7 @@ export const LeadManagement: React.FC = () => {
     statusMode,
     companyFilter,
     serviceFilter,
+    stageFilter,
     currentPage,
     activeUserId,
     activeUserName,
@@ -105,6 +137,7 @@ export const LeadManagement: React.FC = () => {
         statusMode: statusMode === 'Active' ? 'NonDead' : statusMode,
         companyCode: companyFilter !== 'All Companies' ? companyFilter : undefined,
         service: serviceFilter !== 'All Services' ? serviceFilter : undefined,
+        stage: stageFilter !== 'All Stages' ? stageFilter : undefined,
         date: selectedDate || undefined,
         view: activeView,
         page: currentPage,
@@ -555,6 +588,41 @@ export const LeadManagement: React.FC = () => {
               <option value="LD">Lucknow Developers (LD)</option>
             </select>
           </div>
+
+          {/* Stage filter */}
+          <div>
+            <select
+              value={stageFilter}
+              onChange={(e) => {
+                setStageFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-[#161C2C] border border-[#2B354C] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+            >
+              <option value="All Stages">All Stages</option>
+              <option value="Lead">Lead</option>
+              <option value="Meeting">Meeting</option>
+              <option value="Site Visit">Site Visit</option>
+              <option value="Quotation">Quotation</option>
+              <option value="Negotiation">Negotiation</option>
+              <option value="Client">Client</option>
+            </select>
+          </div>
+
+          {/* Active Today Only Badge */}
+          {todayOnly && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/15 border border-amber-500/40 rounded-lg text-xs text-amber-300 font-semibold">
+              <span>Today Only</span>
+              <button
+                type="button"
+                onClick={() => setTodayOnly(false)}
+                className="hover:text-white cursor-pointer"
+                title="Remove today only filter"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
 
           {/* Filter Button (Gold with Funnel) matching Screenshot 2 */}
           <button

@@ -432,17 +432,23 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-slate-300">
                   {leads.slice(0, 6).map((lead) => (
-                    <tr key={lead._id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-3 px-3 font-mono font-bold text-amber-400">
+                    <tr
+                      key={lead._id}
+                      onClick={() => navigate(`/leads?search=${encodeURIComponent(lead.clientName)}`)}
+                      className="hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                      title={`Click to view lead: ${lead.clientName}`}
+                    >
+                      <td className="py-3 px-3 font-mono font-bold text-amber-400 group-hover:underline">
                         {lead.leadCode}
                       </td>
                       <td className="py-3 px-3">
-                        <span className="font-semibold text-white block">{lead.clientName}</span>
+                        <span className="font-semibold text-white block group-hover:text-amber-200 transition-colors">{lead.clientName}</span>
                         <span className="text-[10px] text-slate-500">{lead.siteLocation || '-'}</span>
                       </td>
                       <td className="py-3 px-3 font-mono">
                         <a
                           href={`tel:${lead.mobile1}`}
+                          onClick={(e) => e.stopPropagation()}
                           className="hover:text-amber-400 flex items-center gap-1 text-[11px]"
                         >
                           <Phone className="w-3 h-3 text-slate-500" />
@@ -459,7 +465,10 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
                       </td>
                       <td className="py-3 px-3 text-right">
                         <button
-                          onClick={() => setSelectedLeadForFollowUp(lead)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedLeadForFollowUp(lead);
+                          }}
                           className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer"
                         >
                           Follow Up
@@ -495,10 +504,12 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
                 {todayDueLeads.slice(0, 5).map((l) => (
                   <div
                     key={l._id}
-                    className="p-3 rounded-xl bg-[#131A2C] border border-slate-800 flex items-center justify-between"
+                    onClick={() => setSelectedLeadForFollowUp(l)}
+                    className="p-3 rounded-xl bg-[#131A2C] border border-slate-800 hover:border-rose-500/40 hover:bg-[#182138] transition-all flex items-center justify-between cursor-pointer group"
+                    title={`Click to record follow-up for ${l.clientName}`}
                   >
                     <div>
-                      <p className="text-xs font-bold text-white truncate max-w-[140px]">
+                      <p className="text-xs font-bold text-white group-hover:text-rose-300 transition-colors truncate max-w-[140px]">
                         {l.clientName}
                       </p>
                       <p className="text-[10.5px] text-slate-400 font-mono mt-0.5">
@@ -506,7 +517,10 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
                       </p>
                     </div>
                     <button
-                      onClick={() => setSelectedLeadForFollowUp(l)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedLeadForFollowUp(l);
+                      }}
                       className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 rounded-lg text-[10.5px] font-bold cursor-pointer"
                     >
                       Call Now
@@ -541,10 +555,12 @@ export const LeadManagementDashboard: React.FC<LeadManagementDashboardProps> = (
                 {clients.slice(0, 4).map((c) => (
                   <div
                     key={c._id}
-                    className="p-2.5 rounded-xl bg-[#131A2C] border border-slate-800/80 flex items-center justify-between"
+                    onClick={() => navigate(`/leads/clients?search=${encodeURIComponent(c.name)}`)}
+                    className="p-2.5 rounded-xl bg-[#131A2C] border border-slate-800/80 hover:border-emerald-500/40 hover:bg-[#182138] transition-all flex items-center justify-between cursor-pointer group"
+                    title={`Click to view client dossier: ${c.name}`}
                   >
                     <div>
-                      <p className="text-xs font-bold text-white truncate max-w-[140px]">
+                      <p className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors truncate max-w-[140px]">
                         {c.name}
                       </p>
                       <p className="text-[10.5px] text-slate-400 mt-0.5">

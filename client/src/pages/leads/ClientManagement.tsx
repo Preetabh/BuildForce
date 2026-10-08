@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Building2,
   Search,
@@ -34,17 +35,28 @@ import { ClientDeadModal } from '../../components/leads/ClientDeadModal';
 import { UserProfileMenu } from '../../components/profile/UserProfileMenu';
 
 export const ClientManagement: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Filters
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
   const [statusMode, setStatusMode] = useState<'NonDead' | 'Dead' | 'All'>('NonDead');
-  const [feeStatus, setFeeStatus] = useState<'All' | 'Paid' | 'Pending'>('All');
+  const [feeStatus, setFeeStatus] = useState<'All' | 'Paid' | 'Pending'>(
+    (searchParams.get('feeStatus') as 'All' | 'Paid' | 'Pending') || 'All'
+  );
   const [companyFilter, setCompanyFilter] = useState('All Companies');
   const [serviceFilter, setServiceFilter] = useState('All Services');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // Sync state if searchParams changes
+  useEffect(() => {
+    const s = searchParams.get('search');
+    if (s !== null) setSearch(s);
+    const f = searchParams.get('feeStatus');
+    if (f === 'All' || f === 'Paid' || f === 'Pending') setFeeStatus(f);
+  }, [searchParams]);
 
   // Sorting
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
