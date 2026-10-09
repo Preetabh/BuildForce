@@ -173,8 +173,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const modulesList = [
     {
       id: 'plannings',
-      name: 'Plannings & SOR Rates',
-      desc: 'SOR Master Library, Quantity Calculator, QC Checklists & WBS',
+      name: 'Plannings & SOR Rates (Temp Hold)',
+      desc: 'SOR Master Library, Quantity Calculator, QC Checklists & WBS [Temporarily on Hold]',
       allowed: isMasterAdmin || isModuleAllowed('plannings'),
       category: 'Engineering & BOQ',
     },

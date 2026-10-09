@@ -487,6 +487,14 @@ export class LeadService {
       lead.targetCompanyName = 'Lucknow Builders';
     }
 
+    // Sync isDead state with stage
+    if (updateData.stage === 'Dead') {
+      lead.isDead = true;
+      if (!lead.deadAt) lead.deadAt = new Date();
+    } else if (updateData.stage && updateData.stage !== 'Dead') {
+      lead.isDead = false;
+    }
+
     if (lead.stage === 'Client' && !lead.isRegisteredClient) {
       await LeadService.ensureClientAccount(companyId, lead);
     } else {

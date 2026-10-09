@@ -12,6 +12,7 @@ import { RateMaster } from '../pages/RateMaster';
 import { QuantityMaster } from '../pages/QuantityMaster';
 import { RecycleBin } from '../pages/RecycleBin';
 import { ComingSoonModule } from '../pages/ComingSoonModule';
+import { TempHoldModule } from '../pages/TempHoldModule';
 import { Help } from '../pages/Help';
 import { Settings } from '../pages/Settings';
 import { ClassyAppLoader } from '../components/common/ClassyAppLoader';
@@ -121,53 +122,19 @@ export const AppRouter: React.FC = () => {
             </ProtectedRoute>
           }
         >
-          {/* Functional Core */}
-          <Route path="/" element={<Home />} />
-          <Route
-            path="/sor"
-            element={
-              <PermissionRoute permission={['Admin/LibraryMgmt', '/sor', 'Schedule of Rates (SOR)']}>
-                <RateMaster />
-              </PermissionRoute>
-            }
-          />
+          {/* Functional Core - Home & Plannings are on Temporary Hold */}
+          <Route path="/" element={<TempHoldModule />} />
+          <Route path="/home" element={<TempHoldModule />} />
+          <Route path="/sor" element={<TempHoldModule />} />
           <Route path="/rate-master" element={<Navigate to="/sor" replace />} />
-          <Route path="/projects/:projectId" element={<ProjectWorkspace />} />
+          <Route path="/projects/:projectId" element={<TempHoldModule />} />
           <Route path="/recycle-bin" element={<RecycleBin />} />
 
-          {/* PLANNING */}
-          <Route
-            path="/planning"
-            element={
-              <PermissionRoute permission={['Admin/LibraryMgmt', '/planning', 'Project Schedule & WBS', 'Plannings']}>
-                <ComingSoonModule />
-              </PermissionRoute>
-            }
-          />
-          <Route
-            path="/planning/quantity-master"
-            element={
-              <PermissionRoute permission={['Admin/LibraryMgmt', '/planning/quantity-master', 'Quantity Master']}>
-                <QuantityMaster />
-              </PermissionRoute>
-            }
-          />
-          <Route
-            path="/quantity-master"
-            element={
-              <PermissionRoute permission={['Admin/LibraryMgmt', '/planning/quantity-master', 'Quantity Master']}>
-                <QuantityMaster />
-              </PermissionRoute>
-            }
-          />
-          <Route
-            path="/planning/qc-master"
-            element={
-              <PermissionRoute permission={['Admin/LibraryMgmt', '/planning/qc-master', 'QC Master & Checklists']}>
-                <ComingSoonModule />
-              </PermissionRoute>
-            }
-          />
+          {/* PLANNING - Temporarily on Hold */}
+          <Route path="/planning" element={<TempHoldModule />} />
+          <Route path="/planning/quantity-master" element={<TempHoldModule />} />
+          <Route path="/quantity-master" element={<Navigate to="/planning/quantity-master" replace />} />
+          <Route path="/planning/qc-master" element={<TempHoldModule />} />
 
           {/* EXECUTION */}
           <Route path="/execution" element={<ComingSoonModule />} />

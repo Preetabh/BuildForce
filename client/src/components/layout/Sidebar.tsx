@@ -63,6 +63,7 @@ interface NavSubItem {
   path: string;
   icon?: React.ElementType;
   isComingSoon?: boolean;
+  isTempHold?: boolean;
   permissionKey?: string;
 }
 
@@ -70,6 +71,7 @@ interface NavGroup {
   id: string;
   label: string;
   icon: React.ElementType;
+  isTempHold?: boolean;
   items: NavSubItem[];
 }
 
@@ -125,16 +127,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   // Master Navigation Groups list with permission mapping
+  // Note: Plannings module is temporarily disabled as requested
   const allNavGroups: NavGroup[] = [
     {
       id: 'plannings',
       label: 'PLANNINGS',
       icon: CalendarRange,
+      isTempHold: true,
       items: [
-        { label: 'Schedule of Rates (SOR)', path: '/sor', icon: BookOpen, isComingSoon: false, permissionKey: '/sor' },
-        { label: 'Quantity Master', path: '/planning/quantity-master', icon: Calculator, isComingSoon: false, permissionKey: '/planning/quantity-master' },
-        { label: 'QC Master & Checklists', path: '/planning/qc-master', icon: ClipboardCheck, isComingSoon: true, permissionKey: '/planning/qc-master' },
-        { label: 'Project Schedule & WBS', path: '/planning', icon: Layers, isComingSoon: true, permissionKey: '/planning' },
+        { label: 'Schedule of Rates (SOR)', path: '/sor', icon: BookOpen, isComingSoon: false, isTempHold: true, permissionKey: '/sor' },
+        { label: 'Quantity Master', path: '/planning/quantity-master', icon: Calculator, isComingSoon: false, isTempHold: true, permissionKey: '/planning/quantity-master' },
+        { label: 'QC Master & Checklists', path: '/planning/qc-master', icon: ClipboardCheck, isComingSoon: true, isTempHold: true, permissionKey: '/planning/qc-master' },
+        { label: 'Project Schedule & WBS', path: '/planning', icon: Layers, isComingSoon: true, isTempHold: true, permissionKey: '/planning' },
       ],
     },
     {
@@ -296,7 +300,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Link
                 to="/"
                 onClick={() => onClose()}
-                title="InfraPilot Home (Go to /)"
+                title="InfraPilot Home (Temp Hold)"
                 className="w-11 h-11 rounded-xl overflow-hidden shadow-lg shadow-amber-500/25 border border-amber-500/40 bg-gradient-to-br from-[#161F30] via-[#0E1528] to-black p-1 flex items-center justify-center hover:scale-105 hover:border-amber-400 transition-all cursor-pointer group"
               >
                 <img
@@ -325,7 +329,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Link
                 to="/"
                 onClick={() => onClose()}
-                title="InfraPilot Home (Go to /)"
+                title="InfraPilot Home (Temp Hold)"
                 className="flex items-center gap-2.5 min-w-0 group cursor-pointer"
               >
                 <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-amber-500/25 shrink-0 border border-amber-500/40 bg-gradient-to-br from-[#161F30] via-[#0E1528] to-black p-1 flex items-center justify-center group-hover:scale-105 group-hover:border-amber-400 transition-all">
@@ -375,17 +379,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Items List */}
         <div className="flex-1 px-2 py-3 overflow-y-auto space-y-2 custom-scrollbar text-xs">
-          {/* 1. Home Direct Link */}
+          {/* 1. Home Direct Link with "Temp Hold" Badge */}
           <div>
             <NavLink
               to="/"
               end
               onClick={() => onClose()}
-              title={isCompact ? 'Home' : undefined}
+              title={isCompact ? 'Home (Temp Hold)' : undefined}
               className={({ isActive }) =>
                 cn(
-                  'group flex items-center rounded-lg font-medium transition-all duration-150',
-                  isCompact ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2',
+                  'group flex items-center justify-between rounded-lg font-medium transition-all duration-150',
+                  isCompact ? 'justify-center p-2.5' : 'px-3 py-2',
                   isActive
                     ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -394,13 +398,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               {({ isActive }) => (
                 <>
-                  <Home
-                    className={cn(
-                      'w-4 h-4 shrink-0 transition-colors',
-                      isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-white'
-                    )}
-                  />
-                  {!isCompact && <span className="font-semibold truncate">Home</span>}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Home
+                      className={cn(
+                        'w-4 h-4 shrink-0 transition-colors',
+                        isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-white'
+                      )}
+                    />
+                    {!isCompact && <span className="font-semibold truncate">Home</span>}
+                  </div>
+                  {!isCompact && (
+                    <span
+                      className={cn(
+                        'text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wider shrink-0 transition-all ml-1.5',
+                        isActive
+                          ? 'bg-slate-950/80 text-amber-300 border border-slate-950'
+                          : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                      )}
+                    >
+                      Temp Hold
+                    </span>
+                  )}
                 </>
               )}
             </NavLink>
@@ -431,7 +449,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         toggleGroup(group.id);
                       }
                     }}
-                    title={isCompact ? group.label : undefined}
+                    title={isCompact ? (group.isTempHold ? `${group.label} (Temp Hold)` : group.label) : undefined}
                     className={cn(
                       'w-full flex items-center rounded-lg font-semibold tracking-wider text-[11px] transition-all duration-150',
                       isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
@@ -444,7 +462,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
                     )}
                   >
-                    <div className={cn('flex items-center min-w-0', !isCompact && 'gap-2.5')}>
+                    <div className={cn('flex items-center min-w-0 flex-1', !isCompact && 'gap-2.5')}>
                       <group.icon
                         className={cn(
                           'w-4 h-4 shrink-0 transition-colors',
@@ -455,7 +473,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             : 'text-slate-400'
                         )}
                       />
-                      {!isCompact && <span className="truncate">{group.label}</span>}
+                      {!isCompact && (
+                        <div className="flex items-center justify-between flex-1 min-w-0 mr-1.5">
+                          <span className="truncate">{group.label}</span>
+                          {group.isTempHold && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0 ml-1.5">
+                              Temp Hold
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {!isCompact && (
                       isOpenGroup ? (
@@ -593,7 +620,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     />
                                     <span className="truncate">{subItem.label}</span>
                                   </div>
-                                  {subItem.isComingSoon && (
+                                  {subItem.isTempHold ? (
+                                    <span
+                                      className={cn(
+                                        'text-[9px] px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wider shrink-0 ml-1.5',
+                                        isActive
+                                          ? 'bg-slate-950/80 text-amber-300 border border-slate-950'
+                                          : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                                      )}
+                                    >
+                                      Temp Hold
+                                    </span>
+                                  ) : subItem.isComingSoon ? (
                                     <span
                                       className={cn(
                                         'text-[9px] px-1 py-0.2 rounded font-medium shrink-0 ml-1.5',
@@ -604,7 +642,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     >
                                       Soon
                                     </span>
-                                  )}
+                                  ) : null}
                                 </>
                               )}
                             </NavLink>

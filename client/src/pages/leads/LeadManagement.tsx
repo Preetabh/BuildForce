@@ -20,6 +20,11 @@ import {
   CalendarDays,
   Activity,
   Layers,
+  GripVertical,
+  FileText,
+  AlertTriangle,
+  MessageSquare,
+  UserPlus,
 } from 'lucide-react';
 import { LeadItem, LeadStats, UserTodayStats } from '../../types';
 import leadService, { LeadFilterQuery } from '../../services/lead.service';
@@ -105,6 +110,14 @@ export const LeadManagement: React.FC = () => {
   const [selectedLeadForDead, setSelectedLeadForDead] = useState<LeadItem | null>(null);
   const [availableServices, setAvailableServices] = useState<string[]>([]);
 
+  // Drag and Drop Pipeline States
+  const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+  const [feedbackNotice, setFeedbackNotice] = useState<{
+    message: string;
+    type: 'success' | 'info' | 'error';
+  } | null>(null);
+
   useEffect(() => {
     catalogService
       .getActiveServices()
@@ -134,14 +147,15 @@ export const LeadManagement: React.FC = () => {
     try {
       const query: LeadFilterQuery = {
         search: searchQuery.trim() || undefined,
-        statusMode: statusMode === 'Active' ? 'NonDead' : statusMode,
+        // In process/Kanban view, always fetch All leads (including Dead) so all 6 columns stay full
+        statusMode: activeView === 'process' ? 'All' : statusMode === 'Active' ? 'NonDead' : statusMode,
         companyCode: companyFilter !== 'All Companies' ? companyFilter : undefined,
         service: serviceFilter !== 'All Services' ? serviceFilter : undefined,
         stage: stageFilter !== 'All Stages' ? stageFilter : undefined,
         date: selectedDate || undefined,
         view: activeView,
-        page: currentPage,
-        limit: 15,
+        page: activeView === 'process' ? 1 : currentPage,
+        limit: activeView === 'process' ? 200 : 15,
         userId: activeUserId || undefined,
         viewingUserId: activeUserId || undefined,
         selectedUserId: activeUserId || undefined,
@@ -163,6 +177,80 @@ export const LeadManagement: React.FC = () => {
       console.error('Failed to load leads', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  /**
+   * Handle dragging & dropping a lead card into any stage (Lead, Meeting, Site Visit, Quotation, Client, Dead)
+   */
+  const handleDropLead = async (leadId: string, targetStage: string) => {
+    const leadToMove = leads.find((l) => l._id === leadId);
+    if (!leadToMove) return;
+
+    const currentStage = leadToMove.isDead ? 'Dead' : leadToMove.stage;
+    if (currentStage === targetStage) return;
+
+    // 1. Optimistic instant UI update
+    setLeads((prevLeads) =>
+      prevLeads.map((item) => {
+        if (item._id === leadId) {
+          if (targetStage === 'Dead') {
+            return { ...item, stage: 'Dead' as any, isDead: true };
+          }
+          return { ...item, stage: targetStage as any, isDead: false };
+        }
+        return item;
+      })
+    );
+
+    setFeedbackNotice({
+      message: `Moving "${leadToMove.clientName}" to ${targetStage.toUpperCase()}...`,
+      type: 'info',
+    });
+
+    try {
+      if (targetStage === 'Dead') {
+        // Mark lead dead
+        await leadService.markDead(leadId, 'Moved to Dead via Pipeline Drag & Drop');
+        setFeedbackNotice({
+          message: `Lead "${leadToMove.clientName}" marked as DEAD`,
+          type: 'error',
+        });
+      } else if (leadToMove.isDead) {
+        // Restore from dead and update stage
+        await leadService.restoreDead(leadId);
+        if (targetStage !== 'Lead') {
+          await leadService.updateLead(leadId, { stage: targetStage as any });
+        }
+        setFeedbackNotice({
+          message: `Lead "${leadToMove.clientName}" restored & moved to ${targetStage}`,
+          type: 'success',
+        });
+      } else {
+        // Standard pipeline stage update
+        await leadService.updateLead(leadId, { stage: targetStage as any });
+        setFeedbackNotice({
+          message: `Lead "${leadToMove.clientName}" successfully moved to ${targetStage}`,
+          type: 'success',
+        });
+      }
+
+      // If dropped into Client, trigger registration modal if not yet registered
+      if (targetStage === 'Client' && !leadToMove.isRegisteredClient) {
+        setSelectedLeadForReg(leadToMove);
+      }
+    } catch (err: any) {
+      console.error('Failed to update stage on server', err);
+      // Revert from server
+      fetchLeads();
+      setFeedbackNotice({
+        message: err.response?.data?.message || err.message || 'Failed to update stage',
+        type: 'error',
+      });
+    } finally {
+      setTimeout(() => {
+        setFeedbackNotice(null);
+      }, 4500);
     }
   };
 
@@ -606,6 +694,7 @@ export const LeadManagement: React.FC = () => {
               <option value="Quotation">Quotation</option>
               <option value="Negotiation">Negotiation</option>
               <option value="Client">Client</option>
+              <option value="Dead">Dead</option>
             </select>
           </div>
 
@@ -646,104 +735,400 @@ export const LeadManagement: React.FC = () => {
 
         {/* 4. Table / Process View Container */}
         {activeView === 'process' ? (
-          /* KANBAN PROCESS PIPELINE VIEW */
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5 pt-2">
-            {(['Lead', 'Meeting', 'Site Visit', 'Quotation', 'Client'] as const).map((colStage) => {
-              const colLeads = leads.filter((l) => l.stage === colStage);
-              return (
-                <div
-                  key={colStage}
-                  className="bg-[#111520] border border-[#1E273A] rounded-2xl flex flex-col max-h-[75vh]"
-                >
-                  <div className="p-3 border-b border-[#1E273A] flex items-center justify-between bg-[#151B2A] rounded-t-2xl">
-                    <span className="font-bold text-xs uppercase tracking-wider text-slate-200">
-                      {colStage}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300">
-                      {colLeads.length}
-                    </span>
-                  </div>
-
-                  <div className="p-2 space-y-2 overflow-y-auto flex-1 custom-scrollbar">
-                    {colLeads.length === 0 ? (
-                      <div className="p-4 text-center text-slate-500 text-xs italic">
-                        No leads in {colStage}
-                      </div>
-                    ) : (
-                      colLeads.map((lead) => (
-                        <div
-                          key={lead._id}
-                          className="p-3 rounded-xl bg-[#171E2E] border border-[#232D44] hover:border-amber-400/50 transition-all text-xs space-y-2 group shadow-sm"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono text-cyan-400 font-bold text-[11px]">
-                              {lead.leadCode}
-                            </span>
-                            <span
-                              className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${getPriorityBadgeClass(
-                                lead.priority
-                              )}`}
-                            >
-                              {lead.priority}
-                            </span>
-                          </div>
-
-                          <div>
-                            <p className="font-bold text-white text-sm group-hover:text-amber-300 transition-colors">
-                              {lead.clientName}
-                            </p>
-                            <p className="text-[10px] text-amber-400/80 font-medium">
-                              {lead.targetCompanyName || lead.targetCompanyCode}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                            <MapPin className="w-3 h-3 text-slate-500" />
-                            <span>{lead.siteLocation}</span>
-                          </div>
-
-                          {lead.latestFollowUp?.remarks && (
-                            <div className="p-2 bg-[#121622] rounded-lg text-[10.5px] border border-[#1E2536]">
-                              <p className="text-amber-400/90 font-medium">
-                                {formatDateDisplay(lead.latestFollowUp.date)}
-                              </p>
-                              <p className="text-slate-300 truncate">
-                                {lead.latestFollowUp.remarks}
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="pt-1 flex items-center justify-between border-t border-[#1E273A]">
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              {lead.mobile1}
-                            </span>
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedLeadForFollowUp(lead)}
-                                className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold"
-                              >
-                                Follow
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedLeadForEdit(lead);
-                                  setIsAddModalOpen(true);
-                                }}
-                                className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold"
-                              >
-                                Edit
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+          /* KANBAN PROCESS PIPELINE VIEW WITH FULL DRAG & DROP & DEAD COLUMN */
+          <div className="space-y-3 pt-2">
+            {/* Feedback notification toast */}
+            {feedbackNotice && (
+              <div
+                className={`flex items-center justify-between p-3 rounded-xl border text-xs font-semibold shadow-lg animate-in fade-in duration-200 ${
+                  feedbackNotice.type === 'success'
+                    ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300'
+                    : feedbackNotice.type === 'error'
+                    ? 'bg-rose-950/80 border-rose-500/40 text-rose-300'
+                    : 'bg-amber-950/80 border-amber-500/40 text-amber-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {feedbackNotice.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  ) : feedbackNotice.type === 'error' ? (
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                  ) : (
+                    <Clock className="w-4 h-4 shrink-0 text-amber-400 animate-spin" />
+                  )}
+                  <span>{feedbackNotice.message}</span>
                 </div>
-              );
-            })}
+                <button
+                  type="button"
+                  onClick={() => setFeedbackNotice(null)}
+                  className="p-1 hover:text-white cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Kanban Info & Helper Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-[#121725] border border-[#1E273A] text-xs text-slate-300">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="font-bold text-white tracking-wide">
+                  Interactive Lead Pipeline
+                </span>
+                <span className="text-slate-400 hidden md:inline">
+                  • Drag any lead card between columns to update stage (including DEAD)
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] font-mono">
+                <span className="text-slate-400">Total Pipeline:</span>
+                <span className="px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300">
+                  {leads.length} Leads
+                </span>
+              </div>
+            </div>
+
+            {/* 6 Kanban Columns with Drag and Drop */}
+            <div className="flex gap-3.5 overflow-x-auto pb-4 custom-scrollbar select-none min-h-[72vh]">
+              {[
+                {
+                  id: 'Lead',
+                  label: 'LEAD',
+                  headerBg: 'bg-[#101726] border-cyan-500/30',
+                  titleColor: 'text-cyan-400',
+                  badgeClass: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+                  indicatorColor: 'bg-cyan-400',
+                  icon: UserPlus,
+                },
+                {
+                  id: 'Meeting',
+                  label: 'MEETING',
+                  headerBg: 'bg-[#1B1812] border-amber-500/30',
+                  titleColor: 'text-amber-400',
+                  badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+                  indicatorColor: 'bg-amber-400',
+                  icon: Calendar,
+                },
+                {
+                  id: 'Site Visit',
+                  label: 'SITE VISIT',
+                  headerBg: 'bg-[#181325] border-purple-500/30',
+                  titleColor: 'text-purple-400',
+                  badgeClass: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+                  indicatorColor: 'bg-purple-400',
+                  icon: MapPin,
+                },
+                {
+                  id: 'Quotation',
+                  label: 'QUOTATION',
+                  headerBg: 'bg-[#10192A] border-blue-500/30',
+                  titleColor: 'text-blue-400',
+                  badgeClass: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+                  indicatorColor: 'bg-blue-400',
+                  icon: FileText,
+                },
+                {
+                  id: 'Client',
+                  label: 'CLIENT',
+                  headerBg: 'bg-[#0E2018] border-emerald-500/30',
+                  titleColor: 'text-emerald-400',
+                  badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+                  indicatorColor: 'bg-emerald-400',
+                  icon: CheckCircle2,
+                },
+                {
+                  id: 'Dead',
+                  label: 'DEAD',
+                  headerBg: 'bg-[#220E14] border-rose-500/30',
+                  titleColor: 'text-rose-400',
+                  badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+                  indicatorColor: 'bg-rose-400',
+                  icon: AlertTriangle,
+                },
+              ].map((colStage) => {
+                const colLeads = leads.filter((l) => {
+                  if (colStage.id === 'Dead') {
+                    return l.stage === 'Dead' || l.isDead === true;
+                  }
+                  return !l.isDead && l.stage === colStage.id;
+                });
+
+                const isOverThis = dragOverStage === colStage.id;
+                const ColIcon = colStage.icon;
+
+                return (
+                  <div
+                    key={colStage.id}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (dragOverStage !== colStage.id) {
+                        setDragOverStage(colStage.id);
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                        setDragOverStage(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverStage(null);
+                      const leadId =
+                        e.dataTransfer.getData('text/plain') || draggedLeadId;
+                      if (leadId) {
+                        handleDropLead(leadId, colStage.id);
+                      }
+                    }}
+                    className={`w-[305px] sm:w-[315px] shrink-0 bg-[#10141F] rounded-2xl flex flex-col transition-all duration-200 shadow-xl border ${
+                      isOverThis
+                        ? 'border-amber-400 bg-[#151D2F] ring-2 ring-amber-400/50 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
+                        : 'border-[#1D2538]'
+                    }`}
+                  >
+                    {/* Column Header */}
+                    <div
+                      className={`p-3 border-b flex items-center justify-between rounded-t-2xl transition-colors ${colStage.headerBg}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`w-2 h-2 rounded-full ${colStage.indicatorColor}`}
+                        />
+                        <ColIcon className="w-3.5 h-3.5 shrink-0" />
+                        <span
+                          className={`font-black text-xs uppercase tracking-wider font-mono ${colStage.titleColor}`}
+                        >
+                          {colStage.label}
+                        </span>
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold font-mono border ${colStage.badgeClass}`}
+                      >
+                        {colLeads.length}
+                      </span>
+                    </div>
+
+                    {/* Drag-over drop prompt banner */}
+                    {isOverThis && (
+                      <div className="m-2 p-2.5 rounded-xl border border-dashed border-amber-400 bg-amber-500/10 text-amber-300 text-xs font-bold text-center flex items-center justify-center gap-1.5 animate-pulse">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Drop here to move to {colStage.label}</span>
+                      </div>
+                    )}
+
+                    {/* Cards Container */}
+                    <div className="p-2.5 space-y-2.5 overflow-y-auto flex-1 custom-scrollbar max-h-[70vh]">
+                      {colLeads.length === 0 ? (
+                        <div className="p-6 text-center border border-dashed border-[#1E273A] rounded-xl text-slate-500 text-xs flex flex-col items-center justify-center gap-2 my-2 bg-[#0C101A]">
+                          <ColIcon className="w-6 h-6 text-slate-600 stroke-[1.5]" />
+                          <p className="font-medium italic">No leads in {colStage.label}</p>
+                          <span className="text-[10px] text-slate-600">
+                            Drag a card here to update status
+                          </span>
+                        </div>
+                      ) : (
+                        colLeads.map((lead) => {
+                          const isBeingDragged = draggedLeadId === lead._id;
+                          return (
+                            <div
+                              key={lead._id}
+                              draggable={true}
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', lead._id);
+                                setDraggedLeadId(lead._id);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedLeadId(null);
+                                setDragOverStage(null);
+                              }}
+                              className={`p-3 rounded-xl bg-[#161C2C] border transition-all text-xs space-y-2 group shadow-md cursor-grab active:cursor-grabbing hover:bg-[#1A2236] ${
+                                isBeingDragged
+                                  ? 'opacity-40 border-dashed border-amber-400 scale-[0.98]'
+                                  : 'border-[#222B40] hover:border-amber-400/50'
+                              }`}
+                            >
+                              {/* Top Bar: Grip handle + Lead code + Priority */}
+                              <div className="flex items-center justify-between gap-1.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span title="Drag to change stage" className="shrink-0 flex items-center">
+                                    <GripVertical className="w-3.5 h-3.5 text-slate-500 group-hover:text-amber-400 shrink-0 transition-colors" />
+                                  </span>
+                                  <span className="font-mono text-cyan-400 font-bold text-[11px] tracking-wide truncate">
+                                    {lead.leadCode}
+                                  </span>
+                                </div>
+                                <span
+                                  className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wider shrink-0 border ${getPriorityBadgeClass(
+                                    lead.priority
+                                  )}`}
+                                >
+                                  {lead.priority}
+                                </span>
+                              </div>
+
+                              {/* Client Name & Target Company */}
+                              <div>
+                                <p className="font-black text-white text-sm group-hover:text-amber-300 transition-colors leading-tight">
+                                  {lead.clientName}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                  <span className="text-[10px] text-amber-300 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                    {lead.targetCompanyName ||
+                                      (lead.targetCompanyCode === 'LD'
+                                        ? 'Lucknow Developers'
+                                        : 'Lucknow Builders')}
+                                  </span>
+                                  {lead.requirements?.[0] && (
+                                    <span className="text-[9.5px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded truncate max-w-[140px]">
+                                      {lead.requirements[0]}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Site Location & Budget */}
+                              <div className="flex items-center justify-between text-[11px] text-slate-400 gap-2 pt-0.5">
+                                <div className="flex items-center gap-1 truncate">
+                                  <MapPin className="w-3 h-3 text-slate-500 shrink-0" />
+                                  <span className="truncate">
+                                    {lead.siteLocation || 'Location not specified'}
+                                  </span>
+                                </div>
+                                {lead.finances?.budget ? (
+                                  <span className="text-[10px] font-mono font-bold text-emerald-400 shrink-0 bg-emerald-950/60 px-1 py-0.2 rounded border border-emerald-500/20">
+                                    ₹{lead.finances.budget.toLocaleString('en-IN')}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              {/* Follow-up Remark or Scheduled Meeting */}
+                              {lead.latestFollowUp?.remarks ? (
+                                <div className="p-2 bg-[#101420] rounded-lg text-[10.5px] border border-[#1B2234] space-y-0.5">
+                                  <p className="text-amber-400 font-bold flex items-center gap-1 text-[10px]">
+                                    <Clock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                                    <span>
+                                      {formatDateDisplay(lead.latestFollowUp.date)}
+                                    </span>
+                                  </p>
+                                  <p className="text-slate-300 line-clamp-2 leading-relaxed">
+                                    {lead.latestFollowUp.remarks}
+                                  </p>
+                                </div>
+                              ) : lead.meetingDateTime ? (
+                                <div className="p-2 bg-[#101826] rounded-lg text-[10.5px] border border-cyan-500/20 space-y-0.5">
+                                  <p className="text-cyan-400 font-bold flex items-center gap-1 text-[10px]">
+                                    <Calendar className="w-2.5 h-2.5 text-cyan-400 shrink-0" />
+                                    <span>
+                                      Meeting: {formatDateDisplay(lead.meetingDateTime)}
+                                    </span>
+                                  </p>
+                                </div>
+                              ) : null}
+
+                              {/* Contact Bar + Quick Stage Switcher */}
+                              <div className="pt-1.5 flex items-center justify-between border-t border-[#1F273C] gap-1">
+                                <div className="flex items-center gap-1">
+                                  {/* Click to Call */}
+                                  <a
+                                    href={`tel:${lead.mobile1}`}
+                                    title={`Call ${lead.clientName} (${lead.mobile1})`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="p-1 rounded bg-[#131722] hover:bg-emerald-600/25 hover:text-emerald-300 text-slate-300 text-[10.5px] font-mono flex items-center gap-1 transition-colors"
+                                  >
+                                    <Phone className="w-3 h-3 text-emerald-400 shrink-0" />
+                                    <span>{lead.mobile1}</span>
+                                  </a>
+
+                                  {/* Direct WhatsApp Message */}
+                                  {lead.mobile1 && (
+                                    <a
+                                      href={`https://wa.me/91${lead.mobile1.replace(
+                                        /\D/g,
+                                        ''
+                                      )}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      title="Chat on WhatsApp"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="p-1 rounded bg-emerald-950/60 hover:bg-emerald-600 hover:text-white text-emerald-400 border border-emerald-500/30 transition-colors"
+                                    >
+                                      <MessageSquare className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                </div>
+
+                                {/* Quick Move dropdown (touch & beginner friendly) */}
+                                <select
+                                  value={colStage.id}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleDropLead(lead._id, e.target.value);
+                                  }}
+                                  title="Change stage"
+                                  className="bg-[#101420] border border-[#232F48] hover:border-amber-400/50 text-[9.5px] text-amber-300 font-bold rounded px-1.5 py-0.5 cursor-pointer focus:outline-none"
+                                >
+                                  <option value={colStage.id} disabled>
+                                    Move ▾
+                                  </option>
+                                  <option value="Lead">→ Lead</option>
+                                  <option value="Meeting">→ Meeting</option>
+                                  <option value="Site Visit">→ Site Visit</option>
+                                  <option value="Quotation">→ Quotation</option>
+                                  <option value="Client">→ Client</option>
+                                  <option value="Dead">→ Dead</option>
+                                </select>
+                              </div>
+
+                              {/* Card Bottom Actions */}
+                              <div className="flex items-center gap-1.5 pt-1">
+                                {colStage.id === 'Dead' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDropLead(lead._id, 'Lead')}
+                                    className="flex-1 py-1 px-2 rounded-lg bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 text-[10.5px] font-bold border border-amber-500/40 flex items-center justify-center gap-1 transition-all cursor-pointer"
+                                  >
+                                    <RotateCcw className="w-3 h-3" />
+                                    <span>Restore to Lead</span>
+                                  </button>
+                                ) : colStage.id === 'Client' && !lead.isRegisteredClient ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedLeadForReg(lead)}
+                                    className="flex-1 py-1 px-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10.5px] font-black flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    <span>Register Client</span>
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedLeadForFollowUp(lead)}
+                                      className="flex-1 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10.5px] font-bold transition-colors cursor-pointer text-center"
+                                    >
+                                      Follow
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedLeadForEdit(lead);
+                                        setIsAddModalOpen(true);
+                                      }}
+                                      className="flex-1 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10.5px] font-bold transition-colors cursor-pointer text-center"
+                                    >
+                                      Edit
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : (
           /* TABULAR LIST VIEW EXACTLY MATCHING SCREENSHOT 2 COLUMNS:
