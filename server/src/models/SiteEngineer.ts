@@ -9,9 +9,12 @@ export interface ISiteEngineer extends Document {
   expertise: string; // e.g. "Common", "Civil Structure", "2"
   projectsCount: number;
   assignedProjectIds: Types.ObjectId[];
+  assignedClientIds?: Types.ObjectId[];
   status: 'Active' | 'Inactive'; // Active = Allowed, Inactive = Declined
   walletBalance: number;
   joinedDate: Date;
+  lastReportDate?: Date;
+  profileImage?: string;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -61,6 +64,12 @@ const siteEngineerSchema = new Schema<ISiteEngineer>(
         ref: 'Project',
       },
     ],
+    assignedClientIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'ClientAccount',
+      },
+    ],
     status: {
       type: String,
       enum: ['Active', 'Inactive'],
@@ -73,6 +82,14 @@ const siteEngineerSchema = new Schema<ISiteEngineer>(
     joinedDate: {
       type: Date,
       default: Date.now,
+    },
+    lastReportDate: {
+      type: Date,
+      default: null,
+    },
+    profileImage: {
+      type: String,
+      default: '',
     },
     notes: {
       type: String,

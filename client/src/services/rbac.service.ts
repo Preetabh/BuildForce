@@ -126,4 +126,9 @@ export const rbacService = {
   deleteSiteEngineer: async (id: string): Promise<void> => {
     await api.delete(`/site-engineers/${id}`);
   },
+
+  getMyEngineerProfile: async (): Promise<SiteEngineerItem | null> => {
+    const res = await api.get('/site-engineers/me');
+    return res.data?.data || null;
+  },
 };

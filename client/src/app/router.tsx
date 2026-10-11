@@ -29,6 +29,11 @@ import { ManageRoles } from '../pages/rbac/ManageRoles';
 import { RoleVsUser } from '../pages/rbac/RoleVsUser';
 import { UserManagement } from '../pages/rbac/UserManagement';
 import { DetailedSiteEngineers } from '../pages/siteEngineers/DetailedSiteEngineers';
+import { SiteManagementPage } from '../pages/sites/SiteManagementPage';
+import { AdminDailyReportsPage } from '../pages/dailyReports/AdminDailyReportsPage';
+import { DedicatedEngineerDashboard } from '../pages/siteEngineer/DedicatedEngineerDashboard';
+import { SubmitDailyReportPage } from '../pages/siteEngineer/SubmitDailyReportPage';
+import { EngineerWalletPage } from '../pages/siteEngineer/EngineerWalletPage';
 import { VendorManagement } from '../pages/vendors/VendorManagement';
 import { WorkerManagement } from '../pages/vendors/WorkerManagement';
 import { AuditLogsPage } from '../pages/audit/AuditLogsPage';
@@ -80,6 +85,22 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
+const RootLanding: React.FC = () => {
+  const { user } = useAuth();
+  const userRoleCode = (user?.role || '').trim().toUpperCase();
+  const isEngineerRole =
+    userRoleCode === 'SITE_ENGINEER' ||
+    userRoleCode === 'ENGINEER' ||
+    userRoleCode.includes('ENGINEER') ||
+    Boolean((user as any)?.roleName?.toUpperCase()?.includes('ENGINEER')) ||
+    Boolean((user as any)?.post?.toUpperCase()?.includes('ENGINEER'));
+
+  if (isEngineerRole) {
+    return <Navigate to="/engineer-dashboard" replace />;
+  }
+  return <TempHoldModule />;
+};
+
 export const AppRouter: React.FC = () => {
   return (
     <BrowserRouter>
@@ -123,8 +144,8 @@ export const AppRouter: React.FC = () => {
           }
         >
           {/* Functional Core - Home & Plannings are on Temporary Hold */}
-          <Route path="/" element={<TempHoldModule />} />
-          <Route path="/home" element={<TempHoldModule />} />
+          <Route path="/" element={<RootLanding />} />
+          <Route path="/home" element={<RootLanding />} />
           <Route path="/sor" element={<TempHoldModule />} />
           <Route path="/rate-master" element={<Navigate to="/sor" replace />} />
           <Route path="/projects/:projectId" element={<TempHoldModule />} />
@@ -400,6 +421,76 @@ export const AppRouter: React.FC = () => {
             element={
               <PermissionRoute permission={['Admin/SiteEngineersSection', 'Admin/ManageSiteEngineers']}>
                 <DetailedSiteEngineers />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/sites"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'Admin/Sites']}>
+                <SiteManagementPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/admin/daily-reports"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'Admin/DailyReports', 'Admin/DailyReportList']}>
+                <AdminDailyReportsPage />
+              </PermissionRoute>
+            }
+          />
+
+          {/* SITE ENGINEER DEDICATED PORTAL */}
+          <Route
+            path="/engineer-dashboard"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'SiteEngineer/Dashboard', 'report.view']}>
+                <DedicatedEngineerDashboard />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/engineer/dashboard"
+            element={<Navigate to="/engineer-dashboard" replace />}
+          />
+          <Route
+            path="/engineer/sites"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'SiteEngineer/Dashboard', 'project.view']}>
+                <DedicatedEngineerDashboard />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/engineer/wallet"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'SiteEngineer/Wallet', 'SiteEngineer/Dashboard']}>
+                <EngineerWalletPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/engineer/reports"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'SiteEngineer/Dashboard', 'report.view']}>
+                <DedicatedEngineerDashboard />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/engineer/submit-report"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'SiteEngineer/SubmitReport', 'report.create']}>
+                <SubmitDailyReportPage />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/engineer/submit-report/:reportId"
+            element={
+              <PermissionRoute permission={['Admin/SiteEngineersSection', 'SiteEngineer/SubmitReport', 'report.edit']}>
+                <SubmitDailyReportPage />
               </PermissionRoute>
             }
           />

@@ -16,6 +16,7 @@ import {
 import { BreadcrumbItem, Breadcrumb } from './Breadcrumb';
 import { useAuth } from '../../context/AuthContext';
 import { UserProfileMenu } from '../profile/UserProfileMenu';
+import { NotificationBell } from '../notifications/NotificationBell';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 export interface HeaderProps {
@@ -244,6 +245,9 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </button>
           )}
+
+          {/* In-App Notifications Bell */}
+          <NotificationBell />
 
           {/* User Profile Menu with Authoritative Role Badge & Capsule */}
           <UserProfileMenu showRoleBadge={true} />

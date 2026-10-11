@@ -15,6 +15,10 @@ router.use(
     'Admin/CollectPayment',
     'Admin/ReferencePartners',
     'Admin/CommissionReport',
+    'Admin/SiteEngineersSection',
+    'SiteEngineer/Dashboard',
+    'SiteEngineer/SubmitReport',
+    'SiteEngineer/AssignedSites',
   ])
 );
 

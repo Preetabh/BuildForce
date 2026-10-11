@@ -42,10 +42,23 @@ export interface SiteEngineerItem {
   mobile: string;
   expertise: string;
   projectsCount: number;
+  assignedProjectIds?: Array<{
+    _id: string;
+    name: string;
+    code: string;
+    location?: string;
+    status?: string;
+    progress?: number;
+    clientName?: string;
+  }> | string[];
+  assignedClientIds?: Array<any> | string[];
   status: 'Active' | 'Inactive'; // Active = Allowed, Inactive = Declined
   walletBalance: number;
   joinedDate: string;
+  lastReportDate?: string;
+  profileImage?: string;
   notes?: string;
+  password?: string;
 }
 
 export interface RbacUserItem {

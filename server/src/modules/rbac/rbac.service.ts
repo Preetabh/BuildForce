@@ -58,14 +58,17 @@ export class RbacService {
       },
       {
         title: 'Site Engineer',
-        route: '/admin/site-engineers',
+        route: 'Admin/SiteEngineersSection',
         icon: 'HardHat',
         sort: 3,
         isVisible: true,
         moduleGroup: 'Field Operations',
         children: [
-          { title: 'Detailed Site Engineers', route: '/admin/site-engineers', icon: 'Users', sort: 1, isVisible: true },
-          { title: 'Add Site Engineer', route: '/admin/add-site-engineer', icon: 'UserPlus', sort: 2, isVisible: true },
+          { title: 'Detailed Site Engineers', route: 'Admin/SiteEngineers_List', icon: 'Users', sort: 1, isVisible: true },
+          { title: 'Add Site Engineer', route: 'Admin/ManageSiteEngineers', icon: 'UserPlus', sort: 2, isVisible: true },
+          { title: 'Daily Site Reports', route: 'Admin/DailyReportList', icon: 'ClipboardCheck', sort: 3, isVisible: true },
+          { title: 'Engineer Dashboard', route: 'SiteEngineer/Dashboard', icon: 'Home', sort: 4, isVisible: true },
+          { title: 'Submit Daily Site Report', route: 'SiteEngineer/SubmitReport', icon: 'FilePlus', sort: 5, isVisible: true },
         ],
       },
       {
@@ -178,8 +181,6 @@ export class RbacService {
   // Ensure default roles exist with Allow and Decline permissions
   public static async ensureDefaultRoles(companyIdInput: string | Types.ObjectId) {
     const companyId = this.toObjectId(companyIdInput);
-    const count = await RbacRole.countDocuments({ companyId });
-    if (count > 0) return;
 
     const menus = await this.getMenus(companyId);
     const allMenuRoutes = menus.map((m) => ({
@@ -192,33 +193,57 @@ export class RbacService {
       canDelete: true,
     }));
 
+    const engineerAllowedRoutes = [
+      'Admin/SiteEngineersSection',
+      'Admin/SiteEngineers_List',
+      'Admin/ManageSiteEngineers',
+      'Admin/DailyReportList',
+      'SiteEngineer/Dashboard',
+      'SiteEngineer/SubmitReport',
+      '/admin/site-engineers',
+      '/admin/daily-reports',
+      '/engineer-dashboard',
+      '/engineer/submit-report',
+      'report.view',
+      'report.create',
+      'report.edit',
+    ];
+
     const defaultRoles = [
       { name: 'Master Admin', code: 'MASTER_ADMIN', color: '#F59E0B', isSystem: true, desc: 'Full unrestricted governance across all portal modules and security settings', allAllowed: true },
-      { name: 'Counsellor', code: 'COUNSELLOR', color: '#3B82F6', isSystem: false, desc: 'Lead counselling, client engagement and admission/inquiry followups', allAllowed: false },
+      { name: 'Site Engineer', code: 'SITE_ENGINEER', color: '#F97316', isSystem: true, desc: 'Field operations, client sites, DPR logs, daily site reports, and engineer dashboard', allAllowed: false },
+      { name: 'User', code: 'USER', color: '#10B981', isSystem: false, desc: 'Standard user access to calculation, estimation and projects', allAllowed: false },
+      { name: 'Project Manager', code: 'PROJECT_MANAGER', color: '#14B8A6', isSystem: false, desc: 'Planning, schedule adherence, budgets, BOQ execution, and site governance', allAllowed: false },
+      { name: 'Developer', code: 'DEVELOPER', color: '#EC4899', isSystem: false, desc: 'Software engineering, portal integrations, APIs and system maintenance', allAllowed: false },
       { name: 'Accountant', code: 'ACCOUNTANT', color: '#10B981', isSystem: false, desc: 'Financial records, fee collections, payroll and payment accounting', allAllowed: false },
       { name: 'Employee', code: 'EMPLOYEE', color: '#6366F1', isSystem: false, desc: 'Standard staff employee with access to task assignments and self portal', allAllowed: false },
-      { name: 'Developer', code: 'DEVELOPER', color: '#EC4899', isSystem: false, desc: 'Software engineering, portal integrations, APIs and system maintenance', allAllowed: false },
-      { name: 'Site Engineer', code: 'SITE_ENGINEER', color: '#F97316', isSystem: false, desc: 'Field operations, e-MB measurements, DPR logs, and daily execution reporting', allAllowed: false },
+      { name: 'Counsellor', code: 'COUNSELLOR', color: '#3B82F6', isSystem: false, desc: 'Lead counselling, client engagement and admission/inquiry followups', allAllowed: false },
       { name: 'Interior Designer', code: 'INTERIOR_DESIGNER', color: '#8B5CF6', isSystem: false, desc: 'Architectural finishes, material specification, 3D modelling and layouts', allAllowed: false },
-      { name: 'Project Manager', code: 'PROJECT_MANAGER', color: '#14B8A6', isSystem: false, desc: 'Planning, schedule adherence, budgets, BOQ execution, and site governance', allAllowed: false },
       { name: 'Architect', code: 'ARCHITECT', color: '#EAB308', isSystem: false, desc: 'Structural and spatial blueprint planning, compliance and aesthetic designs', allAllowed: false },
       { name: 'Estimate Engineer', code: 'ESTIMATE_ENGINEER', color: '#06B6D4', isSystem: false, desc: 'Rate analysis, SOR masters, quantity estimations, and BOQ costing', allAllowed: false },
       { name: 'BDM', code: 'BDM', color: '#A855F7', isSystem: false, desc: 'Business development, client acquisitions, partnerships, and revenue expansion', allAllowed: false },
     ];
 
     for (const r of defaultRoles) {
-      await RbacRole.create({
-        companyId,
-        name: r.name,
-        code: r.code,
-        description: r.desc,
-        color: r.color,
-        isSystem: r.isSystem,
-        permissions: allMenuRoutes.map((p) => ({
-          ...p,
-          allow: r.allAllowed ? true : false,
-        })),
-      });
+      const existing = await RbacRole.findOne({ companyId, code: r.code });
+      if (!existing) {
+        await RbacRole.create({
+          companyId,
+          name: r.name,
+          code: r.code,
+          description: r.desc,
+          color: r.color,
+          isSystem: r.isSystem,
+          permissions: allMenuRoutes.map((p) => ({
+            ...p,
+            allow: r.allAllowed
+              ? true
+              : r.code === 'SITE_ENGINEER' && engineerAllowedRoutes.includes(p.menuRoute)
+              ? true
+              : false,
+          })),
+        });
+      }
     }
   }
 

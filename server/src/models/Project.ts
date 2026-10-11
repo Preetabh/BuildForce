@@ -28,6 +28,7 @@ export interface IProject extends Document {
   isArchived: boolean;
   deletedAt?: Date | null;
   deletedBy?: Types.ObjectId | null;
+  assignedEngineers?: Types.ObjectId[];
   createdBy?: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
@@ -167,6 +168,12 @@ const projectSchema = new Schema<IProject>(
       ref: 'User',
       default: null,
     },
+    assignedEngineers: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'SiteEngineer',
+      },
+    ],
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',

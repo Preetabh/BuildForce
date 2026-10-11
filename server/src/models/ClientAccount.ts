@@ -65,6 +65,7 @@ export interface IClientAccount extends Document {
   priority?: string;
   referenceSource?: string;
   handlerName?: string; // e.g. "ER. Ankit Kumar Verma"
+  siteEngineerId?: mongoose.Types.ObjectId;
   subBadge?: string; // e.g. "OLD INFRA", "LB"
   associate?: string; // e.g. "Social Media: Facebook", "Google", "Direct", "PI ADS"
   associateType?: string; // e.g. "SocialMedia", "Direct"
@@ -191,6 +192,12 @@ const clientAccountSchema = new Schema<IClientAccount>(
       type: String,
       trim: true,
       default: '',
+    },
+    siteEngineerId: {
+      type: Schema.Types.ObjectId,
+      ref: 'SiteEngineer',
+      default: null,
+      index: true,
     },
     subBadge: {
       type: String,

@@ -12,6 +12,31 @@ export class SiteEngineerController {
     }
   }
 
+  public static async getMyProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const engineer = await SiteEngineerService.getMyEngineerProfile(
+        companyId,
+        req.user!.userId,
+        req.user!.name,
+        req.user!.email
+      );
+      res.status(200).json({ success: true, data: engineer });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  public static async getSiteEngineerById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.user!.companyId;
+      const engineer = await SiteEngineerService.getSiteEngineerById(companyId, req.params.id);
+      res.status(200).json({ success: true, data: engineer });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   public static async createSiteEngineer(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;

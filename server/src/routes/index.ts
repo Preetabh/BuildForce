@@ -64,4 +64,12 @@ router.use('/', vendorRoutes);
 import auditRoutes from '../modules/audit/audit.routes';
 router.use('/audit', auditRoutes);
 
+// Daily Site Reports Routes
+import dailyReportRoutes from '../modules/dailyReports/dailyReport.routes';
+router.use('/daily-reports', dailyReportRoutes);
+
+// In-App Notification System Routes
+import notificationRoutes from '../modules/notifications/notification.routes';
+router.use('/notifications', notificationRoutes);
+
 export default router;

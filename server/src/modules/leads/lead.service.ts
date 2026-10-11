@@ -6,6 +6,8 @@ import { PaymentRecord } from '../../models/PaymentRecord';
 import { CommissionRecord } from '../../models/CommissionRecord';
 import { PartnerPayout } from '../../models/PartnerPayout';
 import { Company } from '../../models/Company';
+import { SiteEngineer } from '../../models/SiteEngineer';
+import { Notification } from '../../models/Notification';
 import { CommissionService } from './commission.service';
 
 export interface LeadFilterParams {
@@ -488,10 +490,10 @@ export class LeadService {
     }
 
     // Sync isDead state with stage
-    if (updateData.stage === 'Dead') {
+    if ((updateData.stage as any) === 'Dead') {
       lead.isDead = true;
       if (!lead.deadAt) lead.deadAt = new Date();
-    } else if (updateData.stage && updateData.stage !== 'Dead') {
+    } else if (updateData.stage && (updateData.stage as any) !== 'Dead') {
       lead.isDead = false;
     }
 
@@ -940,6 +942,24 @@ export class LeadService {
       const userObjId = new mongoose.Types.ObjectId(effectiveUserId);
       userClientConditions.push({ createdBy: userObjId });
 
+      // Check if user is a Site Engineer
+      const engineerDoc = await SiteEngineer.findOne({
+        companyId: compId,
+        $or: [
+          { userId: userObjId },
+          { _id: userObjId },
+        ],
+      });
+
+      if (engineerDoc) {
+        userClientConditions.push({ siteEngineerId: engineerDoc._id });
+        const safeName = engineerDoc.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        userClientConditions.push({ handlerName: new RegExp(safeName, 'i') });
+        if (engineerDoc.assignedClientIds && engineerDoc.assignedClientIds.length > 0) {
+          userClientConditions.push({ _id: { $in: engineerDoc.assignedClientIds } });
+        }
+      }
+
       // Find all leads belonging to this user
       const leadMatchOr: any[] = [{ createdBy: userObjId }];
       if (query.userName && query.userName.trim()) {
@@ -990,6 +1010,7 @@ export class LeadService {
     const filter = andConditions.length === 1 ? andConditions[0] : { $and: andConditions };
 
     const clients = await ClientAccount.find(filter)
+      .populate('siteEngineerId', 'name loginId mobile expertise status')
       .sort({ registrationDate: -1, createdAt: -1 })
       .lean();
     return clients;
@@ -1055,8 +1076,8 @@ export class LeadService {
    */
   static async updateClient(companyId: string, id: string, data: any) {
     const client = await ClientAccount.findOne({
-      _id: new mongoose.Types.ObjectId(id),
-      companyId: new mongoose.Types.ObjectId(companyId),
+      _id: id,
+      companyId: companyId,
     });
     if (!client) throw new Error('Client not found');
 
@@ -1070,6 +1091,54 @@ export class LeadService {
     if (data.siteLocation !== undefined) client.siteLocation = data.siteLocation;
     if (data.companyName !== undefined) client.companyName = data.companyName;
     if (data.handlerName !== undefined) client.handlerName = data.handlerName;
+    if (data.siteEngineerId !== undefined) {
+      if (data.siteEngineerId) {
+        client.siteEngineerId = new mongoose.Types.ObjectId(data.siteEngineerId);
+        const engineerDoc = await SiteEngineer.findById(client.siteEngineerId);
+        if (engineerDoc) {
+          const engName = engineerDoc.name.trim();
+          client.handlerName = engName.toUpperCase().startsWith('ER') ? engName : `ER. ${engName}`;
+
+          try {
+            await SiteEngineer.findByIdAndUpdate(engineerDoc._id, {
+              $addToSet: { assignedClientIds: client._id },
+            });
+          } catch (e) {
+            console.warn('Failed to sync engineer assignedClientIds:', e);
+          }
+
+          if (engineerDoc.userId) {
+            try {
+              await Notification.create({
+                companyId: client.companyId || new mongoose.Types.ObjectId(companyId),
+                recipientId: engineerDoc.userId,
+                recipientRole: 'SITE_ENGINEER',
+                title: 'New Site / Client Assigned',
+                message: `You have been assigned to client ${client.name} (${client.clientCode}) at ${client.siteLocation}.`,
+                type: 'SITE_ASSIGNED',
+                entityId: client._id,
+                entityType: 'ClientAccount',
+                link: '/engineer-dashboard',
+              });
+            } catch (notifErr) {
+              console.warn('Notification create warning:', notifErr);
+            }
+          }
+        }
+      } else {
+        if (client.siteEngineerId) {
+          try {
+            await SiteEngineer.findByIdAndUpdate(client.siteEngineerId, {
+              $pull: { assignedClientIds: client._id },
+            });
+          } catch (e) {
+            console.warn('Failed to unassign client from engineer:', e);
+          }
+        }
+        client.siteEngineerId = null as any;
+        client.handlerName = '';
+      }
+    }
     if (data.subBadge !== undefined) client.subBadge = data.subBadge;
     if (data.associate !== undefined) client.associate = data.associate;
     if (data.associateType !== undefined) client.associateType = data.associateType;

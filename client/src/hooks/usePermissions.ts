@@ -80,6 +80,43 @@ export function usePermissions() {
       return true;
     }
 
+    // 3b. Dedicated access for SITE_ENGINEER role / post
+    const isEngineerRole =
+      userRoleCode === 'SITE_ENGINEER' ||
+      userRoleCode === 'ENGINEER' ||
+      userRoleCode.includes('ENGINEER') ||
+      Boolean((user as any)?.roleName?.toUpperCase()?.includes('ENGINEER')) ||
+      Boolean((user as any)?.post?.toUpperCase()?.includes('ENGINEER'));
+
+    if (isEngineerRole) {
+      const engineerAllowed = [
+        'Admin/SiteEngineersSection',
+        'Admin/SiteEngineers_List',
+        'Admin/DailyReportList',
+        'Admin/Clients',
+        'SiteEngineer/Dashboard',
+        'SiteEngineer/SubmitReport',
+        'SiteEngineer/AssignedSites',
+        'SiteEngineer/Wallet',
+        'report.view',
+        'report.create',
+        'report.edit',
+        'project.view',
+        '/engineer-dashboard',
+        '/engineer/sites',
+        '/engineer/wallet',
+        '/engineer/submit-report',
+      ];
+      if (
+        engineerAllowed.includes(keyOrRoute) ||
+        keyOrRoute.toLowerCase().includes('engineer') ||
+        keyOrRoute.toLowerCase().includes('daily-report') ||
+        keyOrRoute.toLowerCase().includes('dailyreport')
+      ) {
+        return true;
+      }
+    }
+
     // 4. Module entry point fallback: if user has general access to the module, allow sub-items
     const parentFallbackMap: Record<string, string[]> = {
       // Plannings
@@ -178,7 +215,7 @@ export function usePermissions() {
       lead_management: ['Admin/Management'],
       service_catalog: ['Admin/Service'],
       all_teams: ['Admin/MyTeamsAccess'],
-      site_enginner: ['Admin/SiteEngineersSection'],
+      site_enginner: ['Admin/SiteEngineersSection', 'SITE_ENGINEER'],
       vendor_management: ['Admin/Venders'],
       project_management: ['Admin/ReportAnalytic'],
       settings: ['Admin/Settings'],

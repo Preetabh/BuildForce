@@ -23,6 +23,7 @@ import {
   MapPin,
   RefreshCw,
   Trash2,
+  HardHat,
 } from 'lucide-react';
 import { ClientRecord } from '../../types';
 import leadService, { ClientFilterQuery } from '../../services/lead.service';
@@ -32,6 +33,7 @@ import { DailyProgressReportModal } from '../../components/leads/DailyProgressRe
 import { ClientFollowUpModal } from '../../components/leads/ClientFollowUpModal';
 import { ClientEditModal } from '../../components/leads/ClientEditModal';
 import { ClientDeadModal } from '../../components/leads/ClientDeadModal';
+import { AssignSiteEngineerModal } from '../../components/leads/AssignSiteEngineerModal';
 import { UserProfileMenu } from '../../components/profile/UserProfileMenu';
 
 export const ClientManagement: React.FC = () => {
@@ -84,6 +86,10 @@ export const ClientManagement: React.FC = () => {
 
   const [selectedClientForDead, setSelectedClientForDead] = useState<ClientRecord | null>(null);
   const [isDeadModalOpen, setIsDeadModalOpen] = useState(false);
+
+  // Assign Site Engineer Modal
+  const [selectedClientForAssign, setSelectedClientForAssign] = useState<ClientRecord | null>(null);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
   useEffect(() => {
     fetchClients();
@@ -548,6 +554,17 @@ export const ClientManagement: React.FC = () => {
                           <span className="font-mono font-bold text-amber-400 text-xs tracking-wide">
                             {c.clientCode}
                           </span>
+                          <button
+                            type="button"
+                            title="Assign Site Engineer to this Site"
+                            onClick={() => {
+                              setSelectedClientForAssign(c);
+                              setIsAssignModalOpen(true);
+                            }}
+                            className="p-1 rounded bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 border border-amber-500/40 hover:border-amber-400 transition-all cursor-pointer group"
+                          >
+                            <HardHat className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                          </button>
                           <FolderOpen className="w-3.5 h-3.5 text-amber-400/80 shrink-0" />
                           <span className="text-[10px] text-slate-400 font-mono">
                             {formatDateDisplay(c.registrationDate)}
@@ -560,19 +577,44 @@ export const ClientManagement: React.FC = () => {
                         <div className="font-bold text-white tracking-wide text-xs leading-tight">
                           {c.name}
                         </div>
-                        {(c.subBadge || c.handlerName) && (
+                        {c.handlerName ? (
                           <div className="flex items-center gap-1 mt-0.5">
                             {c.subBadge && (
                               <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                                 {c.subBadge}
                               </span>
                             )}
-                            {c.handlerName && (
-                              <span className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5">
-                                <UserCheck className="w-2.5 h-2.5 text-amber-400" />
-                                <span>{c.handlerName}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedClientForAssign(c);
+                                setIsAssignModalOpen(true);
+                              }}
+                              title="Click to reassign or change Site Engineer"
+                              className="text-[10.5px] text-amber-400 font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                            >
+                              <HardHat className="w-3 h-3 text-amber-400 shrink-0" />
+                              <span>{c.handlerName}</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            {c.subBadge && (
+                              <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                {c.subBadge}
                               </span>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedClientForAssign(c);
+                                setIsAssignModalOpen(true);
+                              }}
+                              className="text-[9.5px] text-slate-400 hover:text-amber-400 flex items-center gap-0.5 transition-colors cursor-pointer"
+                            >
+                              <HardHat className="w-2.5 h-2.5" />
+                              <span>+ Assign Site Eng.</span>
+                            </button>
                           </div>
                         )}
                       </td>
@@ -791,6 +833,17 @@ export const ClientManagement: React.FC = () => {
         onClose={() => {
           setIsDeadModalOpen(false);
           setSelectedClientForDead(null);
+        }}
+        onSuccess={() => fetchClients()}
+      />
+
+      {/* Assign Site Engineer to Client Modal */}
+      <AssignSiteEngineerModal
+        isOpen={isAssignModalOpen}
+        client={selectedClientForAssign}
+        onClose={() => {
+          setIsAssignModalOpen(false);
+          setSelectedClientForAssign(null);
         }}
         onSuccess={() => fetchClients()}
       />

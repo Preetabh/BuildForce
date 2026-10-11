@@ -1,6 +1,9 @@
 import { Types } from 'mongoose';
 import { SiteEngineer, ISiteEngineer } from '../../models/SiteEngineer';
 import { User } from '../../models/User';
+import { Project } from '../../models/Project';
+import { DailySiteReport } from '../../models/DailySiteReport';
+import { Notification } from '../../models/Notification';
 import { AppError } from '../../middleware/error.middleware';
 import bcrypt from 'bcryptjs';
 
@@ -11,45 +14,155 @@ export class SiteEngineerService {
 
   public static async getSiteEngineers(companyIdInput: string | Types.ObjectId) {
     const companyId = this.toObjectId(companyIdInput);
-    // Fetch only user-created site engineers, no hardcoded auto-seeding
     const engineers = await SiteEngineer.find({ companyId })
+      .populate('assignedProjectIds', 'name code location status progress clientName')
       .sort({ createdAt: -1 })
       .lean();
-    return engineers;
+
+    // Attach latest report date for each engineer dynamically
+    const enrichedEngineers = await Promise.all(
+      engineers.map(async (eng) => {
+        let lastReportDate = eng.lastReportDate;
+        if (!lastReportDate) {
+          const latestReport = await DailySiteReport.findOne({
+            companyId,
+            siteEngineerId: eng._id,
+            status: { $ne: 'Draft' },
+          })
+            .sort({ reportDate: -1 })
+            .select('reportDate')
+            .lean();
+          if (latestReport) {
+            lastReportDate = latestReport.reportDate;
+          }
+        }
+        return {
+          ...eng,
+          lastReportDate,
+        };
+      })
+    );
+
+    return enrichedEngineers;
+  }
+
+  public static async getMyEngineerProfile(
+    companyIdInput: string | Types.ObjectId,
+    userId: string,
+    userName?: string,
+    userEmail?: string
+  ) {
+    const companyId = this.toObjectId(companyIdInput);
+    const userObjId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
+
+    const orConditions: any[] = [];
+    if (userObjId) orConditions.push({ userId: userObjId });
+    if (userName && userName.trim()) {
+      const safeName = userName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      orConditions.push({ name: new RegExp(`^${safeName}$`, 'i') });
+    }
+    if (userEmail && userEmail.trim()) {
+      orConditions.push({ loginId: userEmail.toLowerCase().trim() });
+    }
+
+    if (orConditions.length === 0) return null;
+
+    const engineer = await SiteEngineer.findOne({
+      companyId,
+      $or: orConditions,
+    })
+      .populate('assignedProjectIds', 'name code location status progress clientName')
+      .populate('assignedClientIds', 'name clientCode phone siteLocation status')
+      .lean();
+
+    return engineer;
+  }
+
+  public static async getSiteEngineerById(companyIdInput: string | Types.ObjectId, id: string) {
+    const companyId = this.toObjectId(companyIdInput);
+    const engineer = await SiteEngineer.findOne({ _id: id, companyId })
+      .populate('assignedProjectIds', 'name code location status progress clientName')
+      .lean();
+    if (!engineer) throw new AppError('Site engineer not found', 404);
+    return engineer;
   }
 
   public static async createSiteEngineer(companyIdInput: string | Types.ObjectId, data: any) {
     const companyId = this.toObjectId(companyIdInput);
+    const normalizedEmail = data.loginId.toLowerCase().trim();
+
     const existing = await SiteEngineer.findOne({
       companyId,
-      loginId: data.loginId.toLowerCase().trim(),
+      loginId: normalizedEmail,
     });
     if (existing) {
       throw new AppError(`Site engineer with login ID '${data.loginId}' already exists`, 400);
     }
 
+    // Convert assigned project ids to ObjectIds
+    const assignedProjectIds = Array.isArray(data.assignedProjectIds)
+      ? data.assignedProjectIds.map((pId: string) => this.toObjectId(pId))
+      : [];
+
     const engineer = await SiteEngineer.create({
       ...data,
       companyId,
-      loginId: data.loginId.toLowerCase().trim(),
+      loginId: normalizedEmail,
+      assignedProjectIds,
+      projectsCount: assignedProjectIds.length,
     });
 
-    // Also automatically create/update corresponding User account for seamless portal login & impersonation
-    const existingUser = await User.findOne({ email: data.loginId.toLowerCase().trim() });
-    if (!existingUser) {
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash('password123', salt);
-      await User.create({
+    // Create or update corresponding User account for secure portal login
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(data.password || 'password123', salt);
+
+    let user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      user = await User.create({
         name: data.name,
-        email: data.loginId.toLowerCase().trim(),
+        email: normalizedEmail,
         passwordHash,
         role: 'SITE_ENGINEER',
         mobile: data.mobile || '-',
         expertise: data.expertise || 'Common',
-        projectsCount: data.projectsCount || 0,
+        projectsCount: assignedProjectIds.length,
         walletBalance: data.walletBalance || 0,
         companyId,
         isActive: data.status === 'Active',
+      });
+    } else {
+      user.role = 'SITE_ENGINEER';
+      user.name = data.name;
+      user.mobile = data.mobile || '-';
+      user.expertise = data.expertise || 'Common';
+      user.isActive = data.status === 'Active';
+      if (data.password) {
+        user.passwordHash = passwordHash;
+      }
+      await user.save();
+    }
+
+    engineer.userId = user._id as Types.ObjectId;
+    await engineer.save();
+
+    // Bidirectional sync: Add engineer to Project.assignedEngineers
+    if (assignedProjectIds.length > 0) {
+      await Project.updateMany(
+        { _id: { $in: assignedProjectIds }, companyId },
+        { $addToSet: { assignedEngineers: engineer._id } }
+      );
+
+      // Create Notification for engineer
+      await Notification.create({
+        companyId,
+        recipientId: user._id,
+        recipientRole: 'SITE_ENGINEER',
+        title: 'New Sites Assigned',
+        message: `You have been assigned to ${assignedProjectIds.length} site(s). You can now view and report on these sites.`,
+        type: 'SITE_ASSIGNED',
+        entityId: engineer._id,
+        entityType: 'SiteEngineer',
+        link: '/engineer-dashboard',
       });
     }
 
@@ -59,29 +172,86 @@ export class SiteEngineerService {
   public static async updateSiteEngineer(
     companyIdInput: string | Types.ObjectId,
     id: string,
-    data: Partial<ISiteEngineer>
+    data: Partial<ISiteEngineer> & { password?: string; assignedProjectIds?: string[] }
   ) {
     const companyId = this.toObjectId(companyIdInput);
+    const existingEngineer = await SiteEngineer.findOne({ _id: id, companyId });
+    if (!existingEngineer) throw new AppError('Site engineer not found', 404);
+
+    const oldProjectIds = (existingEngineer.assignedProjectIds || []).map((p) => p.toString());
+
+    let newProjectIds: Types.ObjectId[] | undefined;
+    if (data.assignedProjectIds) {
+      newProjectIds = data.assignedProjectIds.map((pId: string) => this.toObjectId(pId));
+      data.projectsCount = newProjectIds.length;
+    }
+
+    const updatePayload: any = { ...data };
+    if (newProjectIds) {
+      updatePayload.assignedProjectIds = newProjectIds;
+    }
+
     const engineer = await SiteEngineer.findOneAndUpdate(
       { _id: id, companyId },
-      { $set: data },
+      { $set: updatePayload },
       { new: true }
-    );
+    ).populate('assignedProjectIds', 'name code location status progress clientName');
+
     if (!engineer) throw new AppError('Site engineer not found', 404);
 
-    // Sync status and details with user account if exists
-    if (data.status || data.name || data.mobile || data.expertise) {
-      await User.findOneAndUpdate(
-        { email: engineer.loginId.toLowerCase() },
-        {
-          $set: {
-            name: engineer.name,
-            mobile: engineer.mobile,
-            expertise: engineer.expertise,
-            isActive: engineer.status === 'Active',
-          },
+    // Sync User account details & password
+    const userUpdate: any = {
+      name: engineer.name,
+      mobile: engineer.mobile,
+      expertise: engineer.expertise,
+      isActive: engineer.status === 'Active',
+      projectsCount: engineer.projectsCount,
+    };
+
+    if (data.password && data.password.trim()) {
+      const salt = await bcrypt.genSalt(10);
+      userUpdate.passwordHash = await bcrypt.hash(data.password.trim(), salt);
+    }
+
+    const userDoc = await User.findOneAndUpdate(
+      { email: engineer.loginId.toLowerCase() },
+      { $set: userUpdate },
+      { new: true }
+    );
+
+    // Sync Projects assignedEngineers bidirectional
+    if (newProjectIds) {
+      const newIdsStr = newProjectIds.map((p) => p.toString());
+      const addedProjects = newIdsStr.filter((p) => !oldProjectIds.includes(p));
+      const removedProjects = oldProjectIds.filter((p) => !newIdsStr.includes(p));
+
+      if (addedProjects.length > 0) {
+        await Project.updateMany(
+          { _id: { $in: addedProjects }, companyId },
+          { $addToSet: { assignedEngineers: engineer._id } }
+        );
+
+        if (userDoc) {
+          await Notification.create({
+            companyId,
+            recipientId: userDoc._id,
+            recipientRole: 'SITE_ENGINEER',
+            title: 'Project Assignment Updated',
+            message: `You have been assigned to new site(s). Check your assigned sites list.`,
+            type: 'SITE_ASSIGNED',
+            entityId: engineer._id,
+            entityType: 'SiteEngineer',
+            link: '/engineer-dashboard',
+          });
         }
-      );
+      }
+
+      if (removedProjects.length > 0) {
+        await Project.updateMany(
+          { _id: { $in: removedProjects }, companyId },
+          { $pull: { assignedEngineers: engineer._id } }
+        );
+      }
     }
 
     return engineer;
@@ -131,7 +301,6 @@ export class SiteEngineerService {
 
     await engineer.save();
 
-    // Sync user wallet balance
     await User.findOneAndUpdate(
       { email: engineer.loginId.toLowerCase() },
       { $set: { walletBalance: engineer.walletBalance } }
@@ -145,7 +314,13 @@ export class SiteEngineerService {
     const res = await SiteEngineer.findOneAndDelete({ _id: id, companyId });
     if (!res) throw new AppError('Site engineer not found', 404);
 
-    // Also delete any associated user account created for this site engineer
+    // Remove engineer from all projects
+    await Project.updateMany(
+      { companyId, assignedEngineers: res._id },
+      { $pull: { assignedEngineers: res._id } }
+    );
+
+    // Delete associated User account
     if (res.loginId) {
       await User.deleteOne({
         email: res.loginId.toLowerCase().trim(),

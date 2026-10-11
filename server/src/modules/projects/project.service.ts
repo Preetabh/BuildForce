@@ -1,16 +1,42 @@
 import { Types } from 'mongoose';
 import { Project, IProject } from '../../models/Project';
+import { SiteEngineer } from '../../models/SiteEngineer';
+import { Notification } from '../../models/Notification';
+import { AuthUser } from '../../middleware/auth.middleware';
 import { AppError } from '../../middleware/error.middleware';
 import { CreateProjectInput, UpdateProjectInput, ProjectQueryInput } from './project.validation';
 import { ProjectStats } from './project.types';
 import { AuditService } from '../audit/audit.service';
 
 export class ProjectService {
-  public static async getProjects(companyId: string, query: ProjectQueryInput) {
+  public static async getProjects(companyId: string, query: ProjectQueryInput, authUser?: AuthUser) {
     const filter: Record<string, unknown> = {
       companyId: new Types.ObjectId(companyId),
       deletedAt: null,
     };
+
+    // If request is made by a Site Engineer, strictly restrict to their assigned sites
+    if (authUser?.role === 'SITE_ENGINEER') {
+      const engineer = await SiteEngineer.findOne({
+        companyId: new Types.ObjectId(companyId),
+        $or: [
+          { userId: new Types.ObjectId(authUser.userId) },
+          { loginId: authUser.email.toLowerCase() },
+        ],
+      });
+
+      if (!engineer) {
+        return {
+          projects: [],
+          pagination: { total: 0, page: 1, limit: query.limit || 12, totalPages: 0, hasMore: false },
+        };
+      }
+
+      filter.$or = [
+        { assignedEngineers: engineer._id },
+        { _id: { $in: engineer.assignedProjectIds || [] } },
+      ];
+    }
 
     if (query.status && query.status !== 'all') {
       filter.status = query.status;
@@ -25,20 +51,32 @@ export class ProjectService {
     }
 
     if (!query.includeSubProjects) {
-      filter.$and = [
+      const parentCondition = [
         { $or: [{ parentId: null }, { parentId: { $exists: false } }] },
         { code: { $not: /-SP\d+/i } },
       ];
+      if (filter.$and && Array.isArray(filter.$and)) {
+        filter.$and.push(...parentCondition);
+      } else {
+        filter.$and = parentCondition;
+      }
     }
 
     if (query.search && query.search.trim() !== '') {
       const searchRegex = new RegExp(query.search.trim(), 'i');
-      filter.$or = [
+      const searchCondition = [
         { name: searchRegex },
         { code: searchRegex },
         { clientName: searchRegex },
         { location: searchRegex },
       ];
+      if (filter.$or && Array.isArray(filter.$or)) {
+        // Intersect with existing $or
+        filter.$and = filter.$and || [];
+        (filter.$and as any[]).push({ $or: searchCondition });
+      } else {
+        filter.$or = searchCondition;
+      }
     }
 
     const page = query.page || 1;
@@ -55,6 +93,7 @@ export class ProjectService {
         .skip(skip)
         .limit(limit)
         .populate('createdBy', 'name email')
+        .populate('assignedEngineers', 'name loginId mobile expertise status')
         .lean(),
       Project.countDocuments(filter),
     ]);
@@ -154,7 +193,7 @@ export class ProjectService {
     };
   }
 
-  public static async getProjectById(companyId: string, projectId: string) {
+  public static async getProjectById(companyId: string, projectId: string, authUser?: AuthUser) {
     if (!Types.ObjectId.isValid(projectId)) {
       throw new AppError('Invalid project ID format', 400);
     }
@@ -166,10 +205,33 @@ export class ProjectService {
     })
       .populate('createdBy', 'name email')
       .populate('parentId', 'name code projectType status')
+      .populate('assignedEngineers', 'name loginId mobile expertise status')
       .lean();
 
     if (!project) {
       throw new AppError('Project not found or may have been deleted', 404);
+    }
+
+    // Role-based authorization for Site Engineer
+    if (authUser?.role === 'SITE_ENGINEER') {
+      const engineer = await SiteEngineer.findOne({
+        companyId: new Types.ObjectId(companyId),
+        $or: [
+          { userId: new Types.ObjectId(authUser.userId) },
+          { loginId: authUser.email.toLowerCase() },
+        ],
+      });
+
+      const isAssigned =
+        engineer &&
+        ((project.assignedEngineers as any[])?.some(
+          (e: any) => (e._id || e).toString() === engineer._id.toString()
+        ) ||
+          engineer.assignedProjectIds?.some((pId: any) => pId.toString() === projectId));
+
+      if (!isAssigned) {
+        throw new AppError('Forbidden: You are not authorized to access this site', 403);
+      }
     }
 
     const subProjectsCount = await Project.countDocuments({
@@ -199,6 +261,7 @@ export class ProjectService {
     })
       .sort({ createdAt: -1 })
       .populate('createdBy', 'name email')
+      .populate('assignedEngineers', 'name loginId mobile expertise status')
       .lean();
 
     return subProjects;
@@ -228,7 +291,6 @@ export class ProjectService {
       throw new AppError('Parent project not found', 404);
     }
 
-    // Auto-generate code prefixed with parent code if not explicitly provided
     let normalizedCode = input.code ? input.code.trim().toUpperCase() : '';
     if (!normalizedCode) {
       const existingCount = await Project.countDocuments({
@@ -282,12 +344,46 @@ export class ProjectService {
       normalizedCode = `${normalizedCode}-${Date.now().toString(36).slice(-3).toUpperCase()}`;
     }
 
+    const assignedEngineers = Array.isArray(input.assignedEngineers)
+      ? input.assignedEngineers.map((id) => new Types.ObjectId(id))
+      : [];
+
     const project = await Project.create({
       ...input,
       code: normalizedCode,
       companyId: compObjectId,
+      assignedEngineers,
       createdBy: new Types.ObjectId(userId),
     });
+
+    // Synchronize SiteEngineer.assignedProjectIds and send notifications
+    if (assignedEngineers.length > 0) {
+      await SiteEngineer.updateMany(
+        { _id: { $in: assignedEngineers }, companyId: compObjectId },
+        { $addToSet: { assignedProjectIds: project._id }, $inc: { projectsCount: 1 } }
+      );
+
+      const engineers = await SiteEngineer.find({
+        _id: { $in: assignedEngineers },
+        companyId: compObjectId,
+      }).select('userId name');
+
+      for (const eng of engineers) {
+        if (eng.userId) {
+          await Notification.create({
+            companyId: compObjectId,
+            recipientId: eng.userId,
+            recipientRole: 'SITE_ENGINEER',
+            title: 'New Site Assigned',
+            message: `You have been assigned to project: ${project.name} (${project.code}).`,
+            type: 'SITE_ASSIGNED',
+            entityId: project._id,
+            entityType: 'Project',
+            link: '/engineer-dashboard',
+          });
+        }
+      }
+    }
 
     await AuditService.log({
       companyId,
@@ -347,9 +443,58 @@ export class ProjectService {
     }
 
     const oldSnapshot = existing.toObject();
+    const oldEngineers = (existing.assignedEngineers || []).map((e) => e.toString());
+
+    let newEngineers: Types.ObjectId[] | undefined;
+    if (input.assignedEngineers !== undefined) {
+      newEngineers = input.assignedEngineers.map((id) => new Types.ObjectId(id));
+      (input as any).assignedEngineers = newEngineers;
+    }
 
     Object.assign(existing, input);
     await existing.save();
+
+    // Synchronize SiteEngineer assignments if assignedEngineers was modified
+    if (newEngineers) {
+      const newIdsStr = newEngineers.map((id) => id.toString());
+      const addedEngineers = newIdsStr.filter((id) => !oldEngineers.includes(id));
+      const removedEngineers = oldEngineers.filter((id) => !newIdsStr.includes(id));
+
+      if (addedEngineers.length > 0) {
+        await SiteEngineer.updateMany(
+          { _id: { $in: addedEngineers }, companyId: compObjectId },
+          { $addToSet: { assignedProjectIds: existing._id }, $inc: { projectsCount: 1 } }
+        );
+
+        const engineers = await SiteEngineer.find({
+          _id: { $in: addedEngineers },
+          companyId: compObjectId,
+        }).select('userId name');
+
+        for (const eng of engineers) {
+          if (eng.userId) {
+            await Notification.create({
+              companyId: compObjectId,
+              recipientId: eng.userId,
+              recipientRole: 'SITE_ENGINEER',
+              title: 'New Site Assigned',
+              message: `You have been assigned to project: ${existing.name} (${existing.code}).`,
+              type: 'SITE_ASSIGNED',
+              entityId: existing._id,
+              entityType: 'Project',
+              link: '/engineer-dashboard',
+            });
+          }
+        }
+      }
+
+      if (removedEngineers.length > 0) {
+        await SiteEngineer.updateMany(
+          { _id: { $in: removedEngineers }, companyId: compObjectId },
+          { $pull: { assignedProjectIds: existing._id }, $inc: { projectsCount: -1 } }
+        );
+      }
+    }
 
     await AuditService.log({
       companyId,

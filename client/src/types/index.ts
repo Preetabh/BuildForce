@@ -67,6 +67,14 @@ export interface Project {
     name: string;
     email: string;
   } | null;
+  assignedEngineers?: Array<{
+    _id: string;
+    name: string;
+    loginId: string;
+    mobile?: string;
+    expertise?: string;
+    status?: string;
+  }> | string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -881,6 +889,7 @@ export interface ClientRecord {
   priority?: string;
   referenceSource?: string;
   handlerName?: string;
+  siteEngineerId?: any;
   subBadge?: string;
   associate?: string;
   associateType?: string;

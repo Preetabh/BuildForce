@@ -7,7 +7,7 @@ export class ProjectController {
     try {
       const companyId = req.user!.companyId;
       const query = req.query as unknown as ProjectQueryInput;
-      const result = await ProjectService.getProjects(companyId, query);
+      const result = await ProjectService.getProjects(companyId, query, req.user);
       res.status(200).json({
         success: true,
         data: result.projects,
@@ -35,7 +35,7 @@ export class ProjectController {
     try {
       const companyId = req.user!.companyId;
       const { id } = req.params;
-      const project = await ProjectService.getProjectById(companyId, id);
+      const project = await ProjectService.getProjectById(companyId, id, req.user);
       res.status(200).json({
         success: true,
         data: project,

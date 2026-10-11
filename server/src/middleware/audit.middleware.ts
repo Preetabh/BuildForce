@@ -80,8 +80,8 @@ export function auditRoute(options: AuditRouteOptions) {
       });
 
       return result;
-    };
+      };
 
-    next();
-  };
-}
+      next();
+    };
+  }

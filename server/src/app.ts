@@ -2,6 +2,8 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
+import fs from 'fs';
 import { env } from './config/env';
 import routes from './routes';
 import { notFoundHandler } from './middleware/notFound.middleware';
@@ -46,6 +48,13 @@ export const createApp = (): Application => {
   if (env.NODE_ENV !== 'test') {
     app.use(morgan('dev'));
   }
+
+  // Static files for uploads (photos, documents)
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use('/uploads', express.static(uploadsDir));
 
   // API Routes
   app.use('/api', routes);

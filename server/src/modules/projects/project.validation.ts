@@ -35,6 +35,7 @@ export const createProjectSchema = z
       .nullable()
       .transform((val) => (val ? new Date(val) : null)),
     phases: z.number().int().min(1).optional().default(1),
+    assignedEngineers: z.array(z.string()).optional().default([]),
   })
   .refine(
     (data) => {
@@ -64,9 +65,7 @@ export const updateProjectSchema = z
     measurementUnit: z.string().max(50).optional(),
     buildupArea: z.number().min(0).optional(),
     description: z.string().max(2000).optional(),
-    projectType: z
-      .enum(['Residential', 'Commercial', 'Infrastructure', 'Industrial', 'Institutional', 'Other'])
-      .optional(),
+    projectType: z.string().optional(),
     status: z.enum(['draft', 'active', 'on_hold', 'completed', 'archived']).optional(),
     progress: z.number().min(0).max(100).optional(),
     estimatedValue: z.number().min(0).optional(),
@@ -83,6 +82,7 @@ export const updateProjectSchema = z
       .nullable()
       .transform((val) => (val ? new Date(val) : null)),
     phases: z.number().int().min(1).optional(),
+    assignedEngineers: z.array(z.string()).optional(),
     isArchived: z.boolean().optional(),
   })
   .refine(

@@ -22,6 +22,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Building2,
+  Plus,
   CreditCard,
   Handshake,
   HardHat,
@@ -39,6 +40,8 @@ import {
   Eye,
   Lock,
   History,
+  MapPin,
+  Wallet,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { rbacService } from '../../services/rbac.service';
@@ -174,8 +177,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Site Enginner',
       icon: HardHat,
       items: [
-        { label: 'Detailed Site Engineers', path: '/admin/site-engineers', icon: Users, isComingSoon: false, permissionKey: 'Admin/SiteEngineers_List' },
-        { label: 'AddSiteEnginner', path: '/admin/add-site-engineer', icon: Compass, isComingSoon: false, permissionKey: 'Admin/ManageSiteEngineers' },
+        { label: 'Site Engineer Dashboard', path: '/engineer-dashboard', icon: Home, isComingSoon: false, permissionKey: 'SiteEngineer/Dashboard' },
+        { label: 'My Assigned Sites', path: '/engineer/sites', icon: MapPin, isComingSoon: false, permissionKey: 'SiteEngineer/AssignedSites' },
+        { label: 'My Wallet', path: '/engineer/wallet', icon: Wallet, isComingSoon: false, permissionKey: 'SiteEngineer/Wallet' },
+        { label: 'Daily Site Reports', path: '/admin/daily-reports', icon: ClipboardCheck, isComingSoon: false, permissionKey: 'Admin/DailyReportList' },
+        { label: 'AddSiteEnginner', path: '/admin/site-engineers', icon: Compass, isComingSoon: false, permissionKey: 'Admin/ManageSiteEngineers' },
       ],
     },
     {

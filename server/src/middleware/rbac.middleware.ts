@@ -13,6 +13,17 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'measurement.edit',
     'sor.view',
     'boq.view',
+    'report.view',
+    'report.create',
+    'report.edit',
+    'Admin/SiteEngineersSection',
+    'Admin/SiteEngineers_List',
+    'Admin/DailyReportList',
+    'Admin/Clients',
+    'SiteEngineer/Dashboard',
+    'SiteEngineer/SubmitReport',
+    'SiteEngineer/AssignedSites',
+    'SiteEngineer/Wallet',
   ],
   MANAGER: [
     'project.view',
@@ -89,8 +100,8 @@ export const checkUserPermission = async (
         : (user.permissions as any);
 
     for (const key of keysToCheck) {
-      if (typeof userPermMap[key] === 'boolean') {
-        return userPermMap[key];
+      if (userPermMap[key] === true) {
+        return true;
       }
     }
   }
@@ -106,7 +117,7 @@ export const checkUserPermission = async (
     return true;
   }
 
-  // 3. Check role-level permissions from database
+  // 3. Check role-level permissions from database (allow if ANY key is permitted)
   const roleDoc = await RbacRole.findOne({
     companyId,
     $or: [{ code: normRole }, { name: normRole }],
@@ -117,8 +128,8 @@ export const checkUserPermission = async (
       const match = roleDoc.permissions.find(
         (p) => p.menuRoute === key || p.menuTitle === key
       );
-      if (match) {
-        return Boolean(match.allow);
+      if (match && match.allow === true) {
+        return true;
       }
     }
   }

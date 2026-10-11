@@ -6,11 +6,16 @@ export const createSiteEngineerSchema = z.object({
   mobile: z.string().optional(),
   expertise: z.string().optional(),
   projectsCount: z.number().int().nonnegative().optional(),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional(),
+  assignedProjectIds: z.array(z.string()).optional(),
   status: z.enum(['Active', 'Inactive']).optional(),
   walletBalance: z.number().nonnegative().optional(),
 });
 
-export const updateSiteEngineerSchema = createSiteEngineerSchema.partial();
+export const updateSiteEngineerSchema = createSiteEngineerSchema.partial().extend({
+  password: z.string().min(6).optional(),
+  assignedProjectIds: z.array(z.string()).optional(),
+});
 
 export const updateWalletSchema = z.object({
   amount: z.number().nonnegative('Amount must be non-negative'),

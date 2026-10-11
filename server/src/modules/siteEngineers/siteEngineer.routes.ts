@@ -12,9 +12,19 @@ import {
 const router = Router();
 
 router.use(authenticate);
-router.use(requireApiPermission(['Admin/SiteEngineersSection', 'Admin/ManageSiteEngineers']));
+router.use(
+  requireApiPermission([
+    'Admin/SiteEngineersSection',
+    'Admin/ManageSiteEngineers',
+    'SiteEngineer/Dashboard',
+    'SiteEngineer/Wallet',
+    'SiteEngineer/AssignedSites',
+  ])
+);
 
+router.get('/me', SiteEngineerController.getMyProfile);
 router.get('/', SiteEngineerController.getSiteEngineers);
+router.get('/:id', SiteEngineerController.getSiteEngineerById);
 router.post(
   '/',
   requireApiPermission(['Admin/SiteEngineersSection', 'Admin/ManageSiteEngineers']),
@@ -22,6 +32,12 @@ router.post(
   SiteEngineerController.createSiteEngineer
 );
 router.put(
+  '/:id',
+  requireApiPermission(['Admin/SiteEngineersSection', 'Admin/ManageSiteEngineers']),
+  validateBody(updateSiteEngineerSchema),
+  SiteEngineerController.updateSiteEngineer
+);
+router.patch(
   '/:id',
   requireApiPermission(['Admin/SiteEngineersSection', 'Admin/ManageSiteEngineers']),
   validateBody(updateSiteEngineerSchema),
