@@ -157,7 +157,7 @@ export const EngineerWalletPage: React.FC = () => {
                 <Building2 className="w-5 h-5" />
               </div>
             </div>
-ZZ
+
             <div className="my-4">
               <div className="text-3xl font-black text-white font-mono">
                 {assignedSitesCount}
