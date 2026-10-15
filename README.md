@@ -41,7 +41,7 @@
 
 ## 🌟 Overview
 
-**BuildForce 360** (formerly *InfraPilot*) is an enterprise Construction Resource Planning (ERP) and project management solution built for infrastructure developers, general contractors, quantity surveyors, civil engineers, and business acquisition teams.
+**BuildForce 360** (formerly _InfraPilot_) is an enterprise Construction Resource Planning (ERP) and project management solution built for infrastructure developers, general contractors, quantity surveyors, civil engineers, and business acquisition teams.
 
 Traditional construction operations suffer from disconnected workflows: lead acquisitions are logged on loose note sheets, measurements sit in isolated Excel files, bills lack audit traceability, and referral commissions lead to manual disputes. BuildForce 360 addresses these challenges by merging **civil engineering estimation** with a **unified commercial lifecycle**:
 
@@ -195,21 +195,21 @@ Centralized costing and rate analysis engine:
 
 ## 💻 Technology Stack Matrix
 
-| Area | Technologies | Purpose |
-|---|---|---|
-| **Frontend Core** | [React 18](https://react.dev/), [TypeScript 5](https://www.typescriptlang.org/) | Type-safe UI components and reactive state |
-| **Build Tool** | [Vite 6](https://vitejs.dev/) | Sub-second Hot Module Replacement (HMR) & bundling |
-| **Styling** | [Tailwind CSS 3](https://tailwindcss.com/) | Dark glassmorphism, responsive mobile layout, custom tokens |
-| **Server State** | [TanStack React Query v5](https://tanstack.com/query/latest) | Request caching, optimistic mutations, query invalidation |
-| **HTTP Client** | [Axios](https://axios-http.com/) | REST API interaction with interceptors and token propagation |
-| **Document Export** | [jsPDF](https://github.com/parallax/jsPDF), [jsPDF-AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable), [XLSX](https://sheetjs.com/) | Client-side generation of Excel sheets and PDF estimates |
-| **Icons** | [Lucide React](https://lucide.dev/) | Consistent iconography across mobile and desktop views |
-| **Backend Core** | [Node.js](https://nodejs.org/), [Express 4](https://expressjs.com/), [TypeScript](https://www.typescriptlang.org/) | Modular RESTful architecture |
-| **Runtime Execution** | [tsx](https://github.com/privatenumber/tsx) | Fast TypeScript execution without manual precompilation |
-| **Database** | [MongoDB 6+](https://www.mongodb.com/), [Mongoose 8](https://mongoosejs.com/) | Document database with multi-tenant company scoping |
-| **Security** | [JWT](https://jwt.io/), [bcryptjs](https://github.com/dcodeIO/bcrypt.js), [Helmet](https://helmetjs.github.io/), CORS | Role-based authorization and header hardening |
-| **Validation** | [Zod 3](https://zod.dev/) | Runtime request payload validation |
-| **File Processing** | [Multer](https://github.com/expressjs/multer), [pdf-parse](https://github.com/mozilla/pdf.js) | Rate schedule uploads and PDF text extraction |
+| Area                  | Technologies                                                                                                                                   | Purpose                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Frontend Core**     | [React 18](https://react.dev/), [TypeScript 5](https://www.typescriptlang.org/)                                                                | Type-safe UI components and reactive state                   |
+| **Build Tool**        | [Vite 6](https://vitejs.dev/)                                                                                                                  | Sub-second Hot Module Replacement (HMR) & bundling           |
+| **Styling**           | [Tailwind CSS 3](https://tailwindcss.com/)                                                                                                     | Dark glassmorphism, responsive mobile layout, custom tokens  |
+| **Server State**      | [TanStack React Query v5](https://tanstack.com/query/latest)                                                                                   | Request caching, optimistic mutations, query invalidation    |
+| **HTTP Client**       | [Axios](https://axios-http.com/)                                                                                                               | REST API interaction with interceptors and token propagation |
+| **Document Export**   | [jsPDF](https://github.com/parallax/jsPDF), [jsPDF-AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable), [XLSX](https://sheetjs.com/) | Client-side generation of Excel sheets and PDF estimates     |
+| **Icons**             | [Lucide React](https://lucide.dev/)                                                                                                            | Consistent iconography across mobile and desktop views       |
+| **Backend Core**      | [Node.js](https://nodejs.org/), [Express 4](https://expressjs.com/), [TypeScript](https://www.typescriptlang.org/)                             | Modular RESTful architecture                                 |
+| **Runtime Execution** | [tsx](https://github.com/privatenumber/tsx)                                                                                                    | Fast TypeScript execution without manual precompilation      |
+| **Database**          | [MongoDB 6+](https://www.mongodb.com/), [Mongoose 8](https://mongoosejs.com/)                                                                  | Document database with multi-tenant company scoping          |
+| **Security**          | [JWT](https://jwt.io/), [bcryptjs](https://github.com/dcodeIO/bcrypt.js), [Helmet](https://helmetjs.github.io/), CORS                          | Role-based authorization and header hardening                |
+| **Validation**        | [Zod 3](https://zod.dev/)                                                                                                                      | Runtime request payload validation                           |
+| **File Processing**   | [Multer](https://github.com/expressjs/multer), [pdf-parse](https://github.com/mozilla/pdf.js)                                                  | Rate schedule uploads and PDF text extraction                |
 
 ---
 
@@ -310,6 +310,7 @@ buildForce360/
 ### Prerequisites
 
 Ensure the following tools are installed:
+
 - **Node.js**: v18.0.0 or higher ([Download Node.js](https://nodejs.org/))
 - **npm**: v9.0.0 or higher (included with Node.js)
 - **MongoDB**: Community Server v6.0+ running on `localhost:27017` or a MongoDB Atlas URI
@@ -320,16 +321,19 @@ Ensure the following tools are installed:
 ### 1. Backend Setup
 
 1. Open a terminal and enter the `server` directory:
+
    ```bash
    cd server
    ```
 
 2. Install backend dependencies:
+
    ```bash
    npm install
    ```
 
 3. Configure environment variables:
+
    ```bash
    # On Windows PowerShell:
    Copy-Item .env.example .env
@@ -339,6 +343,7 @@ Ensure the following tools are installed:
    ```
 
 4. Verify your `server/.env` parameters:
+
    ```env
    PORT=5000
    MONGODB_URI=mongodb://127.0.0.1:27017/civil_guruji_erp
@@ -349,6 +354,7 @@ Ensure the following tools are installed:
    ```
 
 5. Seed master data (CPWD SOR items, resource libraries, sample projects, and leads):
+
    ```bash
    npm run seed
    ```
@@ -357,23 +363,26 @@ Ensure the following tools are installed:
    ```bash
    npm run dev
    ```
-   *The backend will be running at `http://localhost:5000`.*
+   _The backend will be running at `http://localhost:5000`._
 
 ---
 
 ### 2. Frontend Setup
 
 1. Open a second terminal and navigate to the `client` directory:
+
    ```bash
    cd client
    ```
 
 2. Install frontend dependencies:
+
    ```bash
    npm install
    ```
 
 3. Configure client environment:
+
    ```bash
    # On Windows PowerShell:
    Copy-Item .env.example .env
@@ -383,6 +392,7 @@ Ensure the following tools are installed:
    ```
 
 4. Ensure `client/.env` points to your backend:
+
    ```env
    VITE_API_URL=http://localhost:5000/api
    ```
@@ -391,7 +401,7 @@ Ensure the following tools are installed:
    ```bash
    npm run dev
    ```
-   *The application will open at `http://localhost:5173`.*
+   _The application will open at `http://localhost:5173`._
 
 ---
 
@@ -401,10 +411,10 @@ When running `npm run seed`, the database is populated with an enterprise constr
 
 #### Default Credentials:
 
-| Role | Email Address | Password | Permissions |
-|---|---|---|---|
-| **System Administrator** | `admin@civilguruji.com` | `Civil@123` | Full access to all modules, billing, settings & finance |
-| **Project Manager** | `manager@civilguruji.com` | `Civil@123` | Project execution, BOQ, MB, DPR, and site operations |
+| Role                     | Email Address       | Password | Permissions                                             |
+| ------------------------ | ------------------- | -------- | ------------------------------------------------------- |
+| **System Administrator** | `admin@gmail.com`   | `111111` | Full access to all modules, billing, settings & finance |
+| **Project Manager**      | `manager@gmail.com` | `111111` | Project execution, BOQ, MB, DPR, and site operations    |
 
 ---
 
@@ -413,98 +423,108 @@ When running `npm run seed`, the database is populated with an enterprise constr
 All routes are mounted under the `/api` prefix. Protected routes require a Bearer token: `Authorization: Bearer <JWT_TOKEN>`.
 
 ### 1. Authentication (`/api/auth`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/auth/register` | Register a new construction company and admin user |
-| `POST` | `/api/auth/login` | Authenticate user and obtain JWT session token |
-| `GET` | `/api/auth/me` | Fetch active user profile, company details, and permissions |
+
+| Method | Endpoint             | Description                                                 |
+| ------ | -------------------- | ----------------------------------------------------------- |
+| `POST` | `/api/auth/register` | Register a new construction company and admin user          |
+| `POST` | `/api/auth/login`    | Authenticate user and obtain JWT session token              |
+| `GET`  | `/api/auth/me`       | Fetch active user profile, company details, and permissions |
 
 ### 2. Commercial Leads & Inquiries (`/api/leads`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/leads` | List leads with filtering (status, priority, search, pagination) |
-| `GET` | `/api/leads/stats` | Pipeline KPI stats (total inquiries, won, lost, pipeline value) |
-| `POST` | `/api/leads` | Create a new lead inquiry |
-| `GET` | `/api/leads/:id` | Fetch detailed lead profile and interaction history |
-| `PUT` | `/api/leads/:id` | Update lead information |
-| `POST` | `/api/leads/:id/follow-up` | Append follow-up communication record |
-| `POST` | `/api/leads/:id/mark-dead` | Mark inquiry as dead/inactive |
-| `POST` | `/api/leads/:id/restore` | Restore dead lead back to active pipeline |
-| `POST` | `/api/leads/:id/convert-client` | Convert lead into an active Client account |
-| `DELETE` | `/api/leads/:id` | Soft delete lead record |
+
+| Method   | Endpoint                        | Description                                                      |
+| -------- | ------------------------------- | ---------------------------------------------------------------- |
+| `GET`    | `/api/leads`                    | List leads with filtering (status, priority, search, pagination) |
+| `GET`    | `/api/leads/stats`              | Pipeline KPI stats (total inquiries, won, lost, pipeline value)  |
+| `POST`   | `/api/leads`                    | Create a new lead inquiry                                        |
+| `GET`    | `/api/leads/:id`                | Fetch detailed lead profile and interaction history              |
+| `PUT`    | `/api/leads/:id`                | Update lead information                                          |
+| `POST`   | `/api/leads/:id/follow-up`      | Append follow-up communication record                            |
+| `POST`   | `/api/leads/:id/mark-dead`      | Mark inquiry as dead/inactive                                    |
+| `POST`   | `/api/leads/:id/restore`        | Restore dead lead back to active pipeline                        |
+| `POST`   | `/api/leads/:id/convert-client` | Convert lead into an active Client account                       |
+| `DELETE` | `/api/leads/:id`                | Soft delete lead record                                          |
 
 ### 3. Clients & Services (`/api/leads/clients`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/leads/clients/all` | Retrieve all client accounts with project links |
-| `GET` | `/api/leads/clients/:id` | Get single client profile, assigned services, and ledger |
-| `PUT` | `/api/leads/clients/:id` | Update client details and service packages |
-| `POST` | `/api/leads/clients/:id/follow-up` | Record client relationship update |
-| `POST` | `/api/leads/clients/:id/ledger` | Save customized project payment milestone schedule |
-| `POST` | `/api/leads/clients/:id/pay-stage` | Settle specific milestone stage in ledger |
-| `POST` | `/api/leads/clients/:id/dpr` | Submit Daily Progress Report (DPR) for client |
-| `GET` | `/api/leads/clients/:id/dossier` | Export comprehensive client dossier |
-| `DELETE` | `/api/leads/clients/:id` | Soft delete client profile |
+
+| Method   | Endpoint                           | Description                                              |
+| -------- | ---------------------------------- | -------------------------------------------------------- |
+| `GET`    | `/api/leads/clients/all`           | Retrieve all client accounts with project links          |
+| `GET`    | `/api/leads/clients/:id`           | Get single client profile, assigned services, and ledger |
+| `PUT`    | `/api/leads/clients/:id`           | Update client details and service packages               |
+| `POST`   | `/api/leads/clients/:id/follow-up` | Record client relationship update                        |
+| `POST`   | `/api/leads/clients/:id/ledger`    | Save customized project payment milestone schedule       |
+| `POST`   | `/api/leads/clients/:id/pay-stage` | Settle specific milestone stage in ledger                |
+| `POST`   | `/api/leads/clients/:id/dpr`       | Submit Daily Progress Report (DPR) for client            |
+| `GET`    | `/api/leads/clients/:id/dossier`   | Export comprehensive client dossier                      |
+| `DELETE` | `/api/leads/clients/:id`           | Soft delete client profile                               |
 
 ### 4. Payments & Financial Transactions (`/api/leads/payments`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/leads/payments/all` | List all client incoming payments with date filters |
+
+| Method | Endpoint                  | Description                                                       |
+| ------ | ------------------------- | ----------------------------------------------------------------- |
+| `GET`  | `/api/leads/payments/all` | List all client incoming payments with date filters               |
 | `POST` | `/api/leads/payments/pay` | Record client payment & automatically generate partner commission |
 
 ### 5. Associate Partners & Payouts (`/api/leads/partners` & `/payouts`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/leads/partners/all` | List all associate/referral partners and commission stats |
-| `POST` | `/api/leads/partners/create` | Register new associate partner |
-| `PUT` | `/api/leads/partners/:id` | Update associate partner profile & commission rate |
-| `DELETE` | `/api/leads/partners/:id` | Delete associate partner |
-| `GET` | `/api/leads/payouts/all` | List all disbursed partner payouts |
-| `POST` | `/api/leads/payouts/pay` | Process partner payout against accumulated commission |
-| `GET` | `/api/leads/commissions/report` | Summary report of commissions earned, paid, and outstanding |
+
+| Method   | Endpoint                        | Description                                                 |
+| -------- | ------------------------------- | ----------------------------------------------------------- |
+| `GET`    | `/api/leads/partners/all`       | List all associate/referral partners and commission stats   |
+| `POST`   | `/api/leads/partners/create`    | Register new associate partner                              |
+| `PUT`    | `/api/leads/partners/:id`       | Update associate partner profile & commission rate          |
+| `DELETE` | `/api/leads/partners/:id`       | Delete associate partner                                    |
+| `GET`    | `/api/leads/payouts/all`        | List all disbursed partner payouts                          |
+| `POST`   | `/api/leads/payouts/pay`        | Process partner payout against accumulated commission       |
+| `GET`    | `/api/leads/commissions/report` | Summary report of commissions earned, paid, and outstanding |
 
 ### 6. Projects & Sub-Projects (`/api/projects`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/projects` | List active projects (supports filtering by master/sub-project) |
-| `POST` | `/api/projects` | Initialize a new Master Project or Sub-Project package |
-| `GET` | `/api/projects/:id` | Get complete project workspace hierarchy and financials |
-| `PUT` | `/api/projects/:id` | Update project metadata, duration, or sanctioned budget |
-| `DELETE` | `/api/projects/:id` | Soft delete project to Recycle Bin |
+
+| Method   | Endpoint            | Description                                                     |
+| -------- | ------------------- | --------------------------------------------------------------- |
+| `GET`    | `/api/projects`     | List active projects (supports filtering by master/sub-project) |
+| `POST`   | `/api/projects`     | Initialize a new Master Project or Sub-Project package          |
+| `GET`    | `/api/projects/:id` | Get complete project workspace hierarchy and financials         |
+| `PUT`    | `/api/projects/:id` | Update project metadata, duration, or sanctioned budget         |
+| `DELETE` | `/api/projects/:id` | Soft delete project to Recycle Bin                              |
 
 ### 7. Measurement Book (MB) (`/api/projects/:projectId/measurements`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/projects/:projectId/measurements` | Fetch all measurement records organized by groups |
-| `POST` | `/api/projects/:projectId/measurements` | Record detailed dimensional lines ($L \times B \times D$) |
-| `PUT` | `/api/projects/:projectId/measurements/:id` | Edit measurement entry dimensions or deductions |
-| `DELETE` | `/api/projects/:projectId/measurements/:id` | Delete measurement entry |
+
+| Method   | Endpoint                                    | Description                                               |
+| -------- | ------------------------------------------- | --------------------------------------------------------- |
+| `GET`    | `/api/projects/:projectId/measurements`     | Fetch all measurement records organized by groups         |
+| `POST`   | `/api/projects/:projectId/measurements`     | Record detailed dimensional lines ($L \times B \times D$) |
+| `PUT`    | `/api/projects/:projectId/measurements/:id` | Edit measurement entry dimensions or deductions           |
+| `DELETE` | `/api/projects/:projectId/measurements/:id` | Delete measurement entry                                  |
 
 ### 8. Bill of Quantities (BOQ) (`/api/projects/:projectId/boq`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/projects/:projectId/boq` | Fetch current BOQ schedule and total sanctioned value |
-| `POST` | `/api/projects/:projectId/boq` | Create/sync BOQ items from SOR or Measurement Book |
-| `PUT` | `/api/projects/:projectId/boq/:itemId` | Update rate or scope on individual BOQ item |
+
+| Method | Endpoint                               | Description                                           |
+| ------ | -------------------------------------- | ----------------------------------------------------- |
+| `GET`  | `/api/projects/:projectId/boq`         | Fetch current BOQ schedule and total sanctioned value |
+| `POST` | `/api/projects/:projectId/boq`         | Create/sync BOQ items from SOR or Measurement Book    |
+| `PUT`  | `/api/projects/:projectId/boq/:itemId` | Update rate or scope on individual BOQ item           |
 
 ### 9. Running Account (RA) Billing (`/api/projects/:projectId/billing`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/projects/:projectId/billing` | Fetch history of generated RA bills |
-| `POST` | `/api/projects/:projectId/billing` | Generate next sequential progressive RA bill |
-| `PATCH` | `/api/projects/:projectId/billing/:billId/approve` | Approve bill for financial settlement |
+
+| Method  | Endpoint                                           | Description                                  |
+| ------- | -------------------------------------------------- | -------------------------------------------- |
+| `GET`   | `/api/projects/:projectId/billing`                 | Fetch history of generated RA bills          |
+| `POST`  | `/api/projects/:projectId/billing`                 | Generate next sequential progressive RA bill |
+| `PATCH` | `/api/projects/:projectId/billing/:billId/approve` | Approve bill for financial settlement        |
 
 ### 10. Quantity Master & Rate Schedules (`/api/quantity-master` & `/api/sor`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/quantity-master/materials` | List materials master catalog with unit prices |
-| `POST` | `/api/quantity-master/materials` | Add or update material entry |
-| `GET` | `/api/quantity-master/manpower` | List labor wage grades and hourly rates |
-| `GET` | `/api/quantity-master/machinery` | List equipment rental and fuel coefficients |
-| `GET` | `/api/quantity-master/formulas` | List civil rate analysis formulas |
-| `POST` | `/api/quantity-master/upload-pdf` | Bulk upload and parse PDF rate schedules |
-| `GET` | `/api/sor` | List Schedule of Rates (SOR) catalogs |
-| `GET` | `/api/sor/:id/items` | Query items by chapter, sub-head, or specification code |
+
+| Method | Endpoint                          | Description                                             |
+| ------ | --------------------------------- | ------------------------------------------------------- |
+| `GET`  | `/api/quantity-master/materials`  | List materials master catalog with unit prices          |
+| `POST` | `/api/quantity-master/materials`  | Add or update material entry                            |
+| `GET`  | `/api/quantity-master/manpower`   | List labor wage grades and hourly rates                 |
+| `GET`  | `/api/quantity-master/machinery`  | List equipment rental and fuel coefficients             |
+| `GET`  | `/api/quantity-master/formulas`   | List civil rate analysis formulas                       |
+| `POST` | `/api/quantity-master/upload-pdf` | Bulk upload and parse PDF rate schedules                |
+| `GET`  | `/api/sor`                        | List Schedule of Rates (SOR) catalogs                   |
+| `GET`  | `/api/sor/:id/items`              | Query items by chapter, sub-head, or specification code |
 
 ---
 
@@ -512,19 +532,19 @@ All routes are mounted under the `/api` prefix. Protected routes require a Beare
 
 ### Backend Configuration (`server/.env`)
 
-| Variable | Type | Description | Default / Example |
-|---|---|---|---|
-| `PORT` | Number | Port on which the Express server listens | `5000` |
-| `MONGODB_URI` | String | MongoDB connection string | `mongodb://127.0.0.1:27017/civil_guruji_erp` |
-| `JWT_SECRET` | String | Cryptographic key used to sign JWT session tokens | `your_secure_random_secret_string` |
-| `JWT_EXPIRES_IN` | String | Token validity duration | `7d` |
-| `CLIENT_URL` | String | Allowed origin for Cross-Origin Resource Sharing (CORS) | `http://localhost:5173` |
-| `NODE_ENV` | String | Application runtime mode (`development` / `production`) | `development` |
+| Variable         | Type   | Description                                             | Default / Example                            |
+| ---------------- | ------ | ------------------------------------------------------- | -------------------------------------------- |
+| `PORT`           | Number | Port on which the Express server listens                | `5000`                                       |
+| `MONGODB_URI`    | String | MongoDB connection string                               | `mongodb://127.0.0.1:27017/civil_guruji_erp` |
+| `JWT_SECRET`     | String | Cryptographic key used to sign JWT session tokens       | `your_secure_random_secret_string`           |
+| `JWT_EXPIRES_IN` | String | Token validity duration                                 | `7d`                                         |
+| `CLIENT_URL`     | String | Allowed origin for Cross-Origin Resource Sharing (CORS) | `http://localhost:5173`                      |
+| `NODE_ENV`       | String | Application runtime mode (`development` / `production`) | `development`                                |
 
 ### Frontend Configuration (`client/.env`)
 
-| Variable | Type | Description | Default / Example |
-|---|---|---|---|
+| Variable       | Type   | Description                               | Default / Example           |
+| -------------- | ------ | ----------------------------------------- | --------------------------- |
 | `VITE_API_URL` | String | Absolute URL pointing to backend REST API | `http://localhost:5000/api` |
 
 ---
@@ -532,6 +552,7 @@ All routes are mounted under the `/api` prefix. Protected routes require a Beare
 ## 🛠️ Available Scripts
 
 ### Client (`client/package.json`)
+
 ```bash
 # Start local Vite development server with HMR
 npm run dev
@@ -544,6 +565,7 @@ npm run preview
 ```
 
 ### Server (`server/package.json`)
+
 ```bash
 # Run backend with tsx file watcher (hot reloading)
 npm run dev
@@ -563,17 +585,22 @@ npm run seed
 ## 📐 Engineering Standards & Math Precision
 
 ### 1. Integer-Paisa Financial Math (`CurrencyUtil`)
+
 Civil infrastructure projects handle multi-crore transactions where native floating-point math causes rounding drift:
+
 ```javascript
 // Native JavaScript floating point error:
 0.1 + 0.2 = 0.30000000000000004
 ```
+
 BuildForce 360 uses an internal **paisa-integer engine** for all financial and billing computations. Monetary values are scaled to integers during additions, deductions, and tax withholdings, ensuring precision before converting to standard display currency.
 
 ### 2. Multi-Tenant Company Scoping
+
 Every database query is bound to the authenticated user's `companyId`. Cross-tenant data leaks are prevented at the database schema level via Mongoose middleware and service layer validation.
 
 ### 3. Two-Stage Soft Deletion
+
 Critical civil entities (Projects, BOQs, Measurements, Leads, Partners) use soft deletion. Removed items can be inspected, audited, and restored via the **Recycle Bin** module, guarding against accidental site-level data loss.
 
 ---

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home,
@@ -42,6 +42,10 @@ import {
   History,
   MapPin,
   Wallet,
+  PieChart,
+  Link as LinkIcon,
+  Activity,
+  Shield,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { rbacService } from '../../services/rbac.service';
@@ -75,6 +79,7 @@ interface NavGroup {
   label: string;
   icon: React.ElementType;
   isTempHold?: boolean;
+  path?: string;
   items: NavSubItem[];
 }
 
@@ -96,6 +101,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { data: teamUsers = [] } = useQuery({
     queryKey: ['rbacUsers'],
     queryFn: rbacService.getUsers,
+  });
+
+  // Query dynamic menus configured from /settings/manage-menus (Navigation Architecture)
+  const { data: dbMenus = [] } = useQuery({
+    queryKey: ['rbacMenus'],
+    queryFn: rbacService.getMenus,
   });
 
   // Resize drag state
@@ -129,9 +140,88 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setOpenGroupId((prev) => (prev === groupId ? null : groupId));
   };
 
-  // Master Navigation Groups list with permission mapping
-  // Note: Plannings module is temporarily disabled as requested
-  const allNavGroups: NavGroup[] = [
+  // Helper: Map icon string to Lucide component
+  const resolveMenuIcon = (iconName?: string): React.ElementType => {
+    if (!iconName) return Layers;
+    const clean = iconName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const map: Record<string, React.ElementType> = {
+      home: Home,
+      dashboard: Home,
+      users: Users,
+      user: UserIcon,
+      userplus: UserPlus,
+      usercheck: UserCheck,
+      hardhat: HardHat,
+      briefcase: Briefcase,
+      settings: Settings,
+      layers: Layers,
+      link: LinkIcon,
+      piechart: PieChart,
+      pie: PieChart,
+      filespreadsheet: FileSpreadsheet,
+      coins: Coins,
+      creditcard: CreditCard,
+      handshake: Handshake,
+      calendarrange: CalendarRange,
+      bookopen: BookOpen,
+      calculator: Calculator,
+      clipboardcheck: ClipboardCheck,
+      box: Box,
+      truck: Truck,
+      trash2: Trash2,
+      trash: Trash2,
+      listchecks: ListChecks,
+      shieldcheck: ShieldCheck,
+      shield: Shield,
+      mappin: MapPin,
+      wallet: Wallet,
+      building2: Building2,
+      building: Building2,
+      activity: Activity,
+      compass: Compass,
+      wrench: Wrench,
+      history: History,
+      target: Target,
+      contact: Contact,
+    };
+    return map[clean] || Layers;
+  };
+
+  // Helper: Normalize route for client react-router
+  const resolveMenuPath = (route?: string): string => {
+    if (!route) return '/';
+    const trimmed = route.trim();
+    const routeMap: Record<string, string> = {
+      'admin/admindashboard': '/',
+      'admin/dashboard': '/',
+      'admin/enquiry': '/leads',
+      'admin/clients': '/leads/clients',
+      'admin/paymenthistory': '/leads/payments',
+      'admin/collectpayment': '/leads/pay-amount',
+      'admin/referencepartners': '/leads/partners',
+      'admin/commissionreport': '/leads/commission-reports',
+      'admin/siteengineerssection': '/engineer/sites',
+      'admin/siteengineers_list': '/engineer/sites',
+      'admin/managesiteengineers': '/engineer/sites',
+      'admin/dailyreportlist': '/admin/daily-reports',
+      'siteengineer/dashboard': '/engineer-dashboard',
+      'siteengineer/assignedsites': '/engineer/sites',
+      'siteengineer/submitreport': '/engineer/submit-report',
+      'admin/manageservices': '/services',
+      'admin/modules': '/services/modules',
+      'admin/managemenus': '/settings/manage-menus',
+      'admin/manageroles': '/settings/manage-roles',
+      'admin/rolevsuser': '/settings/role-vs-user',
+      'admin/users': '/settings/users',
+    };
+    const lower = trimmed.toLowerCase();
+    if (routeMap[lower]) return routeMap[lower];
+    if (trimmed.startsWith('/') || trimmed.startsWith('http')) return trimmed;
+    return `/${trimmed}`;
+  };
+
+  // Static Fallback Navigation Groups
+  const staticNavGroups: NavGroup[] = [
     {
       id: 'plannings',
       label: 'PLANNINGS',
@@ -179,9 +269,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { label: 'Site Engineer Dashboard', path: '/engineer-dashboard', icon: Home, isComingSoon: false, permissionKey: 'SiteEngineer/Dashboard' },
         { label: 'My Assigned Sites', path: '/engineer/sites', icon: MapPin, isComingSoon: false, permissionKey: 'SiteEngineer/AssignedSites' },
-
         { label: 'Daily Site Reports', path: '/admin/daily-reports', icon: ClipboardCheck, isComingSoon: false, permissionKey: 'Admin/DailyReportList' },
-
       ],
     },
     {
@@ -195,19 +283,195 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
-  // Dynamically filter allowed navigation groups and items based on role permissions
-  const navGroups = allNavGroups
-    .filter((group) => isModuleAllowed(group.id))
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => {
-        if (!item.permissionKey) return true;
-        return canAccess(item.permissionKey);
-      }),
-    }))
-    .filter((group) => group.id === 'all_teams' || group.items.length > 0);
+  // Helper to get consistent module ID for permission and accordion state
+  const getCanonicalGroupId = (title: string, route?: string, fallbackId?: string): string => {
+    const t = (title || '').toLowerCase();
+    const r = (route || '').toLowerCase();
+    if (t.includes('team') || r.includes('team')) return 'all_teams';
+    if (t.includes('plan') || r.includes('plan') || r.includes('sor')) return 'plannings';
+    if (t.includes('lead') || r.includes('lead') || r.includes('enquiry')) return 'lead_management';
+    if (t.includes('service') || r.includes('service')) return 'service_catalog';
+    if (t.includes('engineer') || r.includes('engineer') || t.includes('site')) return 'site_enginner';
+    if (t.includes('vender') || t.includes('vendor') || r.includes('vendor')) return 'vendor_management';
+    return fallbackId || t.replace(/\s+/g, '_');
+  };
 
-  // Auto-expand group that contains current path on initial mount or route change
+  // Dynamic Navigation Groups built from dbMenus
+  const effectiveNavGroups = useMemo<NavGroup[]>(() => {
+    if (!dbMenus || dbMenus.length === 0) {
+      return staticNavGroups;
+    }
+
+    const visibleMenus = dbMenus.filter((m) => m.isVisible !== false);
+
+    // Root menus excluding Home / Dashboard, Settings, and Recycle Bin
+    const rootMenus = visibleMenus.filter((m) => {
+      if (m.parentId) return false;
+      const lowerTitle = (m.title || '').trim().toLowerCase();
+      const lowerRoute = (m.route || '').trim().toLowerCase();
+      return (
+        lowerTitle !== 'home' &&
+        lowerTitle !== 'dashboard' &&
+        lowerRoute !== 'admin/admindashboard' &&
+        lowerRoute !== '/home' &&
+        lowerRoute !== '/' &&
+        lowerTitle !== 'settings' &&
+        lowerRoute !== '/settings' &&
+        lowerTitle !== 'recycle bin' &&
+        lowerRoute !== '/recycle-bin'
+      );
+    });
+
+    rootMenus.sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+
+    const dynamicGroups: NavGroup[] = rootMenus.map((root) => {
+      const children = visibleMenus
+        .filter((child) => child.parentId && String(child.parentId) === String(root._id))
+        .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+
+      const isPlannings =
+        root.title.toUpperCase() === 'PLANNINGS' ||
+        root.route.toLowerCase().includes('planning');
+
+      const groupId = getCanonicalGroupId(root.title, root.route, String(root._id));
+
+      return {
+        id: groupId,
+        label: root.title,
+        icon: resolveMenuIcon(root.icon),
+        isTempHold: isPlannings,
+        path: children.length === 0 ? resolveMenuPath(root.route) : undefined,
+        items: children.map((child) => ({
+          label: child.title,
+          path: resolveMenuPath(child.route),
+          icon: resolveMenuIcon(child.icon),
+          permissionKey: child.route,
+          isTempHold: isPlannings || child.route === '/sor' || child.route.startsWith('/planning'),
+          isComingSoon: child.title.toLowerCase().includes('soon'),
+        })),
+      };
+    });
+
+    // Ensure 'vendor_management' group exists if not created in dbMenus
+    const hasVendors = dynamicGroups.some((g) => g.id === 'vendor_management');
+    if (!hasVendors) {
+      dynamicGroups.push({
+        id: 'vendor_management',
+        label: 'Venders',
+        icon: Truck,
+        items: [
+          { label: 'Supplier', path: '/vendors/suppliers', icon: Truck, isComingSoon: false, permissionKey: 'Admin/Vendors_Suppliers' },
+          { label: 'Workers', path: '/vendors/workers', icon: HardHat, isComingSoon: false, permissionKey: 'Admin/Vendors_Workers' },
+        ],
+      });
+    }
+
+    // Ensure 'all_teams' group exists so team impersonation remains available
+    const hasAllTeams = dynamicGroups.some((g) => g.id === 'all_teams');
+    if (!hasAllTeams) {
+      dynamicGroups.push({
+        id: 'all_teams',
+        label: 'All Teams',
+        icon: CreditCard,
+        items: [],
+      });
+    }
+
+    return dynamicGroups;
+  }, [dbMenus]);
+
+  // Dynamic Home / Dashboard Item from dbMenus
+  const homeMenu = useMemo(() => {
+    if (!dbMenus || dbMenus.length === 0) return null;
+    return dbMenus.find(
+      (m) =>
+        !m.parentId &&
+        (m.title.toLowerCase() === 'home' ||
+          m.title.toLowerCase() === 'dashboard' ||
+          m.route === 'Admin/AdminDashboard' ||
+          m.route === '/home' ||
+          m.route === '/')
+    );
+  }, [dbMenus]);
+
+  const isHomeVisible = homeMenu ? homeMenu.isVisible !== false : true;
+  const homeLabel = homeMenu?.title || 'Home';
+  const HomeIcon = homeMenu ? resolveMenuIcon(homeMenu.icon) : Home;
+
+  // Dynamic Recycle Bin Item from dbMenus
+  const recycleBinMenu = useMemo(() => {
+    if (!dbMenus || dbMenus.length === 0) return null;
+    return dbMenus.find(
+      (m) =>
+        !m.parentId &&
+        (m.title.toLowerCase() === 'recycle bin' || m.route === '/recycle-bin')
+    );
+  }, [dbMenus]);
+
+  const isRecycleBinVisible = recycleBinMenu ? recycleBinMenu.isVisible !== false : true;
+  const recycleBinLabel = recycleBinMenu?.title || 'Recycle Bin';
+  const RecycleBinIcon = recycleBinMenu ? resolveMenuIcon(recycleBinMenu.icon) : Trash2;
+
+  // Dynamic Settings Menu and Sub-Items from dbMenus
+  const settingsMenu = useMemo(() => {
+    if (!dbMenus || dbMenus.length === 0) return null;
+    return dbMenus.find(
+      (m) =>
+        !m.parentId &&
+        (m.title.toLowerCase() === 'settings' || m.route === '/settings')
+    );
+  }, [dbMenus]);
+
+  const isSettingsVisible = settingsMenu ? settingsMenu.isVisible !== false : true;
+
+  const settingsSubItems = useMemo(() => {
+    if (!dbMenus || dbMenus.length === 0 || !settingsMenu) {
+      return [
+        { label: 'Manage Menus', path: '/settings/manage-menus', icon: ListChecks, perm: 'RBAC/ManageMenus' },
+        { label: 'Manage Roles', path: '/settings/manage-roles', icon: ShieldCheck, perm: 'RBAC/ManageRoles' },
+        { label: 'Role Vs User', path: '/settings/role-vs-user', icon: UserCheck, perm: 'RBAC/UserOverrides' },
+        { label: 'User', path: '/settings/users', icon: Users, perm: 'RBAC/Users' },
+        { label: 'Audit Logs', path: '/settings/audit-logs', icon: History, perm: 'Audit/ViewLogs' },
+      ];
+    }
+
+    const children = dbMenus
+      .filter((m) => m.parentId && String(m.parentId) === String(settingsMenu._id) && m.isVisible !== false)
+      .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+
+    if (children.length === 0) {
+      return [
+        { label: 'Manage Menus', path: '/settings/manage-menus', icon: ListChecks, perm: 'RBAC/ManageMenus' },
+        { label: 'Manage Roles', path: '/settings/manage-roles', icon: ShieldCheck, perm: 'RBAC/ManageRoles' },
+        { label: 'Role Vs User', path: '/settings/role-vs-user', icon: UserCheck, perm: 'RBAC/UserOverrides' },
+        { label: 'User', path: '/settings/users', icon: Users, perm: 'RBAC/Users' },
+        { label: 'Audit Logs', path: '/settings/audit-logs', icon: History, perm: 'Audit/ViewLogs' },
+      ];
+    }
+
+    return children.map((c) => ({
+      label: c.title,
+      path: resolveMenuPath(c.route),
+      icon: resolveMenuIcon(c.icon),
+      perm: c.route,
+    }));
+  }, [dbMenus, settingsMenu]);
+
+  // Dynamically filter allowed navigation groups and items based on role permissions
+  const navGroups = useMemo(() => {
+    return effectiveNavGroups
+      .filter((group) => isMasterAdmin || isModuleAllowed(group.id) || Boolean(group.path))
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => {
+          if (!item.permissionKey) return true;
+          return isMasterAdmin || canAccess(item.permissionKey);
+        }),
+      }))
+      .filter((group) => group.id === 'all_teams' || group.items.length > 0 || Boolean(group.path));
+  }, [effectiveNavGroups, isMasterAdmin, isModuleAllowed, canAccess]);
+
+  // Auto-expand group that contains current path on route change ONLY (without resetting user manual clicks)
   useEffect(() => {
     for (const group of navGroups) {
       if (
@@ -219,6 +483,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         break;
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
   // Handle mouse drag to resize sidebar ("chota bada ho sake side bar mouse se")
@@ -385,54 +650,91 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Items List */}
         <div className="flex-1 px-2 py-3 overflow-y-auto space-y-2 custom-scrollbar text-xs">
-          {/* 1. Home Direct Link with "Temp Hold" Badge */}
-          <div>
-            <NavLink
-              to="/"
-              end
-              onClick={() => onClose()}
-              title={isCompact ? 'Home (Temp Hold)' : undefined}
-              className={({ isActive }) =>
-                cn(
-                  'group flex items-center justify-between rounded-lg font-medium transition-all duration-150',
-                  isCompact ? 'justify-center p-2.5' : 'px-3 py-2',
-                  isActive
-                    ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Home
-                      className={cn(
-                        'w-4 h-4 shrink-0 transition-colors',
-                        isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-white'
-                      )}
-                    />
-                    {!isCompact && <span className="font-semibold truncate">Home</span>}
-                  </div>
-                  {!isCompact && (
-                    <span
-                      className={cn(
-                        'text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wider shrink-0 transition-all ml-1.5',
-                        isActive
-                          ? 'bg-slate-950/80 text-amber-300 border border-slate-950'
-                          : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                      )}
-                    >
-                      Temp Hold
-                    </span>
-                  )}
-                </>
-              )}
-            </NavLink>
-          </div>
+          {/* 1. Home Direct Link with dynamic visibility & label */}
+          {isHomeVisible && (
+            <div>
+              <NavLink
+                to="/"
+                end
+                onClick={() => onClose()}
+                title={isCompact ? `${homeLabel} (Temp Hold)` : undefined}
+                className={({ isActive }) =>
+                  cn(
+                    'group flex items-center justify-between rounded-lg font-medium transition-all duration-150',
+                    isCompact ? 'justify-center p-2.5' : 'px-3 py-2',
+                    isActive
+                      ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <HomeIcon
+                        className={cn(
+                          'w-4 h-4 shrink-0 transition-colors',
+                          isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-white'
+                        )}
+                      />
+                      {!isCompact && <span className="font-semibold truncate">{homeLabel}</span>}
+                    </div>
+                    {!isCompact && (
+                      <span
+                        className={cn(
+                          'text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wider shrink-0 transition-all ml-1.5',
+                          isActive
+                            ? 'bg-slate-950/80 text-amber-300 border border-slate-950'
+                            : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                        )}
+                      >
+                        Temp Hold
+                      </span>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            </div>
+          )}
 
-          {/* 2 - 5: Collapsible Accordion Sections */}
+          {/* 2 - Collapsible Accordion Sections OR Direct Links */}
           <div className="space-y-1.5">
             {navGroups.map((group) => {
+              const isDirectLink = group.items.length === 0 && group.id !== 'all_teams' && Boolean(group.path);
+
+              if (isDirectLink && group.path) {
+                return (
+                  <div key={group.id}>
+                    <NavLink
+                      to={group.path}
+                      onClick={() => onClose()}
+                      title={isCompact ? group.label : undefined}
+                      className={({ isActive }) =>
+                        cn(
+                          'group flex items-center justify-between rounded-lg font-medium transition-all duration-150',
+                          isCompact ? 'justify-center p-2.5' : 'px-3 py-2',
+                          isActive
+                            ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                            : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                        )
+                      }
+                    >
+                      {({ isActive }) => (
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <group.icon
+                            className={cn(
+                              'w-4 h-4 shrink-0 transition-colors',
+                              isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-white'
+                            )}
+                          />
+                          {!isCompact && <span className="font-semibold truncate">{group.label}</span>}
+                        </div>
+                      )}
+                    </NavLink>
+                  </div>
+                );
+              }
+
               const isOpenGroup = openGroupId === group.id;
               const hasActiveChild =
                 group.id === 'all_teams'
@@ -664,52 +966,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Recycle Bin & Settings Section */}
           <div className="pt-2 border-t border-slate-800/60 space-y-1">
-            <NavLink
-              to="/recycle-bin"
-              onClick={() => onClose()}
-              title={isCompact ? `Recycle Bin ${deletedCount ? `(${deletedCount})` : ''}` : undefined}
-              className={({ isActive }) =>
-                cn(
-                  'group flex items-center rounded-lg font-medium transition-all duration-150 relative',
-                  isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
-                  isActive
-                    ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <div className={cn('flex items-center min-w-0', !isCompact && 'gap-2.5')}>
-                    <Trash2
-                      className={cn(
-                        'w-4 h-4 shrink-0 transition-colors',
-                        isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-white'
-                      )}
-                    />
-                    {!isCompact && <span className="font-semibold truncate">Recycle Bin</span>}
-                  </div>
-                  {deletedCount !== undefined && deletedCount > 0 && (
-                    <span
-                      className={cn(
-                        'text-[10px] rounded-full font-semibold',
-                        isActive
-                          ? 'bg-slate-950 text-[#F59E0B]'
-                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
-                        isCompact
-                          ? 'absolute top-1 right-1 w-2 h-2 p-0 bg-amber-400 rounded-full'
-                          : 'px-1.5 py-0.2 shrink-0'
-                      )}
-                    >
-                      {!isCompact && deletedCount}
-                    </span>
-                  )}
-                </>
-              )}
-            </NavLink>
+            {isRecycleBinVisible && (
+              <NavLink
+                to="/recycle-bin"
+                onClick={() => onClose()}
+                title={isCompact ? `${recycleBinLabel} ${deletedCount ? `(${deletedCount})` : ''}` : undefined}
+                className={({ isActive }) =>
+                  cn(
+                    'group flex items-center rounded-lg font-medium transition-all duration-150 relative',
+                    isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
+                    isActive
+                      ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className={cn('flex items-center min-w-0', !isCompact && 'gap-2.5')}>
+                      <RecycleBinIcon
+                        className={cn(
+                          'w-4 h-4 shrink-0 transition-colors',
+                          isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-white'
+                        )}
+                      />
+                      {!isCompact && <span className="font-semibold truncate">{recycleBinLabel}</span>}
+                    </div>
+                    {deletedCount !== undefined && deletedCount > 0 && (
+                      <span
+                        className={cn(
+                          'text-[10px] rounded-full font-semibold',
+                          isActive
+                            ? 'bg-slate-950 text-[#F59E0B]'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+                          isCompact
+                            ? 'absolute top-1 right-1 w-2 h-2 p-0 bg-amber-400 rounded-full'
+                            : 'px-1.5 py-0.2 shrink-0'
+                        )}
+                      >
+                        {!isCompact && deletedCount}
+                      </span>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            )}
 
-            {/* Expandable Settings Accordion matching Screenshot 4 */}
-            {isModuleAllowed('settings') && (
+            {/* Expandable Settings Accordion dynamically driven by dbMenus */}
+            {isSettingsVisible && (isMasterAdmin || isModuleAllowed('settings')) && (
               <div className="relative rounded-lg">
                 <button
                   type="button"
@@ -745,142 +1049,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
                 </button>
 
-                {/* Settings Sub-Items */}
+                {/* Dynamic Settings Sub-Items */}
                 {!isCompact && isSettingsOpen && (
                   <div className="pl-4 pr-1 py-1 space-y-0.5 border-l border-amber-500/30 ml-4 my-1 animate-in fade-in slide-in-from-top-1 duration-150">
-                    {canAccess('RBAC/ManageMenus') && (
-                      <NavLink
-                        to="/settings/manage-menus"
-                        onClick={() => onClose()}
-                        className={({ isActive }) =>
-                          cn(
-                            'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
-                            isActive
-                              ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
-                              : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                          )
-                        }
-                      >
-                        {({ isActive }) => (
-                          <div className="flex items-center gap-2 min-w-0">
-                            <ListChecks
-                              className={cn(
-                                'w-3.5 h-3.5 shrink-0 transition-colors',
-                                isActive ? 'text-slate-950' : 'text-blue-400'
-                              )}
-                            />
-                            <span className="truncate">Manage Menus</span>
-                          </div>
-                        )}
-                      </NavLink>
-                    )}
-
-                    {canAccess('RBAC/ManageRoles') && (
-                      <NavLink
-                        to="/settings/manage-roles"
-                        onClick={() => onClose()}
-                        className={({ isActive }) =>
-                          cn(
-                            'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
-                            isActive
-                              ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
-                              : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                          )
-                        }
-                      >
-                        {({ isActive }) => (
-                          <div className="flex items-center gap-2 min-w-0">
-                            <ShieldCheck
-                              className={cn(
-                                'w-3.5 h-3.5 shrink-0 transition-colors',
-                                isActive ? 'text-slate-950' : 'text-blue-400'
-                              )}
-                            />
-                            <span className="truncate">Manage Roles</span>
-                          </div>
-                        )}
-                      </NavLink>
-                    )}
-
-                    {canAccess('RBAC/UserOverrides') && (
-                      <NavLink
-                        to="/settings/role-vs-user"
-                        onClick={() => onClose()}
-                        className={({ isActive }) =>
-                          cn(
-                            'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
-                            isActive
-                              ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
-                              : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                          )
-                        }
-                      >
-                        {({ isActive }) => (
-                          <div className="flex items-center gap-2 min-w-0">
-                            <UserCheck
-                              className={cn(
-                                'w-3.5 h-3.5 shrink-0 transition-colors',
-                                isActive ? 'text-slate-950' : 'text-blue-400'
-                              )}
-                            />
-                            <span className="truncate">Role Vs User</span>
-                          </div>
-                        )}
-                      </NavLink>
-                    )}
-
-                    {canAccess('Home/ManageEmployees') && (
-                      <NavLink
-                        to="/settings/users"
-                        onClick={() => onClose()}
-                        className={({ isActive }) =>
-                          cn(
-                            'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
-                            isActive
-                              ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
-                              : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                          )
-                        }
-                      >
-                        {({ isActive }) => (
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Users
-                              className={cn(
-                                'w-3.5 h-3.5 shrink-0 transition-colors',
-                                isActive ? 'text-slate-950' : 'text-blue-400'
-                              )}
-                            />
-                            <span className="truncate">User</span>
-                          </div>
-                        )}
-                      </NavLink>
-                    )}
-
-                    {/* Enterprise Audit Logs */}
-                    <NavLink
-                      to="/settings/audit-logs"
-                      onClick={() => onClose()}
-                      className={({ isActive }) =>
-                        cn(
-                          'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
-                          isActive
-                            ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
-                            : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                        )
-                      }
-                    >
-                      {({ isActive }) => (
-                        <div className="flex items-center gap-2 min-w-0">
-                          <History
-                            className={cn(
-                              'w-3.5 h-3.5 shrink-0 transition-colors',
-                              isActive ? 'text-slate-950' : 'text-amber-400'
+                    {settingsSubItems
+                      .filter((sub) => isMasterAdmin || !sub.perm || canAccess(sub.perm))
+                      .map((sub) => {
+                        const SubIcon = sub.icon;
+                        return (
+                          <NavLink
+                            key={sub.path}
+                            to={sub.path}
+                            onClick={() => onClose()}
+                            className={({ isActive }) =>
+                              cn(
+                                'group flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11.5px] font-medium transition-all duration-150',
+                                isActive
+                                  ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-sm'
+                                  : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                              )
+                            }
+                          >
+                            {({ isActive }) => (
+                              <div className="flex items-center gap-2 min-w-0">
+                                <SubIcon
+                                  className={cn(
+                                    'w-3.5 h-3.5 shrink-0 transition-colors',
+                                    isActive ? 'text-slate-950' : 'text-amber-400'
+                                  )}
+                                />
+                                <span className="truncate">{sub.label}</span>
+                              </div>
                             )}
-                          />
-                          <span className="truncate">Audit Logs</span>
-                        </div>
-                      )}
-                    </NavLink>
+                          </NavLink>
+                        );
+                      })}
                   </div>
                 )}
               </div>

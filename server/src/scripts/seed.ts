@@ -49,18 +49,18 @@ const seedDatabase = async () => {
       name: 'Digi Epitome Technology',
       code: 'APEX-INFR',
       address: 'Plot 42, Cyber Gateway, Udyog Vihar, Gurugram, India',
-      contactEmail: 'admin@civilguruji.com',
+      contactEmail: 'admin@gmail.com',
       taxId: '07AAAAA0000A1Z5',
     });
     logger.info(`Company created: ${company.name} [${company.code}]`);
 
     // 2. Create Users
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash('Civil@123', salt);
+    const passwordHash = await bcrypt.hash('111111', salt);
 
     const adminUser = await User.create({
       name: 'Er. Rajesh Sharma',
-      email: 'admin@civilguruji.com',
+      email: 'admin@gmail.com',
       passwordHash,
       role: 'ADMIN',
       companyId: company._id,
@@ -69,7 +69,7 @@ const seedDatabase = async () => {
 
     const managerUser = await User.create({
       name: 'Er. Priya Patel',
-      email: 'manager@civilguruji.com',
+      email: 'manager@gmail.com',
       passwordHash,
       role: 'MANAGER',
       companyId: company._id,

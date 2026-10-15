@@ -25,13 +25,13 @@ export const seedAuditLogs = async () => {
       const primaryUser = users[0] || {
         _id: new Types.ObjectId(),
         name: 'System Admin',
-        email: 'admin@civilguruji.com',
+        email: 'admin@gmail.com',
         role: 'ADMIN',
       };
       const secondaryUser = users[1] || {
         _id: new Types.ObjectId(),
         name: 'Er. Priya Patel',
-        email: 'manager@civilguruji.com',
+        email: 'manager@gmail.com',
         role: 'MANAGER',
       };
 

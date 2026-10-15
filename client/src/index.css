@@ -213,3 +213,97 @@ body,
   animation: scanline 3s linear infinite;
 }
 
+/* Construction Site Dynamics & Keyframes */
+@keyframes kenburns {
+  0% {
+    transform: scale(1.02) translate(0%, 0%);
+  }
+  50% {
+    transform: scale(1.09) translate(-1.5%, -1%);
+  }
+  100% {
+    transform: scale(1.02) translate(0%, 0%);
+  }
+}
+
+.animate-kenburns {
+  animation: kenburns 35s ease-in-out infinite alternate;
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 5s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: floatSlow 6s ease-in-out 1.5s infinite;
+}
+
+@keyframes cautionStripes {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 36px 0;
+  }
+}
+
+.hazard-bar {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #F59E0B,
+    #F59E0B 12px,
+    #0B0F17 12px,
+    #0B0F17 24px
+  );
+  background-size: 34px 34px;
+  animation: cautionStripes 2s linear infinite;
+}
+
+@keyframes beaconPing {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  }
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+  }
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+}
+
+.beacon-ping {
+  animation: beaconPing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.blueprint-grid {
+  background-size: 36px 36px;
+  background-image: 
+    linear-gradient(to right, rgba(245, 158, 11, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(245, 158, 11, 0.04) 1px, transparent 1px);
+}
+
+@keyframes shimmerGlow {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmerGlow 2.5s infinite;
+}
+
