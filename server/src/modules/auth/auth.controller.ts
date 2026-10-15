@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from './auth.service';
 import { AuditService } from '../audit/audit.service';
+import { Company } from '../../models/Company';
 
 export class AuthController {
   public static async getSetupStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -108,6 +109,14 @@ export class AuthController {
         message: 'Profile updated successfully',
         data: result,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+  public static async getCompanies(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const companies = await Company.find({}).sort({ name: 1 }).select('name code').lean();
+      res.status(200).json({ success: true, data: companies });
     } catch (error) {
       next(error);
     }

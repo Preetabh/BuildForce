@@ -14,6 +14,10 @@ import {
   ChevronUp,
   Settings,
   Calendar,
+  Pencil,
+  Trash2,
+  Plus,
+  RotateCcw,
 } from 'lucide-react';
 import { ClientRecord, ClientLedgerStage } from '../../types';
 import leadService from '../../services/lead.service';
@@ -26,16 +30,15 @@ interface PaymentLedgerModalProps {
   onSuccess: () => void;
 }
 
-const DEFAULT_9_STAGES = [
-  { stageName: 'Advance', percentage: 20 },
-  { stageName: 'Slab', percentage: 20 },
-  { stageName: 'Brick Work', percentage: 15 },
-  { stageName: 'Electrical Work', percentage: 10 },
-  { stageName: 'Plaster', percentage: 10 },
-  { stageName: 'Tile Work', percentage: 10 },
-  { stageName: 'Bathroom Fitting', percentage: 5 },
-  { stageName: 'Painting Work', percentage: 5 },
-  { stageName: 'Site Completion', percentage: 5 },
+// 7 exact milestone stages breakdown matching agreement document (Total = 100%)
+export const DEFAULT_7_STAGES = [
+  { stageName: 'Agreement & Mobilisation Amount', percentage: 10 },
+  { stageName: 'Before Foundation Work Stage', percentage: 20 },
+  { stageName: 'Before Plinth Level Work Stage', percentage: 15 },
+  { stageName: 'Before RCC Slab Casting Work Stage', percentage: 25 },
+  { stageName: 'Before Brickwork & Plaster', percentage: 15 },
+  { stageName: 'Before Finishing Work', percentage: 10 },
+  { stageName: 'Final Handover', percentage: 5 },
 ];
 
 export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
@@ -50,6 +53,7 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
 
   const [stages, setStages] = useState<ClientLedgerStage[]>([]);
   const [showEstimator, setShowEstimator] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Pay Now Modal state
@@ -84,13 +88,12 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
 
       if (client.ledgerStages && client.ledgerStages.length > 0) {
         setStages(client.ledgerStages);
-        // If stages exist, collapse estimator to show the clean table view from screenshot
         setShowEstimator(false);
       } else {
-        // Initialize default 9 stages based on agreedAmount or area * rate
-        const total = client.agreedAmount || 8000;
+        // Initialize default 7 stages based on agreedAmount or area * rate
+        const total = client.agreedAmount || 100000;
         const todayFormatted = '01-10-2026';
-        const initialStages: ClientLedgerStage[] = DEFAULT_9_STAGES.map((s) => {
+        const initialStages: ClientLedgerStage[] = DEFAULT_7_STAGES.map((s) => {
           const amt = Math.round((total * s.percentage) / 100);
           return {
             stageName: s.stageName,
@@ -127,6 +130,7 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
           .catch(() => {});
       }
 
+      setIsEditMode(false);
       setError('');
       setSuccessMsg('');
       setActivePayStage(null);
@@ -139,7 +143,9 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
   const finalRate = Math.max(0, ratePerSqft - discountPerSqft);
   const totalAmount = Math.round(areaSqft * finalRate);
 
-  // Initialize or save schedule
+  const totalPercentage = stages.reduce((acc, s) => acc + (Number(s.percentage) || 0), 0);
+
+  // Initialize or save schedule from Cost Estimator
   const handleInitializeSchedule = async () => {
     setIsSaving(true);
     setError('');
@@ -147,17 +153,32 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
 
     try {
       const todayFormatted = '01-10-2026';
-      // Compute stages based on calculated totalAmount
-      const updatedStages: ClientLedgerStage[] = DEFAULT_9_STAGES.map((s) => {
-        const amt = Math.round((totalAmount * s.percentage) / 100);
+      // Re-scale existing stages or use DEFAULT_7_STAGES
+      const baseStages: ClientLedgerStage[] =
+        stages && stages.length > 0
+          ? stages
+          : DEFAULT_7_STAGES.map((s) => ({
+              stageName: s.stageName,
+              percentage: s.percentage,
+              amount: 0,
+              targetDate: todayFormatted,
+              paid: 0,
+              due: 0,
+              status: 'Pending' as const,
+            }));
+
+      const updatedStages: ClientLedgerStage[] = baseStages.map((s) => {
+        const amt = Math.round((totalAmount * (Number(s.percentage) || 0)) / 100);
+        const paid = s.paid || 0;
         return {
+          ...s,
           stageName: s.stageName,
           percentage: s.percentage,
           amount: amt,
-          targetDate: todayFormatted,
-          paid: 0,
-          due: amt,
-          status: 'Pending',
+          targetDate: s.targetDate || todayFormatted,
+          paid,
+          due: Math.max(0, amt - paid),
+          status: (paid >= amt && amt > 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Pending') as 'Pending' | 'Paid' | 'Partial',
         };
       });
 
@@ -184,7 +205,166 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
     }
   };
 
-  // Handle stage target date change
+  // Editable Stages Handlers
+  const handleStageNameChange = (index: number, newName: string) => {
+    const updated = [...stages];
+    updated[index] = { ...updated[index], stageName: newName };
+    setStages(updated);
+  };
+
+  const handlePercentageChange = (index: number, newPct: number) => {
+    const effectiveTotal = totalAmount > 0 ? totalAmount : stages.reduce((acc, s) => acc + (s.amount || 0), 0);
+    const newAmt = Math.round((effectiveTotal * newPct) / 100);
+    const updated = [...stages];
+    const paid = updated[index].paid || 0;
+    updated[index] = {
+      ...updated[index],
+      percentage: newPct,
+      amount: newAmt,
+      due: Math.max(0, newAmt - paid),
+      status: (paid >= newAmt && newAmt > 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Pending') as 'Pending' | 'Paid' | 'Partial',
+    };
+    setStages(updated);
+  };
+
+  const handleAmountChange = (index: number, newAmt: number) => {
+    const effectiveTotal = totalAmount > 0 ? totalAmount : stages.reduce((acc, s) => acc + (s.amount || 0), 0);
+    const updated = [...stages];
+    const newPct = effectiveTotal > 0 ? Math.round((newAmt / effectiveTotal) * 100) : updated[index].percentage;
+    const paid = updated[index].paid || 0;
+    updated[index] = {
+      ...updated[index],
+      amount: newAmt,
+      percentage: newPct,
+      due: Math.max(0, newAmt - paid),
+      status: (paid >= newAmt && newAmt > 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Pending') as 'Pending' | 'Paid' | 'Partial',
+    };
+    setStages(updated);
+  };
+
+  const handleDateChangeLocal = (index: number, newDate: string) => {
+    const updated = [...stages];
+    updated[index] = { ...updated[index], targetDate: newDate };
+    setStages(updated);
+  };
+
+  const handleDeleteStage = (index: number) => {
+    if (stages.length <= 1) {
+      setError('At least one payment stage is required.');
+      return;
+    }
+    const updated = stages.filter((_, i) => i !== index);
+    setStages(updated);
+  };
+
+  const handleAddStage = () => {
+    const currentTotalPct = stages.reduce((acc, s) => acc + (Number(s.percentage) || 0), 0);
+    const remainingPct = Math.max(0, 100 - currentTotalPct);
+    const effectiveTotal = totalAmount > 0 ? totalAmount : stages.reduce((acc, s) => acc + (s.amount || 0), 0);
+    const amt = Math.round((effectiveTotal * remainingPct) / 100);
+    const newStage: ClientLedgerStage = {
+      stageName: `Stage ${stages.length + 1}`,
+      percentage: remainingPct,
+      amount: amt,
+      targetDate: '01-10-2026',
+      paid: 0,
+      due: amt,
+      status: 'Pending',
+    };
+    setStages([...stages, newStage]);
+  };
+
+  const handleAutoBalancePercentages = () => {
+    if (stages.length === 0) return;
+    const equalPct = Math.floor(100 / stages.length);
+    const remainder = 100 - equalPct * stages.length;
+    const effectiveTotal = totalAmount > 0 ? totalAmount : stages.reduce((acc, s) => acc + (s.amount || 0), 0);
+    const updated: ClientLedgerStage[] = stages.map((s, idx) => {
+      const pct = idx === 0 ? equalPct + remainder : equalPct;
+      const amt = Math.round((effectiveTotal * pct) / 100);
+      const paid = s.paid || 0;
+      return {
+        ...s,
+        percentage: pct,
+        amount: amt,
+        due: Math.max(0, amt - paid),
+        status: (paid >= amt && amt > 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Pending') as 'Pending' | 'Paid' | 'Partial',
+      };
+    });
+    setStages(updated);
+  };
+
+  const handleResetToStandard = () => {
+    const todayFormatted = '01-10-2026';
+    const effectiveTotal = totalAmount > 0 ? totalAmount : client.agreedAmount || 100000;
+    const stdStages: ClientLedgerStage[] = DEFAULT_7_STAGES.map((s) => {
+      const amt = Math.round((effectiveTotal * s.percentage) / 100);
+      return {
+        stageName: s.stageName,
+        percentage: s.percentage,
+        amount: amt,
+        targetDate: todayFormatted,
+        paid: 0,
+        due: amt,
+        status: 'Pending',
+      };
+    });
+    setStages(stdStages);
+    setSuccessMsg('Applied standard 7 stages from agreement document. Click "Save Schedule" to confirm.');
+  };
+
+  const handleSaveEditedSchedule = async () => {
+    const hasEmptyName = stages.some((s) => !s.stageName || !s.stageName.trim());
+    if (hasEmptyName) {
+      setError('Please provide a name for all construction stages.');
+      return;
+    }
+
+    if (totalPercentage !== 100) {
+      setError(`Total percentage must equal 100% (currently ${totalPercentage}%). Adjust percentages before saving.`);
+      return;
+    }
+
+    setIsSaving(true);
+    setError('');
+    setSuccessMsg('');
+
+    try {
+      const effectiveTotal = totalAmount > 0 ? totalAmount : stages.reduce((acc, s) => acc + (s.amount || 0), 0);
+      const updated = await leadService.saveLedgerSchedule(
+        client._id,
+        {
+          areaSqft,
+          ratePerSqft,
+          discountPerSqft,
+          finalRate,
+          totalAmount: effectiveTotal,
+        },
+        stages
+      );
+
+      if (updated.ledgerStages) {
+        setStages(updated.ledgerStages);
+      }
+      setIsEditMode(false);
+      setSuccessMsg('Payment schedule saved successfully!');
+      onSuccess();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to save schedule');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (client.ledgerStages && client.ledgerStages.length > 0) {
+      setStages(client.ledgerStages);
+    }
+    setIsEditMode(false);
+    setError('');
+  };
+
+  // Handle stage target date change in View Mode (auto-save in background)
   const handleDateChange = async (index: number, newDate: string) => {
     const updatedStages = [...stages];
     updatedStages[index].targetDate = newDate;
@@ -344,29 +524,121 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1A2232] text-slate-400 border border-[#222E44]">
                   {stages.length} Stages
                 </span>
+                {isEditMode && (
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold animate-pulse">
+                    ✏️ Editing Mode
+                  </span>
+                )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEstimator(!showEstimator)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1A2232] hover:bg-[#232D42] text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm"
-                >
-                  <Calculator className="w-3.5 h-3.5" />
-                  <span>{showEstimator ? 'Hide Estimator' : 'Modify Cost Estimator'}</span>
-                  {showEstimator ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {!isEditMode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditMode(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Edit Schedule</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => setShowHistoryModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1C2433] hover:bg-[#253044] text-slate-300 border border-[#2B384E] text-xs font-semibold rounded-lg transition-colors cursor-pointer shadow-sm"
-                >
-                  <History className="w-3.5 h-3.5 text-slate-400" />
-                  <span>History</span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowEstimator(!showEstimator)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1A2232] hover:bg-[#232D42] text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-sm"
+                    >
+                      <Calculator className="w-3.5 h-3.5" />
+                      <span>{showEstimator ? 'Hide Estimator' : 'Modify Cost Estimator'}</span>
+                      {showEstimator ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowHistoryModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1C2433] hover:bg-[#253044] text-slate-300 border border-[#2B384E] text-xs font-semibold rounded-lg transition-colors cursor-pointer shadow-sm"
+                    >
+                      <History className="w-3.5 h-3.5 text-slate-400" />
+                      <span>History</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleResetToStandard}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1C2433] hover:bg-[#273348] text-slate-300 border border-[#2F3D55] text-xs font-medium rounded-lg transition-colors cursor-pointer"
+                      title="Reset to standard 7 document stages"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Reset to 7 Stages</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      disabled={isSaving}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#171E2B] hover:bg-[#20293B] text-slate-400 hover:text-white border border-[#29354A] text-xs font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Cancel</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveEditedSchedule}
+                      disabled={isSaving || totalPercentage !== 100}
+                      className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-lg shadow-md shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Save className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>{isSaving ? 'Saving...' : 'Save Schedule'}</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
+
+            {/* EDIT MODE TOP CONTROLS & PERCENTAGE VALIDATION */}
+            {isEditMode && (
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-[#151D2A] border border-amber-500/30 rounded-xl text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-300 font-semibold">Total Percentage:</span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono flex items-center gap-1 ${
+                      totalPercentage === 100
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                    }`}
+                  >
+                    {totalPercentage === 100 ? (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5" />
+                    )}
+                    {totalPercentage}% {totalPercentage === 100 ? '(Valid 100%)' : '(Must be 100%)'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAddStage}
+                    className="flex items-center gap-1.5 px-3 py-1 bg-[#1F293D] hover:bg-[#283650] text-amber-300 border border-amber-500/30 rounded-md font-semibold text-[11px] cursor-pointer transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Stage</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAutoBalancePercentages}
+                    className="flex items-center gap-1.5 px-3 py-1 bg-[#1F293D] hover:bg-[#283650] text-slate-300 border border-slate-700 rounded-md font-semibold text-[11px] cursor-pointer transition-colors"
+                    title="Distribute 100% equally among stages"
+                  >
+                    <span>Auto-Balance %</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* PROJECT COST ESTIMATOR */}
             {showEstimator && (
@@ -441,7 +713,7 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
                     className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-50"
                   >
                     <Save className="w-4 h-4 stroke-[2.5]" />
-                    <span>{isSaving ? 'SAVING...' : 'INITIALIZE / SAVE SCHEDULE'}</span>
+                    <span>{isSaving ? 'SAVING...' : 'INITIALIZE / RE-SCALE SCHEDULE'}</span>
                   </button>
                 </div>
               </div>
@@ -462,7 +734,7 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
                     <thead>
                       <tr className="bg-white text-slate-800 text-[10px] font-black uppercase tracking-wider select-none whitespace-nowrap">
                         <th className="py-2.5 px-3 text-center w-8">S.N.</th>
-                        <th className="py-2.5 px-3 min-w-[130px]">CONSTRUCTION STAGE</th>
+                        <th className="py-2.5 px-3 min-w-[170px]">CONSTRUCTION STAGE</th>
                         <th className="py-2.5 px-3 text-center min-w-[90px]">PERCENTAGE (%)</th>
                         <th className="py-2.5 px-3 text-right min-w-[95px]">AMOUNT (₹)</th>
                         <th className="py-2.5 px-3 text-center min-w-[110px]">TARGET DATE</th>
@@ -480,20 +752,54 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
                           </td>
 
                           {/* CONSTRUCTION STAGE */}
-                          <td className="py-2.5 px-3 font-semibold text-white whitespace-nowrap">
-                            {stage.stageName}
+                          <td className="py-2 px-3 font-semibold text-white whitespace-nowrap">
+                            {isEditMode ? (
+                              <input
+                                type="text"
+                                value={stage.stageName}
+                                onChange={(e) => handleStageNameChange(idx, e.target.value)}
+                                className="w-full bg-[#0D1017] border border-[#2B374E] text-white px-2.5 py-1 rounded text-xs focus:outline-none focus:border-amber-400 font-semibold"
+                                placeholder="Stage Name"
+                              />
+                            ) : (
+                              stage.stageName
+                            )}
                           </td>
 
                           {/* PERCENTAGE (%) */}
-                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                            <span className="font-mono font-bold text-amber-400 bg-[#1A2232] border border-[#263146] px-2 py-0.5 rounded text-[10.5px]">
-                              {stage.percentage}%
-                            </span>
+                          <td className="py-2 px-3 text-center whitespace-nowrap">
+                            {isEditMode ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={stage.percentage}
+                                  onChange={(e) => handlePercentageChange(idx, parseFloat(e.target.value) || 0)}
+                                  className="w-16 bg-[#0D1017] border border-[#2B374E] text-amber-300 font-mono font-bold text-center px-1.5 py-1 rounded text-xs focus:outline-none focus:border-amber-400"
+                                />
+                                <span className="text-slate-400 font-mono text-xs">%</span>
+                              </div>
+                            ) : (
+                              <span className="font-mono font-bold text-amber-400 bg-[#1A2232] border border-[#263146] px-2 py-0.5 rounded text-[10.5px]">
+                                {stage.percentage}%
+                              </span>
+                            )}
                           </td>
 
                           {/* AMOUNT (₹) */}
-                          <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
-                            ₹{(stage.amount || 0).toLocaleString()}
+                          <td className="py-2 px-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
+                            {isEditMode ? (
+                              <input
+                                type="number"
+                                min="0"
+                                value={stage.amount}
+                                onChange={(e) => handleAmountChange(idx, parseFloat(e.target.value) || 0)}
+                                className="w-24 bg-[#0D1017] border border-[#2B374E] text-emerald-400 font-mono font-bold text-right px-2 py-1 rounded text-xs focus:outline-none focus:border-emerald-400"
+                              />
+                            ) : (
+                              `₹${(stage.amount || 0).toLocaleString()}`
+                            )}
                           </td>
 
                           {/* TARGET DATE */}
@@ -501,7 +807,11 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
                             <input
                               type="text"
                               value={stage.targetDate || '01-10-2026'}
-                              onChange={(e) => handleDateChange(idx, e.target.value)}
+                              onChange={(e) =>
+                                isEditMode
+                                  ? handleDateChangeLocal(idx, e.target.value)
+                                  : handleDateChange(idx, e.target.value)
+                              }
                               className="w-24 sm:w-28 bg-[#0D1017] border border-[#232B3B] text-slate-300 font-mono text-center px-2 py-1 rounded text-[11px] focus:outline-none focus:border-amber-400"
                             />
                           </td>
@@ -518,7 +828,16 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
 
                           {/* ACTION */}
                           <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                            {stage.due <= 0 && stage.amount > 0 ? (
+                            {isEditMode ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteStage(idx)}
+                                className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-500/20 rounded-md transition-colors cursor-pointer inline-flex items-center gap-1"
+                                title="Delete this stage"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            ) : stage.due <= 0 && stage.amount > 0 ? (
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400">
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                 <span>PAID</span>
@@ -535,6 +854,33 @@ export const PaymentLedgerModal: React.FC<PaymentLedgerModalProps> = ({
                           </td>
                         </tr>
                       ))}
+
+                      {/* Add stage / reset row when in edit mode */}
+                      {isEditMode && (
+                        <tr className="bg-[#141A26]">
+                          <td colSpan={8} className="py-2.5 px-3">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={handleAddStage}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1F2B3E] hover:bg-[#283852] text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                              >
+                                <Plus className="w-4 h-4" />
+                                <span>Add New Stage</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={handleResetToStandard}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#192230] hover:bg-[#222E42] text-slate-300 border border-[#2B394E] rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Reset to Standard 7 Stages</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
 
                       {/* TOTAL PROJECT BALANCE ROW */}
                       <tr className="bg-[#0A3326] text-emerald-300 font-bold text-xs whitespace-nowrap">

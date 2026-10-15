@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Plus, Check, Info } from 'lucide-react';
 import { LeadItem, PartnerItem } from '../../types';
 import leadService from '../../services/lead.service';
-import catalogService from '../../services/catalog.service';
+import catalogService, { CompanyItem } from '../../services/catalog.service';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 interface AddLeadModalProps {
@@ -49,6 +49,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [partners, setPartners] = useState<PartnerItem[]>([]);
   const [dynamicServices, setDynamicServices] = useState<string[]>([]);
+  const [availableCompanies, setAvailableCompanies] = useState<CompanyItem[]>([]);
 
   // Form State
   const [leadDate, setLeadDate] = useState(new Date().toISOString().split('T')[0]);
@@ -86,6 +87,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
     if (isOpen) {
       loadDynamicServices();
       loadPartners();
+      catalogService.getCompanies().then((data) => setAvailableCompanies(data || [])).catch(() => {});
       if (leadToEdit) {
         setLeadDate(leadToEdit.leadDate ? new Date(leadToEdit.leadDate).toISOString().split('T')[0] : '');
         setClientName(leadToEdit.clientName || '');
@@ -240,7 +242,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
         leadDate,
         clientName: clientName.trim(),
         targetCompanyCode,
-        targetCompanyName: targetCompanyCode === 'LD' ? 'Lucknow Developers' : 'Lucknow Builders',
+        targetCompanyName: availableCompanies.find((c) => c.code === targetCompanyCode)?.name || targetCompanyCode,
         occupation,
         mobile1: mobile1.trim(),
         mobile2: mobile2.trim(),
@@ -442,8 +444,15 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
                     onChange={(e) => setTargetCompanyCode(e.target.value)}
                     className="w-full bg-[#181F2F] border border-[#2B354C] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#EAB308] transition-colors"
                   >
-                    <option value="LB">Lucknow Builders (LB)</option>
-                    <option value="LD">Lucknow Developers (LD)</option>
+                    {availableCompanies.length > 0 ? (
+                      availableCompanies.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name} ({c.code})
+                        </option>
+                      ))
+                    ) : (
+                      <option value={targetCompanyCode}>{targetCompanyCode}</option>
+                    )}
                   </select>
                 </div>
               </div>

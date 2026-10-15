@@ -75,7 +75,7 @@ export const ClientFollowUpModal: React.FC<ClientFollowUpModalProps> = ({
       return 'No previous follow-up recorded';
     }
     const latest = client.followUps && client.followUps.length > 0 ? client.followUps[0] : null;
-    const author = latest?.createdByName || 'admin@lucknowbuilders.com';
+    const author = latest?.createdByName || 'Admin';
     const dateObj = latest?.date ? new Date(latest.date) : client.latestFollowUp?.date ? new Date(client.latestFollowUp.date) : new Date();
 
     const formattedDate = dateObj.toLocaleDateString('en-GB', {
@@ -152,7 +152,7 @@ export const ClientFollowUpModal: React.FC<ClientFollowUpModalProps> = ({
                 EMAIL
               </span>
               <span className="text-white font-medium text-xs">
-                {client.email || `${client.name.toLowerCase().replace(/\s+/g, '')}@dummy.com`}
+                {client.email || '-'}
               </span>
             </div>
           </div>

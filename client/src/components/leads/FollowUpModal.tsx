@@ -99,8 +99,8 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
     referenceDisplay = lead.referenceType;
   }
 
-  // Lead Taken By email
-  const leadTakenBy = 'admin@lucknowbuilders.com';
+  // Lead Taken By email — use actual user info if available
+  const leadTakenBy = (lead as any)?.createdByName || 'Admin';
 
   // Latest follow up info
   const latestEntry =

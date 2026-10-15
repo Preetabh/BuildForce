@@ -495,14 +495,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <div className="p-3 rounded-xl bg-[#090E1A] border border-slate-800/80">
                     <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Company</span>
                     <span className="font-bold text-white text-xs mt-0.5 block truncate">
-                      {company?.name || 'Lucknow Builders'}
+                      {company?.name || '-'}
                     </span>
                   </div>
 
                   <div className="p-3 rounded-xl bg-[#090E1A] border border-slate-800/80">
                     <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Company Code</span>
                     <span className="font-mono font-black text-amber-400 text-xs mt-0.5 block">
-                      {company?.code || 'LB-360'}
+                      {company?.code || '-'}
                     </span>
                   </div>
 

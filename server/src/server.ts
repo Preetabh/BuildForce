@@ -5,7 +5,7 @@ import { logger } from './config/logger';
 import { SorService } from './modules/sor/sor.service';
 import { Company } from './models/Company';
 import { RateAnalysisService } from './modules/sor/rateAnalysis.service';
-
+// Server bootstrap
 const startServer = async () => {
   try {
     // 1. Connect MongoDB

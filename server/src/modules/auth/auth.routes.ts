@@ -7,6 +7,7 @@ import { authenticate } from '../../middleware/auth.middleware';
 const router = Router();
 
 router.get('/setup-status', AuthController.getSetupStatus);
+router.get('/companies', AuthController.getCompanies);
 router.post('/register', validateBody(registerSchema), AuthController.register);
 router.post('/register-admin', validateBody(registerAdminSchema), AuthController.registerAdmin);
 router.post('/login', validateBody(loginSchema), AuthController.login);

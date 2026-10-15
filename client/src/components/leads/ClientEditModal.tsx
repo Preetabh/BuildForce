@@ -270,7 +270,7 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
                 <label className="block text-[10px] font-semibold text-slate-300">Buildup</label>
                 <input
                   type="text"
-                  placeholder="dummy"
+                  placeholder="e.g. 120 sq ft"
                   value={buildup}
                   onChange={(e) => setBuildup(e.target.value)}
                   className="w-full bg-[#10141D] border border-[#2B3346] rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
@@ -281,7 +281,7 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
                 <label className="block text-[10px] font-semibold text-slate-300">Dimensional</label>
                 <input
                   type="text"
-                  placeholder="dummy"
+                  placeholder="e.g. 95 sq ft"
                   value={dimensional}
                   onChange={(e) => setDimensional(e.target.value)}
                   className="w-full bg-[#10141D] border border-[#2B3346] rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
@@ -306,7 +306,7 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
                 <label className="block text-[10px] font-semibold text-slate-300">Level</label>
                 <input
                   type="text"
-                  placeholder="dummy"
+                  placeholder="e.g. Grnd/1st"
                   value={level}
                   onChange={(e) => setLevel(e.target.value)}
                   className="w-full bg-[#10141D] border border-[#2B3346] rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
@@ -436,7 +436,7 @@ export const ClientEditModal: React.FC<ClientEditModalProps> = ({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Dummy@dummy.com"
+                  placeholder="client@example.com"
                   className="w-full bg-[#10141D] border border-[#2B3346] rounded-lg px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
                 />
               </div>

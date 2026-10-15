@@ -151,7 +151,7 @@ export class MeasurementService {
       canonicalUnit = calcResult.canonicalUnit;
     }
 
-    let dummyBoqItem: any = {
+    let tempBoqItem: any = {
       itemCode: input.itemCode || 'CUSTOM-ITEM',
       description: input.description || 'Measured Item',
       unit: input.unit || canonicalUnit || 'cum',
@@ -162,11 +162,11 @@ export class MeasurementService {
 
     if (input.boqItemId && Types.ObjectId.isValid(input.boqItemId)) {
       const b = await BoqItem.findById(input.boqItemId).lean();
-      if (b) dummyBoqItem = { ...b, formulaId: input.formulaId || b.formulaId, formulaCode: input.formulaCode || b.formulaCode };
+      if (b) tempBoqItem = { ...b, formulaId: input.formulaId || b.formulaId, formulaCode: input.formulaCode || b.formulaCode };
     } else if (input.sorItemId && Types.ObjectId.isValid(input.sorItemId)) {
       const s = await SorItem.findById(input.sorItemId).lean();
       if (s) {
-        dummyBoqItem = {
+        tempBoqItem = {
           itemCode: s.itemCode,
           description: s.descriptionEnglish,
           unit: s.unit,
@@ -178,8 +178,8 @@ export class MeasurementService {
       }
     }
   
-    const rateAnalysis = await RateAnalysisService.resolveAnalysisForBoqItem(companyId, dummyBoqItem);
-    const activeUnitRate = input.rate !== undefined && input.rate > 0 ? input.rate : (dummyBoqItem.rate || 0);
+    const rateAnalysis = await RateAnalysisService.resolveAnalysisForBoqItem(companyId, tempBoqItem);
+    const activeUnitRate = input.rate !== undefined && input.rate > 0 ? input.rate : (tempBoqItem.rate || 0);
     const impact = CalculationEngine.calculateImpactPreview(
       totalQty,
       activeUnitRate,

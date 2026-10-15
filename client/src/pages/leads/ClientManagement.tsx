@@ -35,8 +35,10 @@ import { ClientEditModal } from '../../components/leads/ClientEditModal';
 import { ClientDeadModal } from '../../components/leads/ClientDeadModal';
 import { AssignSiteEngineerModal } from '../../components/leads/AssignSiteEngineerModal';
 import { UserProfileMenu } from '../../components/profile/UserProfileMenu';
+import { useAuth } from '../../context/AuthContext';
 
 export const ClientManagement: React.FC = () => {
+  const { company } = useAuth();
   const [searchParams] = useSearchParams();
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,11 +75,18 @@ export const ClientManagement: React.FC = () => {
   const [selectedClientForEdit, setSelectedClientForEdit] = useState<ClientRecord | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [availableServices, setAvailableServices] = useState<string[]>([]);
+  const [availableCompanies, setAvailableCompanies] = useState<{ name: string; code: string }[]>([]);
 
   useEffect(() => {
     catalogService.getActiveServices().then((data) => {
       const activeList = (data || []).filter((s) => s.isActive).map((s) => s.name);
       setAvailableServices(activeList);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    catalogService.getCompanies().then((data) => {
+      setAvailableCompanies(data || []);
     }).catch(() => {});
   }, []);
 
@@ -192,7 +201,7 @@ export const ClientManagement: React.FC = () => {
             </div>
             <div>
               <div className="text-[10px] uppercase font-bold tracking-widest text-amber-400">
-                LUCKNOW BUILDERS
+                {company?.name?.toUpperCase() || 'MY COMPANY'}
               </div>
               <h1 className="text-lg font-black tracking-wider text-amber-300 drop-shadow-sm flex items-center gap-2">
                 <span>LEAD FORCE PORTAL</span>
@@ -419,10 +428,11 @@ export const ClientManagement: React.FC = () => {
             className="bg-[#0C1017] border border-[#1E273A] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
           >
             <option value="All Companies">All Companies</option>
-            <option value="Lucknow Builders">Lucknow Builders</option>
-            <option value="Lucknow Developers">Lucknow Developers</option>
-            <option value="OLD INFRA">OLD INFRA</option>
-            <option value="Apex Realty">Apex Realty</option>
+            {availableCompanies.map((c) => (
+              <option key={c.code} value={c.name}>
+                {c.name}
+              </option>
+            ))}
           </select>
 
           {/* Services Dropdown */}

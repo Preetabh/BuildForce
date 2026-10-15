@@ -373,7 +373,7 @@ export class LeadController {
     try {
       const companyId = req.user!.companyId;
       const clients = await LeadService.seedRealisticClients(companyId);
-      res.status(200).json({ success: true, message: '13 realistic clients seeded successfully', data: clients });
+      res.status(200).json({ success: true, message: '12 realistic clients seeded successfully', data: clients });
     } catch (error) {
       next(error);
     }

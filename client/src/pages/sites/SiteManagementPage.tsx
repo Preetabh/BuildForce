@@ -541,7 +541,7 @@ export const SiteManagementPage: React.FC = () => {
                     type="text"
                     value={formClientName}
                     onChange={(e) => setFormClientName(e.target.value)}
-                    placeholder="e.g. Lucknow Builders Pvt Ltd"
+                    placeholder="e.g. Client Name / Company"
                     className="w-full px-3 py-2 rounded-xl bg-[#141B2D] border border-[#232F4A] text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>

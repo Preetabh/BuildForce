@@ -109,6 +109,7 @@ export const LeadManagement: React.FC = () => {
   const [selectedLeadForReg, setSelectedLeadForReg] = useState<LeadItem | null>(null);
   const [selectedLeadForDead, setSelectedLeadForDead] = useState<LeadItem | null>(null);
   const [availableServices, setAvailableServices] = useState<string[]>([]);
+  const [availableCompanies, setAvailableCompanies] = useState<{ name: string; code: string }[]>([]);
 
   // Drag and Drop Pipeline States
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
@@ -127,6 +128,13 @@ export const LeadManagement: React.FC = () => {
       })
       .catch(() => {});
   }, [activeView]);
+
+  useEffect(() => {
+    catalogService
+      .getCompanies()
+      .then((data) => setAvailableCompanies(data || []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchLeads();
@@ -672,8 +680,11 @@ export const LeadManagement: React.FC = () => {
               className="bg-[#161C2C] border border-[#2B354C] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
             >
               <option value="All Companies">All Companies</option>
-              <option value="LB">Lucknow Builders (LB)</option>
-              <option value="LD">Lucknow Developers (LD)</option>
+              {availableCompanies.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.name} ({c.code})
+                </option>
+              ))}
             </select>
           </div>
 
@@ -972,10 +983,7 @@ export const LeadManagement: React.FC = () => {
                                 </p>
                                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                   <span className="text-[10px] text-amber-300 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                                    {lead.targetCompanyName ||
-                                      (lead.targetCompanyCode === 'LD'
-                                        ? 'Lucknow Developers'
-                                        : 'Lucknow Builders')}
+                                      {lead.targetCompanyName || lead.targetCompanyCode || '-'}
                                   </span>
                                   {lead.requirements?.[0] && (
                                     <span className="text-[9.5px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded truncate max-w-[140px]">

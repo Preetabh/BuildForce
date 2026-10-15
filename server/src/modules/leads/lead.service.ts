@@ -1201,25 +1201,38 @@ export class LeadService {
     client.projectEstimator = estimatorData;
 
     if (customStages && customStages.length > 0) {
-      client.ledgerStages = customStages as any;
+      client.ledgerStages = customStages.map((s: any) => {
+        const stageAmount = Number(s.amount) || 0;
+        const stagePaid = Number(s.paid) || 0;
+        const stageDue = Math.max(0, stageAmount - stagePaid);
+        return {
+          _id: s._id && mongoose.Types.ObjectId.isValid(s._id) ? new mongoose.Types.ObjectId(s._id) : new mongoose.Types.ObjectId(),
+          stageName: s.stageName || 'Stage',
+          percentage: Number(s.percentage) || 0,
+          amount: stageAmount,
+          targetDate: s.targetDate || '',
+          paid: stagePaid,
+          due: stageDue,
+          status: stagePaid >= stageAmount && stageAmount > 0 ? 'Paid' : stagePaid > 0 ? 'Partial' : 'Pending',
+        };
+      }) as any;
     } else if (!client.ledgerStages || client.ledgerStages.length === 0) {
-      // 9 standard milestone stages breakdown matching user portal
+      // 7 standard milestone stages breakdown matching agreement document
       const defaultMilestones = [
-        { stageName: 'Advance', percentage: 20 },
-        { stageName: 'Slab', percentage: 20 },
-        { stageName: 'Brick Work', percentage: 15 },
-        { stageName: 'Electrical Work', percentage: 10 },
-        { stageName: 'Plaster', percentage: 10 },
-        { stageName: 'Tile Work', percentage: 10 },
-        { stageName: 'Bathroom Fitting', percentage: 5 },
-        { stageName: 'Painting Work', percentage: 5 },
-        { stageName: 'Site Completion', percentage: 5 },
+        { stageName: 'Agreement & Mobilisation Amount', percentage: 10 },
+        { stageName: 'Before Foundation Work Stage', percentage: 20 },
+        { stageName: 'Before Plinth Level Work Stage', percentage: 15 },
+        { stageName: 'Before RCC Slab Casting Work Stage', percentage: 25 },
+        { stageName: 'Before Brickwork & Plaster', percentage: 15 },
+        { stageName: 'Before Finishing Work', percentage: 10 },
+        { stageName: 'Final Handover', percentage: 5 },
       ];
 
       const todayFormatted = new Date().toISOString().split('T')[0];
       client.ledgerStages = defaultMilestones.map((m) => {
         const stageAmount = Math.round((total * m.percentage) / 100);
         return {
+          _id: new mongoose.Types.ObjectId(),
           stageName: m.stageName,
           percentage: m.percentage,
           amount: stageAmount,
@@ -1271,20 +1284,18 @@ export class LeadService {
     });
     if (!client) throw new Error('Client not found');
 
-    // Auto-initialize 9 default stages if client has no schedule yet
+    // Auto-initialize 7 default stages if client has no schedule yet
     if (!client.ledgerStages || client.ledgerStages.length === 0) {
-      const total = client.agreedAmount || 8000;
-      const todayFormatted = '01-10-2026';
+      const total = client.agreedAmount || 0;
+      const todayFormatted = new Date().toISOString().split('T')[0];
       const defaultStages = [
-        { stageName: 'Advance', percentage: 20 },
-        { stageName: 'Slab', percentage: 20 },
-        { stageName: 'Brick Work', percentage: 15 },
-        { stageName: 'Electrical Work', percentage: 10 },
-        { stageName: 'Plaster', percentage: 10 },
-        { stageName: 'Tile Work', percentage: 10 },
-        { stageName: 'Bathroom Fitting', percentage: 5 },
-        { stageName: 'Painting Work', percentage: 5 },
-        { stageName: 'Site Completion', percentage: 5 },
+        { stageName: 'Agreement & Mobilisation Amount', percentage: 10 },
+        { stageName: 'Before Foundation Work Stage', percentage: 20 },
+        { stageName: 'Before Plinth Level Work Stage', percentage: 15 },
+        { stageName: 'Before RCC Slab Casting Work Stage', percentage: 25 },
+        { stageName: 'Before Brickwork & Plaster', percentage: 15 },
+        { stageName: 'Before Finishing Work', percentage: 10 },
+        { stageName: 'Final Handover', percentage: 5 },
       ];
       client.ledgerStages = defaultStages.map((s) => {
         const amt = Math.round((total * s.percentage) / 100);
@@ -1536,7 +1547,7 @@ export class LeadService {
   }
 
   /**
-   * Pre-seed 13 exact realistic clients from screenshot
+   * Pre-seed 12 exact realistic clients from screenshot
    */
   static async seedRealisticClients(companyId: string) {
     const compId = new mongoose.Types.ObjectId(companyId);
@@ -1546,7 +1557,7 @@ export class LeadService {
   }
 
   /**
-   * Ensure Initial 13 Clients matching screenshot exist
+   * Ensure Initial 12 Clients matching screenshot exist
    */
   static async ensureInitialClients(companyId: string, force: boolean = false) {
     const compId = new mongoose.Types.ObjectId(companyId);
@@ -1556,55 +1567,6 @@ export class LeadService {
     }
 
     const realClients = [
-      {
-        companyId: compId,
-        clientCode: '000018',
-        registrationDate: new Date('2026-09-29'),
-        name: 'Dummy',
-        subBadge: 'OLD INFRA',
-        siteLocation: 'Dummy',
-        associate: 'Social Media: Facebook',
-        associateType: 'SocialMedia',
-        area: '-',
-        phone: '8427215202',
-        services: 'Renovation',
-        agreedAmount: 8000,
-        paidAmount: 0,
-        balanceAmount: 8000,
-        status: 'Active',
-        isDead: false,
-        projectEstimator: {
-          areaSqft: 100,
-          ratePerSqft: 80,
-          discountPerSqft: 0,
-          finalRate: 80,
-          totalAmount: 8000,
-        },
-        ledgerStages: [
-          { stageName: 'Advance', percentage: 20, amount: 1600, targetDate: '01-10-2026', paid: 0, due: 1600, status: 'Pending' },
-          { stageName: 'Slab', percentage: 20, amount: 1600, targetDate: '01-10-2026', paid: 0, due: 1600, status: 'Pending' },
-          { stageName: 'Brick Work', percentage: 15, amount: 1200, targetDate: '01-10-2026', paid: 0, due: 1200, status: 'Pending' },
-          { stageName: 'Electrical Work', percentage: 10, amount: 800, targetDate: '01-10-2026', paid: 0, due: 800, status: 'Pending' },
-          { stageName: 'Plaster', percentage: 10, amount: 800, targetDate: '01-10-2026', paid: 0, due: 800, status: 'Pending' },
-          { stageName: 'Tile Work', percentage: 10, amount: 800, targetDate: '01-10-2026', paid: 0, due: 800, status: 'Pending' },
-          { stageName: 'Bathroom Fitting', percentage: 5, amount: 400, targetDate: '01-10-2026', paid: 0, due: 400, status: 'Pending' },
-          { stageName: 'Painting Work', percentage: 5, amount: 400, targetDate: '01-10-2026', paid: 0, due: 400, status: 'Pending' },
-          { stageName: 'Site Completion', percentage: 5, amount: 400, targetDate: '01-10-2026', paid: 0, due: 400, status: 'Pending' },
-        ],
-        followUps: [
-          {
-            date: new Date('2026-09-30'),
-            remarks: 'No Remark',
-            status: 'Pending',
-            createdAt: new Date('2026-09-29T10:00:00'),
-            createdByName: 'Admin',
-          },
-        ],
-        latestFollowUp: {
-          date: new Date('2026-09-30'),
-          remarks: 'No Remark',
-        },
-      },
       {
         companyId: compId,
         clientCode: '000017',

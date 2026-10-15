@@ -1,5 +1,11 @@
 import api from './api';
 
+export interface CompanyItem {
+  _id: string;
+  name: string;
+  code: string;
+}
+
 export interface ServiceCatalogItem {
   _id: string;
   companyId: string;
@@ -12,6 +18,11 @@ export interface ServiceCatalogItem {
 }
 
 export const catalogService = {
+  getCompanies: async (): Promise<CompanyItem[]> => {
+    const res = await api.get('/auth/companies');
+    return res.data.data || [];
+  },
+
   getServices: async (activeOnly = false): Promise<ServiceCatalogItem[]> => {
     const res = await api.get('/services', { params: { activeOnly } });
     return res.data.data || [];

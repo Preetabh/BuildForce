@@ -433,13 +433,14 @@ export class RbacService {
 
     if (!user) throw new AppError('User not found', 404);
 
-    // If updated to SITE_ENGINEER, ensure SiteEngineer record exists
+    // If updated to SITE_ENGINEER, ensure SiteEngineer record exists and is linked
     if (data.role === 'SITE_ENGINEER' || data.role === 'Site Engineer') {
       const existingSe = await SiteEngineer.findOne({ loginId: user.email.toLowerCase().trim(), companyId });
       if (!existingSe) {
         await SiteEngineer.create({
           name: user.name,
           loginId: user.email,
+          userId: user._id,
           mobile: user.mobile || '-',
           expertise: 'Common',
           projectsCount: 0,
@@ -447,6 +448,9 @@ export class RbacService {
           status: user.isActive ? 'Active' : 'Inactive',
           companyId,
         });
+      } else if (!existingSe.userId) {
+        existingSe.userId = user._id;
+        await existingSe.save();
       }
     }
 
@@ -509,6 +513,7 @@ export class RbacService {
       await SiteEngineer.create({
         name: user.name,
         loginId: user.email,
+        userId: user._id,
         mobile: user.mobile || '-',
         expertise: data.expertise || 'Common',
         projectsCount: 0,
