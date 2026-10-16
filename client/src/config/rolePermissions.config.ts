@@ -130,11 +130,8 @@ export const ROLE_PERMISSION_MODULES: PermissionModuleConfig[] = [
       description: 'Module Entry Point for Field Engineers, Daily Site Reports, and Site Operations',
     },
     items: [
-      { key: 'Admin/SiteEngineers_List', title: 'Detailed Site Engineers', route: '/admin/site-engineers' },
-      { key: 'Admin/ManageSiteEngineers', title: 'Add Site Engineer', route: '/admin/add-site-engineer' },
+      { key: 'Admin/SiteEngineers_List', title: 'Site Engineers', route: '/admin/site-engineers' },
       { key: 'Admin/DailyReportList', title: 'Daily Site Reports', route: '/admin/daily-reports' },
-      { key: 'SiteEngineer/Dashboard', title: 'Engineer Dashboard', route: '/engineer-dashboard' },
-      { key: 'SiteEngineer/SubmitReport', title: 'Submit Daily Site Report', route: '/engineer/submit-report' },
     ],
   },
 

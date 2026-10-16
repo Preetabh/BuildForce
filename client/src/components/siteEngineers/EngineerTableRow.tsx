@@ -79,42 +79,7 @@ export const EngineerTableRow: React.FC<EngineerTableRowProps> = ({
         </div>
       </td>
 
-      {/* 3. Expertise */}
-      <td className="py-3 px-4">
-        <span className="inline-block px-2 py-0.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-slate-300 text-[11px] font-medium">
-          {engineer.expertise || 'Common'}
-        </span>
-      </td>
-
-      {/* 4. Assigned Sites */}
-      <td className="py-3 px-4">
-        {assignedSites.length === 0 ? (
-          <span className="text-slate-400 text-[11px] italic">No sites assigned</span>
-        ) : (
-          <div className="flex items-center gap-1.5 flex-wrap max-w-xs">
-            {assignedSites.slice(0, 2).map((site: any, idx: number) => {
-              const name = typeof site === 'string' ? 'Site' : site.name || site.code;
-              return (
-                <span
-                  key={idx}
-                  title={typeof site === 'object' ? `${site.name} (${site.code})` : undefined}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[10.5px] font-medium"
-                >
-                  <Building2 className="w-3 h-3 text-amber-400" />
-                  <span className="truncate max-w-[100px]">{name}</span>
-                </span>
-              );
-            })}
-            {assignedSites.length > 2 && (
-              <span className="px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px] font-bold">
-                +{assignedSites.length - 2} more
-              </span>
-            )}
-          </div>
-        )}
-      </td>
-
-      {/* 5. Status: Active (Green) / Inactive (Red) */}
+      {/* 3. Status: Active (Green) / Inactive (Red) */}
       <td className="py-3 px-4 text-center">
         {engineer.status === 'Active' ? (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)]">

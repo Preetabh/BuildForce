@@ -203,8 +203,6 @@ export const DetailedSiteEngineers: React.FC = () => {
                 <tr className="border-b border-[#1B2438] bg-[#0E1526]/80 text-[11px] font-bold uppercase tracking-wider text-amber-400/90">
                   <th className="py-3.5 px-4 sm:px-6">Engineer</th>
                   <th className="py-3.5 px-4">Contact & Login</th>
-                  <th className="py-3.5 px-4">Expertise</th>
-                  <th className="py-3.5 px-4">Assigned Sites</th>
                   <th className="py-3.5 px-4 text-center">Status</th>
                   <th className="py-3.5 px-4 text-center">Last Report</th>
                   <th className="py-3.5 px-4 sm:px-6 text-right">Actions</th>
@@ -213,13 +211,13 @@ export const DetailedSiteEngineers: React.FC = () => {
               <tbody className="divide-y divide-[#151D2E] text-xs">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <td colSpan={5} className="py-12 text-center text-slate-400">
                       Loading site engineers...
                     </td>
                   </tr>
                 ) : filteredEngineers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-16 text-center text-slate-400">
+                    <td colSpan={5} className="py-16 text-center text-slate-400">
                       <div className="max-w-xs mx-auto space-y-3">
                         <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-inner">
                           <HardHat className="w-6 h-6" />

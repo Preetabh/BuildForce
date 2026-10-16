@@ -64,11 +64,8 @@ export class RbacService {
         isVisible: true,
         moduleGroup: 'Field Operations',
         children: [
-          { title: 'Detailed Site Engineers', route: 'Admin/SiteEngineers_List', icon: 'Users', sort: 1, isVisible: true },
-          { title: 'Add Site Engineer', route: 'Admin/ManageSiteEngineers', icon: 'UserPlus', sort: 2, isVisible: true },
-          { title: 'Daily Site Reports', route: 'Admin/DailyReportList', icon: 'ClipboardCheck', sort: 3, isVisible: true },
-          { title: 'Engineer Dashboard', route: 'SiteEngineer/Dashboard', icon: 'Home', sort: 4, isVisible: true },
-          { title: 'Submit Daily Site Report', route: 'SiteEngineer/SubmitReport', icon: 'FilePlus', sort: 5, isVisible: true },
+          { title: 'Site Engineers', route: 'Admin/SiteEngineers_List', icon: 'Users', sort: 1, isVisible: true },
+          { title: 'Daily Site Reports', route: 'Admin/DailyReportList', icon: 'ClipboardCheck', sort: 2, isVisible: true },
         ],
       },
       {

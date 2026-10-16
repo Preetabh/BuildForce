@@ -1988,12 +1988,49 @@ export class LeadService {
 
     await payment.save();
 
-    // If client account ID is provided, update client paidAmount and balanceAmount
+    // If client account ID is provided, update client paidAmount, balanceAmount, and ledgerStages
     if (paymentData.clientId) {
       const client = await ClientAccount.findOne({ _id: paymentData.clientId, companyId: compId });
       if (client) {
-        client.paidAmount = (client.paidAmount || 0) + paymentData.amount;
-        client.balanceAmount = Math.max(0, (client.agreedAmount || 0) - client.paidAmount);
+        let remaining = Number(paymentData.amount) || 0;
+        if (client.ledgerStages && client.ledgerStages.length > 0) {
+          let startIndex = 0;
+          if (paymentData.stageId) {
+            const foundIdx = client.ledgerStages.findIndex(
+              (s: any) =>
+                s._id?.toString() === paymentData.stageId ||
+                (s.stageName && s.stageName.toLowerCase() === String(paymentData.stageId).toLowerCase())
+            );
+            if (foundIdx !== -1) startIndex = foundIdx;
+          }
+          for (let i = startIndex; i < client.ledgerStages.length && remaining > 0; i++) {
+            const stage = client.ledgerStages[i];
+            if (stage.due > 0) {
+              const alloc = Math.min(remaining, stage.due);
+              stage.paid = (stage.paid || 0) + alloc;
+              stage.due = Math.max(0, (stage.amount || 0) - stage.paid);
+              stage.status = stage.due <= 0 ? 'Paid' : 'Partial';
+              remaining -= alloc;
+            }
+          }
+          if (remaining > 0) {
+            for (let i = 0; i < startIndex && remaining > 0; i++) {
+              const stage = client.ledgerStages[i];
+              if (stage.due > 0) {
+                const alloc = Math.min(remaining, stage.due);
+                stage.paid = (stage.paid || 0) + alloc;
+                stage.due = Math.max(0, (stage.amount || 0) - stage.paid);
+                stage.status = stage.due <= 0 ? 'Paid' : 'Partial';
+                remaining -= alloc;
+              }
+            }
+          }
+          client.paidAmount = client.ledgerStages.reduce((sum, s) => sum + (s.paid || 0), 0);
+          client.balanceAmount = Math.max(0, (client.agreedAmount || 0) - client.paidAmount);
+        } else {
+          client.paidAmount = (client.paidAmount || 0) + paymentData.amount;
+          client.balanceAmount = Math.max(0, (client.agreedAmount || 0) - client.paidAmount);
+        }
         await client.save();
       }
     }
