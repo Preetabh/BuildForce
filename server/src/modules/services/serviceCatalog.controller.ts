@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { ServiceCatalog } from '../../models/ServiceCatalog';
 import { RecycleBinService } from '../recycleBin/recycleBin.service';
+import { AuditService } from '../audit/audit.service';
 
 export const DEFAULT_SERVICES = [
   'Floor Plan Design',
@@ -97,6 +98,20 @@ export class ServiceCatalogController {
         softDeleted.description = description?.trim() || softDeleted.description || '';
         softDeleted.isActive = isActive !== undefined ? Boolean(isActive) : true;
         await softDeleted.save();
+
+        await AuditService.log({
+          companyId: compId.toString(),
+          userId: req.user?.userId,
+          action: 'RESTORE',
+          module: 'SERVICES',
+          entity: 'ServiceCatalog',
+          entityId: softDeleted._id.toString(),
+          entityName: softDeleted.name,
+          summary: `Restored service category "${softDeleted.name}"`,
+          newValue: softDeleted.toObject() as any,
+          req,
+        });
+
         return res.status(201).json({ success: true, message: 'Service restored successfully', data: softDeleted });
       }
 
@@ -111,6 +126,20 @@ export class ServiceCatalogController {
       });
 
       await newService.save();
+
+      await AuditService.log({
+        companyId: compId.toString(),
+        userId: req.user?.userId,
+        action: 'CREATE',
+        module: 'SERVICES',
+        entity: 'ServiceCatalog',
+        entityId: newService._id.toString(),
+        entityName: newService.name,
+        summary: `Created service category "${newService.name}"`,
+        newValue: newService.toObject() as any,
+        req,
+      });
+
       return res.status(201).json({ success: true, message: 'Service created successfully', data: newService });
     } catch (error) {
       next(error);
@@ -142,6 +171,19 @@ export class ServiceCatalogController {
         return res.status(404).json({ success: false, message: 'Service not found' });
       }
 
+      await AuditService.log({
+        companyId: (companyId || updated.companyId).toString(),
+        userId: req.user?.userId,
+        action: 'UPDATE',
+        module: 'SERVICES',
+        entity: 'ServiceCatalog',
+        entityId: updated._id.toString(),
+        entityName: updated.name,
+        summary: `Updated service category "${updated.name}"`,
+        newValue: updateData,
+        req,
+      });
+
       return res.status(200).json({ success: true, message: 'Service updated successfully', data: updated });
     } catch (error) {
       next(error);
@@ -169,12 +211,25 @@ export class ServiceCatalogController {
       service.isActive = !service.isActive;
       await service.save();
 
+      await AuditService.log({
+        companyId: service.companyId.toString(),
+        userId: req.user?.userId,
+        action: 'STATUS_CHANGE',
+        module: 'SERVICES',
+        entity: 'ServiceCatalog',
+        entityId: service._id.toString(),
+        entityName: service.name,
+        summary: `Toggled service "${service.name}" to ${service.isActive ? 'Active' : 'Inactive'}`,
+        newValue: { isActive: service.isActive },
+        req,
+      });
+
       return res.status(200).json({
         success: true,
         message: `Service marked as ${service.isActive ? 'Active' : 'Inactive'}`,
         data: service,
       });
-    } catch (error) {               
+    } catch (error) {
       next(error);
     }
   }

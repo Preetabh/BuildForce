@@ -28,14 +28,22 @@ export const AuditFiltersBar: React.FC<AuditFiltersBarProps> = ({
 
   const modulesList = [
     { value: '', label: 'All Modules' },
-    { value: 'AUTH', label: 'Authentication & Access' },
+    { value: 'AUTH', label: 'Authentication & Security' },
     { value: 'PROJECTS', label: 'Projects & BOQ' },
+    { value: 'LEADS', label: 'Leads & Inquiries' },
+    { value: 'CLIENTS', label: 'Clients & Accounts' },
+    { value: 'PAYMENTS', label: 'Payments & Billing' },
+    { value: 'PARTNERS', label: 'Reference Partners & Payouts' },
+    { value: 'SITE_ENGINEERS', label: 'Site Engineers' },
+    { value: 'SERVICES', label: 'Service Catalog' },
+    { value: 'REPORTS', label: 'Daily Progress Reports (DPR)' },
+    { value: 'RECYCLE_BIN', label: 'Recycle Bin (Restore/Delete)' },
     { value: 'VENDORS', label: 'Vendors & Suppliers' },
     { value: 'WORKERS', label: 'Workers & Labours' },
-    { value: 'ROLES', label: 'RBAC Roles & Menus' },
+    { value: 'ROLES', label: 'RBAC Roles & Permissions' },
     { value: 'USERS', label: 'User Accounts' },
-    { value: 'LEADS', label: 'Leads & Inquiries' },
-    { value: 'SERVICES', label: 'Service Catalog' },
+    { value: 'QUANTITY_MASTER', label: 'Quantity Master' },
+    { value: 'SOR', label: 'Schedule of Rates' },
     { value: 'SETTINGS', label: 'System Settings' },
   ];
 

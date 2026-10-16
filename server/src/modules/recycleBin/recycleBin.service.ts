@@ -79,6 +79,20 @@ export class RecycleBinService {
       status: 'active',
     });
 
+    // Record deletion event in enterprise audit log
+    await AuditService.log({
+      companyId: companyId.toString(),
+      userId: deletedBy?.toString(),
+      action: 'DELETE',
+      module: options.entityType.toUpperCase(),
+      entity: options.entityType,
+      entityId: originalId.toString(),
+      entityName: options.title,
+      summary: `Moved ${options.entityType} "${options.title}" to Recycle Bin (60-day safe retention)`,
+      severity: 'WARN',
+      metadata: { code: options.code, retentionDays: 60, expiresAt },
+    });
+
     return item;
   }
 
@@ -360,17 +374,19 @@ export class RecycleBinService {
     item.restoredAt = new Date();
     await item.save();
 
-    // Audit log
-    if (userId) {
-      await AuditService.log({
-        companyId: companyId.toString(),
-        userId,
-        action: 'RESTORE',
-        entity: item.entityType,
-        entityId: originalId.toString(),
-        newValue: { title: item.title, restoredAt: item.restoredAt },
-      });
-    }
+    // Record restore event in enterprise audit log
+    await AuditService.log({
+      companyId: companyId.toString(),
+      userId: userId ? userId.toString() : undefined,
+      action: 'RESTORE',
+      module: item.entityType.toUpperCase(),
+      entity: item.entityType,
+      entityId: originalId.toString(),
+      entityName: item.title,
+      summary: `Restored ${item.entityType} "${item.title}" from Recycle Bin back to active records`,
+      severity: 'INFO',
+      newValue: { title: item.title, restoredAt: item.restoredAt },
+    });
 
     return {
       success: true,
@@ -427,17 +443,19 @@ export class RecycleBinService {
     // Delete from RecycleBinItem
     await RecycleBinItem.deleteOne({ _id: item._id });
 
-    // Audit log
-    if (userId) {
-      await AuditService.log({
-        companyId: companyId.toString(),
-        userId,
-        action: 'DELETE',
-        entity: item.entityType,
-        entityId: originalId.toString(),
-        oldValue: { title: item.title, permanentlyPurged: true },
-      });
-    }
+    // Enterprise Audit log for permanent destruction
+    await AuditService.log({
+      companyId: companyId.toString(),
+      userId: userId ? userId.toString() : undefined,
+      action: 'DELETE',
+      module: item.entityType.toUpperCase(),
+      entity: item.entityType,
+      entityId: originalId.toString(),
+      entityName: item.title,
+      summary: `Permanently deleted ${item.entityType} "${item.title}" from system`,
+      severity: 'CRITICAL',
+      oldValue: { title: item.title, permanentlyPurged: true },
+    });
 
     return {
       success: true,

@@ -641,6 +641,14 @@ export const AppRouter: React.FC = () => {
             path="/audit"
             element={<Navigate to="/settings/audit-logs" replace />}
           />
+          <Route
+            path="/logs"
+            element={<Navigate to="/settings/audit-logs" replace />}
+          />
+          <Route
+            path="/activity-logs"
+            element={<Navigate to="/settings/audit-logs" replace />}
+          />
 
           {/* Utilities */}
           <Route path="/help" element={<Help />} />

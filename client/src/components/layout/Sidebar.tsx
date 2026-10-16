@@ -448,12 +448,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ];
     }
 
-    return children.map((c) => ({
+    const items = children.map((c) => ({
       label: c.title,
       path: resolveMenuPath(c.route),
       icon: resolveMenuIcon(c.icon),
       perm: c.route,
     }));
+
+    if (!items.some((i) => i.path.includes('audit'))) {
+      items.push({
+        label: 'Audit & Security Logs',
+        path: '/settings/audit-logs',
+        icon: History,
+        perm: 'Audit/ViewLogs',
+      });
+    }
+
+    return items;
   }, [dbMenus, settingsMenu]);
 
   // Dynamically filter allowed navigation groups and items based on role permissions
@@ -963,8 +974,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
             })}
           </div>
 
-          {/* Recycle Bin & Settings Section */}
+          {/* Activity Logs, Recycle Bin & Settings Section */}
           <div className="pt-2 border-t border-slate-800/60 space-y-1">
+            {/* Direct Activity & Audit Logs */}
+            <NavLink
+              to="/settings/audit-logs"
+              onClick={() => onClose()}
+              title={isCompact ? 'Activity & Audit Logs' : undefined}
+              className={({ isActive }) =>
+                cn(
+                  'group flex items-center rounded-lg font-medium transition-all duration-150 relative',
+                  isCompact ? 'justify-center p-2.5' : 'justify-between px-3 py-2',
+                  isActive
+                    ? 'bg-[#F59E0B] text-slate-950 font-bold shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                )
+              }
+            >
+              {({ isActive }) => (
+                <div className={cn('flex items-center min-w-0', !isCompact && 'gap-2.5')}>
+                  <History
+                    className={cn(
+                      'w-4 h-4 shrink-0 transition-colors',
+                      isActive ? 'text-slate-950 font-bold' : 'text-slate-400 group-hover:text-amber-400'
+                    )}
+                  />
+                  {!isCompact && <span className="font-semibold truncate">Activity Logs</span>}
+                </div>
+              )}
+            </NavLink>
+
             {isRecycleBinVisible && (
               <NavLink
                 to="/recycle-bin"

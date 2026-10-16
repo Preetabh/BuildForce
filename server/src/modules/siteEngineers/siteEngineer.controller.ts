@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { SiteEngineerService } from './siteEngineer.service';
+import { AuditService } from '../audit/audit.service';
 
 export class SiteEngineerController {
   public static async getSiteEngineers(req: Request, res: Response, next: NextFunction) {
@@ -41,6 +42,20 @@ export class SiteEngineerController {
     try {
       const companyId = req.user!.companyId;
       const engineer = await SiteEngineerService.createSiteEngineer(companyId, req.body);
+
+      await AuditService.log({
+        companyId: companyId.toString(),
+        userId: req.user?.userId,
+        action: 'CREATE',
+        module: 'SITE_ENGINEERS',
+        entity: 'SiteEngineer',
+        entityId: (engineer as any)._id?.toString() || req.params.id,
+        entityName: engineer.name,
+        summary: `Registered Site Engineer "${engineer.name}" (${engineer.mobile || 'No mobile'})`,
+        newValue: req.body,
+        req,
+      });
+
       res.status(201).json({ success: true, data: engineer });
     } catch (err) {
       next(err);
@@ -51,6 +66,20 @@ export class SiteEngineerController {
     try {
       const companyId = req.user!.companyId;
       const engineer = await SiteEngineerService.updateSiteEngineer(companyId, req.params.id, req.body);
+
+      await AuditService.log({
+        companyId: companyId.toString(),
+        userId: req.user?.userId,
+        action: 'UPDATE',
+        module: 'SITE_ENGINEERS',
+        entity: 'SiteEngineer',
+        entityId: (engineer as any)._id?.toString() || req.params.id,
+        entityName: engineer.name,
+        summary: `Updated Site Engineer profile "${engineer.name}"`,
+        newValue: req.body,
+        req,
+      });
+
       res.status(200).json({ success: true, data: engineer });
     } catch (err) {
       next(err);
@@ -61,6 +90,20 @@ export class SiteEngineerController {
     try {
       const companyId = req.user!.companyId;
       const engineer = await SiteEngineerService.toggleStatus(companyId, req.params.id);
+
+      await AuditService.log({
+        companyId: companyId.toString(),
+        userId: req.user?.userId,
+        action: 'STATUS_CHANGE',
+        module: 'SITE_ENGINEERS',
+        entity: 'SiteEngineer',
+        entityId: (engineer as any)._id?.toString() || req.params.id,
+        entityName: engineer.name,
+        summary: `Site Engineer "${engineer.name}" status changed to ${engineer.status}`,
+        newValue: { status: engineer.status },
+        req,
+      });
+
       res.status(200).json({ success: true, data: engineer });
     } catch (err) {
       next(err);
@@ -72,6 +115,21 @@ export class SiteEngineerController {
       const companyId = req.user!.companyId;
       const { amount, operation, notes } = req.body;
       const engineer = await SiteEngineerService.updateWallet(companyId, req.params.id, amount, operation, notes);
+
+      await AuditService.log({
+        companyId: companyId.toString(),
+        userId: req.user?.userId,
+        action: 'UPDATE',
+        module: 'SITE_ENGINEERS',
+        entity: 'SiteEngineer',
+        entityId: (engineer as any)._id?.toString() || req.params.id,
+        entityName: engineer.name,
+        summary: `Wallet ${operation === 'add' ? 'credited' : 'debited'} ₹${amount} for "${engineer.name}"`,
+        severity: 'WARN',
+        newValue: { amount, operation, notes, walletBalance: engineer.walletBalance },
+        req,
+      });
+
       res.status(200).json({ success: true, data: engineer });
     } catch (err) {
       next(err);

@@ -10,8 +10,12 @@ import quantityMasterRoutes from '../modules/quantityMaster/quantityMaster.route
 import leadRoutes from '../modules/leads/lead.routes';
 import { authenticate } from '../middleware/auth.middleware';
 import { AuditService } from '../modules/audit/audit.service';
+import { universalActionAuditMiddleware } from '../middleware/audit.middleware';
 
 const router = Router();
+
+// Universal Audit Interceptor for all mutating actions across the entire platform
+router.use(universalActionAuditMiddleware());
 
 // Public Health Check
 router.get('/health', (req, res) => {

@@ -59,6 +59,9 @@ export class AuditService {
    */
   public static async log(params: CreateAuditLogParams): Promise<void> {
     try {
+      if (params.req) {
+        (params.req as any)._auditLogged = true;
+      }
       const companyId = new Types.ObjectId(params.companyId.toString());
       let userId: Types.ObjectId | null = null;
       let userSnapshot: IAuditUserSnapshot = params.userSnapshot || {

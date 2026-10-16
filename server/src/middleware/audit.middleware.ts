@@ -80,8 +80,114 @@ export function auditRoute(options: AuditRouteOptions) {
       });
 
       return result;
-      };
-
-      next();
     };
-  }
+
+    next();
+  };
+}
+
+/**
+ * Universal Action Audit Middleware:
+ * Automatically captures ANY website action across all routes if not already logged explicitly.
+ */
+export function universalActionAuditMiddleware() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    // Only capture state-mutating HTTP methods
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+      return next();
+    }
+
+    const url = req.originalUrl || req.url;
+    // Skip internal auth/token refresh/health/audit querying
+    if (
+      url.includes('/api/auth/login') ||
+      url.includes('/api/auth/refresh') ||
+      url.includes('/api/auth/logout') ||
+      url.includes('/api/audit') ||
+      url.includes('/api/health')
+    ) {
+      return next();
+    }
+
+    const originalJson = res.json.bind(res);
+
+    res.json = function (body: any) {
+      const result = originalJson(body);
+
+      setImmediate(async () => {
+        try {
+          // If already explicitly logged by controller, skip duplicate
+          if ((req as any)._auditLogged) {
+            return;
+          }
+
+          const companyId = req.user?.companyId;
+          if (!companyId) return;
+
+          // Infer clean module name from URL
+          const pathClean = url.replace(/^\/api\//, '').split('?')[0];
+          const parts = pathClean.split('/').filter(Boolean);
+          const rawModule = parts[0] || 'GENERAL';
+          const module = rawModule.toUpperCase().replace(/-/g, '_');
+
+          // Action type
+          let action: AuditAction = 'UPDATE';
+          if (req.method === 'POST') action = 'CREATE';
+          else if (req.method === 'DELETE') action = 'DELETE';
+          else if (req.method === 'PATCH' || req.method === 'PUT') action = 'UPDATE';
+
+          const entityId =
+            req.params?.id ||
+            req.params?.projectId ||
+            req.params?.userId ||
+            req.params?.engineerId ||
+            body?.data?._id ||
+            'N/A';
+
+          const entityName =
+            body?.data?.name ||
+            body?.data?.title ||
+            body?.data?.clientName ||
+            req.body?.name ||
+            req.body?.clientName ||
+            '';
+
+          const isSuccess = res.statusCode >= 200 && res.statusCode < 400 && body?.success !== false;
+
+          let summary = '';
+          if (body?.message && typeof body.message === 'string') {
+            summary = body.message;
+          } else {
+            summary = `${action} in ${module}${entityName ? ` "${entityName}"` : ''}`;
+          }
+
+          let severity: AuditSeverity = 'INFO';
+          if (action === 'DELETE') severity = 'WARN';
+          if (!isSuccess) severity = 'CRITICAL';
+
+          await AuditService.log({
+            companyId,
+            userId: req.user?.userId,
+            action,
+            module,
+            entity: module,
+            entityId: entityId.toString(),
+            entityName: entityName ? entityName.toString() : undefined,
+            summary,
+            newValue: req.body || undefined,
+            status: isSuccess ? 'SUCCESS' : 'FAILURE',
+            failureReason: !isSuccess ? body?.message || 'Action failed' : undefined,
+            severity,
+            req,
+          });
+        } catch {
+          // Silent non-blocking fail
+        }
+      });
+
+      return result;
+    };
+
+    next();
+  };
+}
