@@ -102,6 +102,9 @@ export interface IClientAccount extends Document {
   deadAt?: Date;
   status: 'Active' | 'Under Construction' | 'Handover' | 'Archived' | 'Dead';
   notes?: string;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -366,6 +369,20 @@ const clientAccountSchema = new Schema<IClientAccount>(
     notes: {
       type: String,
       default: '',
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
   },
   {

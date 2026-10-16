@@ -81,8 +81,13 @@ export class SiteEngineerController {
   public static async deleteSiteEngineer(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      await SiteEngineerService.deleteSiteEngineer(companyId, req.params.id);
-      res.status(200).json({ success: true, message: 'Engineer deleted' });
+      await SiteEngineerService.deleteSiteEngineer(
+        companyId,
+        req.params.id,
+        req.user?.userId,
+        req.user?.name
+      );
+      res.status(200).json({ success: true, message: 'Engineer moved to Recycle Bin' });
     } catch (err) {
       next(err);
     }

@@ -96,7 +96,7 @@ export const AppLayout: React.FC = () => {
   const { data: recycleBinData } = useQuery({
     queryKey: ['recycleBinCount'],
     queryFn: async () => {
-      const res = await api.get('/projects/recycle-bin');
+      const res = await api.get('/recycle-bin');
       return res.data?.data || [];
     },
     enabled: isAuthenticated,

@@ -32,6 +32,9 @@ export interface IPartner extends Document {
   };
   address?: string;
   notes?: string;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -128,6 +131,20 @@ const partnerSchema = new Schema<IPartner>(
     },
     address: { type: String, default: '' },
     notes: { type: String, default: '' },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
   },
   {
     timestamps: true,

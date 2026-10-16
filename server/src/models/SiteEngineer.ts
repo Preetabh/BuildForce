@@ -16,6 +16,9 @@ export interface ISiteEngineer extends Document {
   lastReportDate?: Date;
   profileImage?: string;
   notes?: string;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -94,6 +97,20 @@ const siteEngineerSchema = new Schema<ISiteEngineer>(
     notes: {
       type: String,
       default: '',
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
   },
   {

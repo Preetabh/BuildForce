@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   Edit2,
@@ -17,6 +18,7 @@ import catalogService, { ServiceCatalogItem } from '../../services/catalog.servi
 
 export const ServiceCatalogPage: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [services, setServices] = useState<ServiceCatalogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -103,11 +105,13 @@ export const ServiceCatalogPage: React.FC = () => {
   };
 
   const handleDelete = async (srv: ServiceCatalogItem) => {
-    if (!window.confirm(`Are you sure you want to delete service "${srv.name}"?`)) return;
+    if (!window.confirm(`Are you sure you want to move service "${srv.name}" to the Recycle Bin? (It will be kept for 60 days)`)) return;
     try {
       await catalogService.deleteService(srv._id);
       setServices((prev) => prev.filter((item) => item._id !== srv._id));
-      showToast(`Service "${srv.name}" deleted successfully`);
+      queryClient.invalidateQueries({ queryKey: ['recycleBinCount'] });
+      queryClient.invalidateQueries({ queryKey: ['recycleBinItems'] });
+      showToast(`Service "${srv.name}" moved to Recycle Bin`);
     } catch (err) {
       console.error('Failed to delete service:', err);
       alert('Failed to delete service');

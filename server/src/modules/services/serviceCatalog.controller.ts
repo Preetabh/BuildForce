@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { ServiceCatalog } from '../../models/ServiceCatalog';
+import { RecycleBinService } from '../recycleBin/recycleBin.service';
 
 export const DEFAULT_SERVICES = [
   'Floor Plan Design',
@@ -42,7 +43,7 @@ export class ServiceCatalogController {
         await ServiceCatalog.insertMany(seedDocs);
       }
 
-      const query: any = { companyId: compId };
+      const query: any = { companyId: compId, isDeleted: { $ne: true } };
       if (activeOnly) {
         query.isActive = true;
       }
@@ -71,14 +72,32 @@ export class ServiceCatalogController {
 
       const compId = new mongoose.Types.ObjectId(companyId);
 
-      // Check if already exists
+      // Check if already exists among active services
       const existing = await ServiceCatalog.findOne({
         companyId: compId,
         name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
+        isDeleted: { $ne: true },
       });
 
       if (existing) {
         return res.status(400).json({ success: false, message: 'A service with this name already exists' });
+      }
+
+      // If exists but was soft-deleted, revive it
+      const softDeleted = await ServiceCatalog.findOne({
+        companyId: compId,
+        name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
+        isDeleted: true,
+      });
+
+      if (softDeleted) {
+        softDeleted.isDeleted = false;
+        softDeleted.deletedAt = undefined;
+        softDeleted.deletedBy = undefined;
+        softDeleted.description = description?.trim() || softDeleted.description || '';
+        softDeleted.isActive = isActive !== undefined ? Boolean(isActive) : true;
+        await softDeleted.save();
+        return res.status(201).json({ success: true, message: 'Service restored successfully', data: softDeleted });
       }
 
       const count = await ServiceCatalog.countDocuments({ companyId: compId });
@@ -113,7 +132,7 @@ export class ServiceCatalogController {
       if (isActive !== undefined) updateData.isActive = Boolean(isActive);
       if (sortOrder !== undefined) updateData.sortOrder = Number(sortOrder);
 
-      const query: any = { _id: new mongoose.Types.ObjectId(id) };
+      const query: any = { _id: new mongoose.Types.ObjectId(id), isDeleted: { $ne: true } };
       if (companyId) {
         query.companyId = new mongoose.Types.ObjectId(companyId);
       }
@@ -131,13 +150,13 @@ export class ServiceCatalogController {
 
   /**
    * Toggle service active status
-      */
-      static async toggleService(req: Request, res: Response, next: NextFunction) {
-        try {
+   */
+  static async toggleService(req: Request, res: Response, next: NextFunction) {
+    try {
       const companyId = req.user?.companyId;
       const { id } = req.params;
 
-      const query: any = { _id: new mongoose.Types.ObjectId(id) };
+      const query: any = { _id: new mongoose.Types.ObjectId(id), isDeleted: { $ne: true } };
       if (companyId) {
         query.companyId = new mongoose.Types.ObjectId(companyId);
       }
@@ -161,24 +180,45 @@ export class ServiceCatalogController {
   }
 
   /**
-   * Delete service
+   * Delete service (Soft-delete to 60-day Recycle Bin)
    */
   static async deleteService(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user?.companyId;
       const { id } = req.params;
 
-      const query: any = { _id: new mongoose.Types.ObjectId(id) };
+      const query: any = { _id: new mongoose.Types.ObjectId(id), isDeleted: { $ne: true } };
       if (companyId) {
         query.companyId = new mongoose.Types.ObjectId(companyId);
       }
 
-      const deleted = await ServiceCatalog.findOneAndDelete(query);
-      if (!deleted) {
+      const service = await ServiceCatalog.findOne(query);
+      if (!service) {
         return res.status(404).json({ success: false, message: 'Service not found' });
       }
 
-      return res.status(200).json({ success: true, message: 'Service removed successfully' });
+      service.isDeleted = true;
+      service.deletedAt = new Date();
+      service.isActive = false;
+      if (req.user?.userId && mongoose.Types.ObjectId.isValid(req.user.userId)) {
+        service.deletedBy = new mongoose.Types.ObjectId(req.user.userId);
+      }
+      await service.save();
+
+      // Move to 60-day Recycle Bin
+      await RecycleBinService.moveToRecycleBin({
+        companyId: service.companyId,
+        entityType: 'Service',
+        originalId: service._id,
+        title: service.name,
+        code: `SRV-${service.sortOrder || 1}`,
+        subtitle: service.description || 'Service Catalog Item',
+        data: service.toObject(),
+        deletedBy: req.user?.userId,
+        deletedByName: req.user?.name || 'Admin',
+      });
+
+      return res.status(200).json({ success: true, message: `Service "${service.name}" moved to Recycle Bin` });
     } catch (error) {
       next(error);
     }

@@ -14,6 +14,9 @@ export interface IUser extends Document {
   projectsCount?: number;
   permissions?: Record<string, boolean>; // Granular menu/feature allow/decline flags
   isActive: boolean;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -72,6 +75,20 @@ const userSchema = new Schema<IUser>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
   },
   {

@@ -72,4 +72,8 @@ router.use('/daily-reports', dailyReportRoutes);
 import notificationRoutes from '../modules/notifications/notification.routes';
 router.use('/notifications', notificationRoutes);
 
+// Universal 60-Day Recycle Bin Routes
+import recycleBinRoutes from '../modules/recycleBin/recycleBin.routes';
+router.use('/recycle-bin', recycleBinRoutes);
+
 export default router;

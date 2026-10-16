@@ -5,6 +5,7 @@ import { Project } from '../../models/Project';
 import { DailySiteReport } from '../../models/DailySiteReport';
 import { Notification } from '../../models/Notification';
 import { AppError } from '../../middleware/error.middleware';
+import { RecycleBinService } from '../recycleBin/recycleBin.service';
 import bcrypt from 'bcryptjs';
 
 export class SiteEngineerService {
@@ -14,7 +15,7 @@ export class SiteEngineerService {
 
   public static async getSiteEngineers(companyIdInput: string | Types.ObjectId) {
     const companyId = this.toObjectId(companyIdInput);
-    const engineers = await SiteEngineer.find({ companyId })
+    const engineers = await SiteEngineer.find({ companyId, isDeleted: { $ne: true } })
       .populate('assignedProjectIds', 'name code location status progress clientName')
       .sort({ createdAt: -1 })
       .lean();
@@ -69,6 +70,7 @@ export class SiteEngineerService {
 
     const engineer = await SiteEngineer.findOne({
       companyId,
+      isDeleted: { $ne: true },
       $or: orConditions,
     })
       .populate('assignedProjectIds', 'name code location status progress clientName')
@@ -80,7 +82,7 @@ export class SiteEngineerService {
 
   public static async getSiteEngineerById(companyIdInput: string | Types.ObjectId, id: string) {
     const companyId = this.toObjectId(companyIdInput);
-    const engineer = await SiteEngineer.findOne({ _id: id, companyId })
+    const engineer = await SiteEngineer.findOne({ _id: id, companyId, isDeleted: { $ne: true } })
       .populate('assignedProjectIds', 'name code location status progress clientName')
       .lean();
     if (!engineer) throw new AppError('Site engineer not found', 404);
@@ -309,25 +311,45 @@ export class SiteEngineerService {
     return engineer;
   }
 
-  public static async deleteSiteEngineer(companyIdInput: string | Types.ObjectId, id: string) {
+  public static async deleteSiteEngineer(
+    companyIdInput: string | Types.ObjectId,
+    id: string,
+    deletedBy?: string,
+    deletedByName?: string
+  ) {
     const companyId = this.toObjectId(companyIdInput);
-    const res = await SiteEngineer.findOneAndDelete({ _id: id, companyId });
-    if (!res) throw new AppError('Site engineer not found', 404);
+    const engineer = await SiteEngineer.findOne({ _id: id, companyId, isDeleted: { $ne: true } });
+    if (!engineer) throw new AppError('Site engineer not found', 404);
 
-    // Remove engineer from all projects
-    await Project.updateMany(
-      { companyId, assignedEngineers: res._id },
-      { $pull: { assignedEngineers: res._id } }
-    );
+    engineer.isDeleted = true;
+    engineer.deletedAt = new Date();
+    if (deletedBy && Types.ObjectId.isValid(deletedBy)) {
+      engineer.deletedBy = new Types.ObjectId(deletedBy);
+    }
+    engineer.status = 'Inactive';
+    await engineer.save();
 
-    // Delete associated User account
-    if (res.loginId) {
-      await User.deleteOne({
-        email: res.loginId.toLowerCase().trim(),
-        role: 'SITE_ENGINEER',
-      });
+    // Deactivate associated User account (do NOT delete so it can be restored)
+    if (engineer.loginId) {
+      await User.updateOne(
+        { email: engineer.loginId.toLowerCase().trim() },
+        { $set: { isActive: false } }
+      );
     }
 
-    return { success: true };
+    // Move to Recycle Bin (60-day safe retention)
+    await RecycleBinService.moveToRecycleBin({
+      companyId,
+      entityType: 'SiteEngineer',
+      originalId: engineer._id,
+      title: engineer.name,
+      code: engineer.loginId,
+      subtitle: `Mobile: ${engineer.mobile || '-'} • Assigned Sites: ${engineer.projectsCount || 0}`,
+      data: engineer.toObject(),
+      deletedBy,
+      deletedByName: deletedByName || 'Admin',
+    });
+
+    return { success: true, message: `Engineer "${engineer.name}" moved to Recycle Bin` };
   }
 }

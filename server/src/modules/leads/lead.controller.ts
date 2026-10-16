@@ -149,8 +149,8 @@ export class LeadController {
   static async deleteLead(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      await LeadService.deleteLead(companyId, req.params.id);
-      res.status(200).json({ success: true, message: 'Lead deleted successfully' });
+      await LeadService.deleteLead(companyId, req.params.id, req.user?.userId, req.user?.name);
+      res.status(200).json({ success: true, message: 'Lead moved to Recycle Bin' });
     } catch (error) {
       next(error);
     }
@@ -362,8 +362,8 @@ export class LeadController {
   static async deleteClient(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      await LeadService.deleteClient(companyId, req.params.id);
-      res.status(200).json({ success: true, message: 'Client deleted successfully' });
+      await LeadService.deleteClient(companyId, req.params.id, req.user?.userId, req.user?.name);
+      res.status(200).json({ success: true, message: 'Client moved to Recycle Bin' });
     } catch (error) {
       next(error);
     }
@@ -483,8 +483,8 @@ export class LeadController {
   static async deletePartner(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = req.user!.companyId;
-      await LeadService.deletePartner(companyId, req.params.id);
-      res.status(200).json({ success: true, message: 'Partner deleted successfully' });
+      await LeadService.deletePartner(companyId, req.params.id, req.user?.userId, req.user?.name);
+      res.status(200).json({ success: true, message: 'Partner moved to Recycle Bin' });
     } catch (error) {
       next(error);
     }

@@ -125,6 +125,8 @@ export const UserManagement: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rbacUsers'] });
       queryClient.invalidateQueries({ queryKey: ['siteEngineers'] });
+      queryClient.invalidateQueries({ queryKey: ['recycleBinCount'] });
+      queryClient.invalidateQueries({ queryKey: ['recycleBinItems'] });
     },
   });
 

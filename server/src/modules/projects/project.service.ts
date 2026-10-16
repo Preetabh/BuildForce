@@ -7,6 +7,8 @@ import { AppError } from '../../middleware/error.middleware';
 import { CreateProjectInput, UpdateProjectInput, ProjectQueryInput } from './project.validation';
 import { ProjectStats } from './project.types';
 import { AuditService } from '../audit/audit.service';
+import { RecycleBinService } from '../recycleBin/recycleBin.service';
+import { RecycleBinItem } from '../../models/RecycleBinItem';
 
 export class ProjectService {
   public static async getProjects(companyId: string, query: ProjectQueryInput, authUser?: AuthUser) {
@@ -544,6 +546,19 @@ export class ProjectService {
     project.deletedBy = new Types.ObjectId(userId);
     await project.save();
 
+    // Sync with centralized 60-day Recycle Bin
+    await RecycleBinService.moveToRecycleBin({
+      companyId,
+      entityType: 'Project',
+      originalId: project._id,
+      title: project.name,
+      code: project.code,
+      subtitle: `Client: ${project.clientName || '-'} • Value: ₹${(project.contractValue || project.estimatedValue || 0).toLocaleString()}`,
+      data: project.toObject(),
+      deletedBy: userId,
+      deletedByName: 'Admin',
+    });
+
     await AuditService.log({
       companyId,
       userId,
@@ -574,7 +589,6 @@ export class ProjectService {
       deletedAt: { $ne: null },
     });
 
-    
     if (!project) {
       throw new AppError('Project not found in Recycle Bin', 404);
     }
@@ -582,6 +596,12 @@ export class ProjectService {
     project.deletedAt = null;
     project.deletedBy = null;
     await project.save();
+
+    // Mark as restored in RecycleBinItem
+    await RecycleBinItem.updateOne(
+      { originalId: project._id, companyId: new Types.ObjectId(companyId) },
+      { $set: { status: 'restored', restoredAt: new Date() } }
+    );
 
     await AuditService.log({
       companyId,

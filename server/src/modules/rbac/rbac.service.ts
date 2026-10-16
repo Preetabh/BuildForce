@@ -4,6 +4,7 @@ import { RbacRole, IRbacRole } from '../../models/RbacRole';
 import { User, IUser } from '../../models/User';
 import { SiteEngineer } from '../../models/SiteEngineer';
 import { AppError } from '../../middleware/error.middleware';
+import { RecycleBinService } from '../recycleBin/recycleBin.service';
 import bcrypt from 'bcryptjs';
 
 export class RbacService {
@@ -393,7 +394,7 @@ export class RbacService {
   // User & Role Vs User Management
   public static async getUsers(companyIdInput: string | Types.ObjectId) {
     const companyId = this.toObjectId(companyIdInput);
-    const users = await User.find({ companyId })
+    const users = await User.find({ companyId, isDeleted: { $ne: true } })
       .select('-passwordHash')
       .sort({ createdAt: -1 })
       .lean();
@@ -524,15 +525,49 @@ export class RbacService {
     return userObj;
   }
 
-  public static async deleteUser(companyIdInput: string | Types.ObjectId, userId: string) {
+  public static async deleteUser(
+    companyIdInput: string | Types.ObjectId,
+    userId: string,
+    deletedBy?: string,
+    deletedByName?: string
+  ) {
     const companyId = this.toObjectId(companyIdInput);
-    const user = await User.findOneAndDelete({ _id: userId, companyId });
+    const user = await User.findOne({ _id: userId, companyId, isDeleted: { $ne: true } });
     if (!user) throw new AppError('User not found', 404);
 
-    if (user.role === 'SITE_ENGINEER') {
-      await SiteEngineer.deleteOne({ loginId: user.email.toLowerCase().trim(), companyId });
+    if (user.role === 'SUPER_ADMIN') {
+      throw new AppError('Super Admin cannot be deleted', 400);
     }
 
-    return { success: true };
+    user.isDeleted = true;
+    user.deletedAt = new Date();
+    user.isActive = false;
+    if (deletedBy && Types.ObjectId.isValid(deletedBy)) {
+      user.deletedBy = new Types.ObjectId(deletedBy);
+    }
+    await user.save();
+
+    // If site engineer, soft-delete site engineer record as well
+    if (user.role === 'SITE_ENGINEER') {
+      await SiteEngineer.updateOne(
+        { loginId: user.email.toLowerCase().trim(), companyId },
+        { $set: { isDeleted: true, deletedAt: new Date(), status: 'Inactive' } }
+      );
+    }
+
+    // Move to Recycle Bin (60-day safe retention)
+    await RecycleBinService.moveToRecycleBin({
+      companyId,
+      entityType: 'User',
+      originalId: user._id,
+      title: user.name,
+      code: user.email,
+      subtitle: `Role: ${user.role} • Mobile: ${user.mobile || '-'}`,
+      data: user.toObject(),
+      deletedBy,
+      deletedByName: deletedByName || 'Admin',
+    });
+
+    return { success: true, message: `User "${user.name}" moved to Recycle Bin` };
   }
 }

@@ -296,7 +296,7 @@ export class RbacController {
     try {
       const companyId = req.user!.companyId;
       const { userId } = req.params;
-      const result = await RbacService.deleteUser(companyId, userId);
+      const result = await RbacService.deleteUser(companyId, userId, req.user?.userId, req.user?.name);
       await AuditService.log({
         companyId,
         userId: req.user!.userId,

@@ -9,6 +9,7 @@ import { Company } from '../../models/Company';
 import { SiteEngineer } from '../../models/SiteEngineer';
 import { Notification } from '../../models/Notification';
 import { CommissionService } from './commission.service';
+import { RecycleBinService } from '../recycleBin/recycleBin.service';
 
 export interface LeadFilterParams {
   search?: string;
@@ -35,7 +36,10 @@ export class LeadService {
    * Fetch leads with full filter, user-scoped lead management, and pagination support
    */
   static async getLeads(companyId: string, params: LeadFilterParams) {
-    const andConditions: any[] = [{ companyId: new mongoose.Types.ObjectId(companyId) }];
+    const andConditions: any[] = [
+      { companyId: new mongoose.Types.ObjectId(companyId) },
+      { isDeleted: { $ne: true } },
+    ];
 
     // 1. Status mode (Active / NonDead / Dead / Converted / All)
     if (params.statusMode === 'Dead') {
@@ -278,6 +282,7 @@ export class LeadService {
         hasUserFilter
           ? {
               companyId: compId,
+              isDeleted: { $ne: true },
               isDead: false,
               isRegisteredClient: { $ne: true },
               stage: { $ne: 'Client' },
@@ -285,6 +290,7 @@ export class LeadService {
             }
           : {
               companyId: compId,
+              isDeleted: { $ne: true },
               isDead: false,
               isRegisteredClient: { $ne: true },
               stage: { $ne: 'Client' },
@@ -294,11 +300,13 @@ export class LeadService {
         hasUserFilter
           ? {
               companyId: compId,
+              isDeleted: { $ne: true },
               isDead: true,
               $or: userOrConditions,
             }
           : {
               companyId: compId,
+              isDeleted: { $ne: true },
               isDead: true,
             }
       ),
@@ -306,6 +314,7 @@ export class LeadService {
         hasUserFilter
           ? {
               companyId: compId,
+              isDeleted: { $ne: true },
               $and: [
                 { $or: userOrConditions },
                 { $or: [{ stage: 'Client' }, { isRegisteredClient: true }] },
@@ -313,6 +322,7 @@ export class LeadService {
             }
           : {
               companyId: compId,
+              isDeleted: { $ne: true },
               $or: [{ stage: 'Client' }, { isRegisteredClient: true }],
             }
       ),
@@ -320,6 +330,7 @@ export class LeadService {
         hasUserFilter
           ? {
               companyId: compId,
+              isDeleted: { $ne: true },
               isDead: false,
               isRegisteredClient: { $ne: true },
               stage: { $ne: 'Client' },
@@ -328,6 +339,7 @@ export class LeadService {
             }
           : {
               companyId: compId,
+              isDeleted: { $ne: true },
               isDead: false,
               isRegisteredClient: { $ne: true },
               stage: { $ne: 'Client' },
@@ -356,6 +368,7 @@ export class LeadService {
     const query: any = {
       _id: new mongoose.Types.ObjectId(leadId),
       companyId: new mongoose.Types.ObjectId(companyId),
+      isDeleted: { $ne: true },
     };
 
     if (filterUser) {
@@ -506,14 +519,36 @@ export class LeadService {
   }
 
   /**
-   * Delete single lead
+   * Delete single lead (Soft-delete to Recycle Bin)
    */
-  static async deleteLead(companyId: string, leadId: string) {
-    const res = await Lead.deleteOne({
+  static async deleteLead(companyId: string, leadId: string, deletedBy?: string, deletedByName?: string) {
+    const lead = await Lead.findOne({
       _id: new mongoose.Types.ObjectId(leadId),
       companyId: new mongoose.Types.ObjectId(companyId),
+      isDeleted: { $ne: true },
     });
-    return res;
+    if (!lead) throw new Error('Lead not found');
+
+    lead.isDeleted = true;
+    lead.deletedAt = new Date();
+    if (deletedBy && mongoose.Types.ObjectId.isValid(deletedBy)) {
+      lead.deletedBy = new mongoose.Types.ObjectId(deletedBy);
+    }
+    await lead.save();
+
+    await RecycleBinService.moveToRecycleBin({
+      companyId,
+      entityType: 'Lead',
+      originalId: lead._id,
+      title: lead.clientName,
+      code: lead.leadCode,
+      subtitle: `Mobile: ${lead.mobile1 || '-'} • Service: ${lead.requirements?.join(', ') || '-'}`,
+      data: lead.toObject(),
+      deletedBy,
+      deletedByName: deletedByName || 'Admin',
+    });
+
+    return { success: true, message: `Lead "${lead.clientName}" moved to Recycle Bin` };
   }
 
   /**
@@ -889,7 +924,10 @@ export class LeadService {
     } = {}
   ) {
     const compId = new mongoose.Types.ObjectId(companyId);
-    const andConditions: any[] = [{ companyId: compId }];
+    const andConditions: any[] = [
+      { companyId: compId },
+      { isDeleted: { $ne: true } },
+    ];
 
     // Dead / NonDead filter
     if (query.statusMode === 'Dead') {
@@ -1028,6 +1066,7 @@ export class LeadService {
     const andConditions: any[] = [
       { _id: new mongoose.Types.ObjectId(id) },
       { companyId: compId },
+      { isDeleted: { $ne: true } },
     ];
 
     if (filterUser) {
@@ -1536,14 +1575,37 @@ export class LeadService {
   }
 
   /**
-   * Delete Client
+   * Delete Client (Soft-delete to Recycle Bin)
    */
-  static async deleteClient(companyId: string, id: string) {
-    const res = await ClientAccount.deleteOne({
+  static async deleteClient(companyId: string, id: string, deletedBy?: string, deletedByName?: string) {
+    const client = await ClientAccount.findOne({
       _id: new mongoose.Types.ObjectId(id),
       companyId: new mongoose.Types.ObjectId(companyId),
+      isDeleted: { $ne: true },
     });
-    return res;
+    if (!client) throw new Error('Client not found');
+
+    client.isDeleted = true;
+    client.deletedAt = new Date();
+    if (deletedBy && mongoose.Types.ObjectId.isValid(deletedBy)) {
+      client.deletedBy = new mongoose.Types.ObjectId(deletedBy);
+    }
+    client.status = 'Dead';
+    await client.save();
+
+    await RecycleBinService.moveToRecycleBin({
+      companyId,
+      entityType: 'Client',
+      originalId: client._id,
+      title: client.name,
+      code: client.clientCode,
+      subtitle: `Phone: ${client.phone || '-'} • Site: ${client.siteLocation || '-'} • Agreed: ₹${(client.agreedAmount || 0).toLocaleString()}`,
+      data: client.toObject(),
+      deletedBy,
+      deletedByName: deletedByName || 'Admin',
+    });
+
+    return { success: true, message: `Client "${client.name}" moved to Recycle Bin` };
   }
 
   /**
@@ -2055,21 +2117,47 @@ export class LeadService {
    * Get Reference Partners & stats
    */
   static async getPartners(companyId: string) {
-    const partners = await Partner.find({ companyId: new mongoose.Types.ObjectId(companyId) })
+    const partners = await Partner.find({
+      companyId: new mongoose.Types.ObjectId(companyId),
+      isDeleted: { $ne: true },
+    })
       .sort({ createdAt: -1 })
       .lean();
     return partners;
   }
 
   /**
-   * Delete Partner
+   * Delete Partner (Soft-delete to Recycle Bin)
    */
-  static async deletePartner(companyId: string, partnerId: string) {
-    const res = await Partner.deleteOne({
+  static async deletePartner(companyId: string, partnerId: string, deletedBy?: string, deletedByName?: string) {
+    const partner = await Partner.findOne({
       _id: new mongoose.Types.ObjectId(partnerId),
       companyId: new mongoose.Types.ObjectId(companyId),
+      isDeleted: { $ne: true },
     });
-    return res;
+    if (!partner) throw new Error('Partner not found');
+
+    partner.isDeleted = true;
+    partner.deletedAt = new Date();
+    if (deletedBy && mongoose.Types.ObjectId.isValid(deletedBy)) {
+      partner.deletedBy = new mongoose.Types.ObjectId(deletedBy);
+    }
+    partner.status = 'INACTIVE';
+    await partner.save();
+
+    await RecycleBinService.moveToRecycleBin({
+      companyId,
+      entityType: 'Partner',
+      originalId: partner._id,
+      title: partner.name,
+      code: partner.phone,
+      subtitle: `Type: ${partner.partnerType || '-'} • Leads: ${partner.totalLeadsReferred || 0}`,
+      data: partner.toObject(),
+      deletedBy,
+      deletedByName: deletedByName || 'Admin',
+    });
+
+    return { success: true, message: `Partner "${partner.name}" moved to Recycle Bin` };
   }
 
   /**

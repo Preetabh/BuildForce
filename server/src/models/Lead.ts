@@ -71,6 +71,9 @@ export interface ILead extends Document {
   convertedClientId?: mongoose.Types.ObjectId;
   notes?: string;
   createdBy?: mongoose.Types.ObjectId;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -281,6 +284,20 @@ const leadSchema = new Schema<ILead>(
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
   },
   {
