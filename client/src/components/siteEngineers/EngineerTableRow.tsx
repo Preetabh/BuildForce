@@ -6,7 +6,6 @@ import {
   UserX,
   Eye,
   Trash2,
-  Building2,
   Calendar,
   Phone,
   Mail,
@@ -43,10 +42,6 @@ export const EngineerTableRow: React.FC<EngineerTableRowProps> = ({
       return 'Never reported';
     }
   };
-
-  const assignedSites = Array.isArray(engineer.assignedProjectIds)
-    ? engineer.assignedProjectIds
-    : [];
 
   return (
     <tr className="hover:bg-[#121929]/70 transition-colors text-xs">
