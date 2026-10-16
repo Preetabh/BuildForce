@@ -3,6 +3,7 @@ import { RbacMenu, IRbacMenu } from '../../models/RbacMenu';
 import { RbacRole, IRbacRole } from '../../models/RbacRole';
 import { User, IUser } from '../../models/User';
 import { SiteEngineer } from '../../models/SiteEngineer';
+import { RecycleBinItem } from '../../models/RecycleBinItem';
 import { AppError } from '../../middleware/error.middleware';
 import { RecycleBinService } from '../recycleBin/recycleBin.service';
 import bcrypt from 'bcryptjs';
